@@ -206,7 +206,7 @@ test.describe('API Endpoints', () => {
     // POST creates an API key (returns 201)
     const res = await request.post(`${BASE}/api/admin/api-keys`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { name: 'test-key' }
+      data: { name: `test-key-${Date.now()}` }
     });
     expect(res.status()).toBe(201);
   });
