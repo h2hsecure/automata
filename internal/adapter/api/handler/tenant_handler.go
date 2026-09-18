@@ -57,7 +57,7 @@ func (h *TenantHandler) Create(c *gin.Context) {
 	t := &tenant.Tenant{
 		Slug:     strings.ToLower(req.Slug),
 		Name:     req.Name,
-		Domain:   req.Domain,
+		Domain:   &req.Domain,
 		Settings: req.Settings,
 	}
 
@@ -109,7 +109,7 @@ func (h *TenantHandler) Update(c *gin.Context) {
 		existing.Name = req.Name
 	}
 	if req.Domain != "" {
-		existing.Domain = req.Domain
+		existing.Domain = &req.Domain
 	}
 	if req.IsActive != nil {
 		existing.IsActive = *req.IsActive

@@ -2,12 +2,13 @@ services:
   automata:
     build: .
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - AUTOMATA_DATABASE_HOST=postgres
       - AUTOMATA_DATABASE_NAME=automata
       - AUTOMATA_DATABASE_USER=automata
       - AUTOMATA_DATABASE_PASSWORD=changeme
+      - WEB_DIR=/root/web
     depends_on:
       postgres:
         condition: service_healthy

@@ -8,24 +8,22 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/domain/tenant"
 )
-
-// Proxy represents the reverse proxy router for tenant content routing.
 type Proxy struct {
 	tenantRepo tenant.Repository
 }
 
 // NewProxy creates a Gin router group for tenant content routing.
-func NewProxy(tenantRepo tenant.Repository, engine *gin.Engine) *Proxy {
+func NewProxy(tenantRepo tenant.Repository, router gin.IRouter) *Proxy {
 	p := &Proxy{tenantRepo: tenantRepo}
 
 	// Form rendering: /form/<slug>
-	engine.GET("/form/*path", p.formHandler())
+	router.GET("/form/*path", p.formHandler())
 
 	// Snippet serving: /snippet/<tenant-id>.js
-	engine.GET("/snippet/*path", p.snippetHandler())
+	router.GET("/snippet/*path", p.snippetHandler())
 
 	// Static assets: /static/*path
-	engine.StaticFS("/static", http.Dir("./static"))
+	router.StaticFS("/static", http.Dir("./static"))
 
 	return p
 }

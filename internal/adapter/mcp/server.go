@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 
+	"github.com/hekemen/automata/internal/domain/contact"
 	"github.com/hekemen/automata/internal/domain/tenant"
 )
 
@@ -15,14 +16,16 @@ type Tool struct {
 
 // Server is the MCP server that exposes tools for AI integration.
 type Server struct {
-	tenantRepo tenant.Repository
-	tools      []*Tool
+	tenantRepo   tenant.Repository
+	contactRepo  contact.Repository
+	tools        []*Tool
 }
 
 // NewServer creates a new MCP server.
-func NewServer(tenantRepo tenant.Repository) *Server {
-	s := &Server{tenantRepo: tenantRepo}
+func NewServer(tenantRepo tenant.Repository, contactRepo contact.Repository) *Server {
+	s := &Server{tenantRepo: tenantRepo, contactRepo: contactRepo}
 	s.registerBaseTools()
+	s.registerContactTools()
 	return s
 }
 
@@ -48,11 +51,15 @@ func (s *Server) registerBaseTools() {
 		}
 		result := make([]map[string]interface{}, 0, len(tenants))
 		for _, t := range tenants {
+			domain := ""
+			if t.Domain != nil {
+				domain = *t.Domain
+			}
 			result = append(result, map[string]interface{}{
 				"id":        t.ID,
 				"slug":      t.Slug,
 				"name":      t.Name,
-				"domain":    t.Domain,
+				"domain":    domain,
 				"is_active": t.IsActive,
 			})
 		}

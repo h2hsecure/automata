@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/adapter/api"
 	"github.com/hekemen/automata/internal/infrastructure/auth"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
@@ -20,9 +21,15 @@ import (
 
 func main() {
 	// Load configuration
-	if err := config.Load("config.yaml"); err != nil {
-		log.Warn().Err(err).Msg("failed to load config, using defaults")
+	configPath := os.Getenv("CONFIG_FILE")
+	if configPath == "" {
+		configPath = "config.yaml"
 	}
+	if err := config.Load(configPath); err != nil {
+		log.Warn().Err(err).Str("path", configPath).Msg("failed to load config, using defaults")
+	}
+
+	log.Info().Str("db_host", config.Get("database.host")).Msg("loaded config")
 
 	// Initialize database
 	pool, err := database.NewPool()
@@ -35,6 +42,11 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to run migrations")
 	}
 
+	// Verify database connection
+	var tenantCount int
+	pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tenants").Scan(&tenantCount)
+	log.Info().Int("tenants", tenantCount).Msg("database connected")
+
 	// Initialize repositories
 	tenantRepo := tenant_repo.NewPostgresRepo(pool)
 	userRepo := tenant_repo.NewUserPostgresRepo(pool)
@@ -43,8 +55,18 @@ func main() {
 	// Initialize auth service
 	authService := auth.NewService(userRepo)
 
-	// Initialize API server
-	server := api.NewServer(tenantRepo, userRepo, authService, apiKeyRepo)
+	// Create Gin engine
+	engine := gin.Default()
+
+	// Register API routes under /api
+	api.NewServer(engine, tenantRepo, userRepo, authService, apiKeyRepo, "/api")
+
+	// Serve static UI files at root
+	webDir := os.Getenv("WEB_DIR")
+	if webDir == "" {
+		webDir = "./web"
+	}
+	api.ServeStatic(engine, webDir)
 
 	// Start server
 	host := config.Get("server.host")
@@ -72,7 +94,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: server,
+		Handler: engine,
 	}
 
 	go func() {

@@ -12,7 +12,7 @@ type Tenant struct {
 	ID        string
 	Slug      string
 	Name      string
-	Domain    string
+	Domain    *string
 	IsActive  bool
 	Settings  map[string]interface{}
 	CreatedAt time.Time

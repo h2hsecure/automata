@@ -88,7 +88,7 @@ func (r *postgresRepo) GetBySlug(slug string) (*tenant.Tenant, error) {
 		&settingsBytes, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get tenant by slug: %w", err)
+		return nil, fmt.Errorf("get tenant by slug: %w (slug=%s, err_detail=%v)", err, slug, err)
 	}
 
 	if len(settingsBytes) > 0 {

@@ -25,7 +25,10 @@ func TenantResolver(tenantRepo tenant.Repository) gin.HandlerFunc {
 		// Skip tenant resolution for admin API routes
 		if strings.HasPrefix(c.Request.URL.Path, "/admin") ||
 			strings.HasPrefix(c.Request.URL.Path, "/auth") ||
-			c.Request.URL.Path == "/health" {
+			strings.HasPrefix(c.Request.URL.Path, "/api/auth") ||
+			strings.HasPrefix(c.Request.URL.Path, "/api/admin") ||
+			c.Request.URL.Path == "/health" ||
+			strings.HasPrefix(c.Request.URL.Path, "/api/health") {
 			c.Next()
 			return
 		}

@@ -1,0 +1,8 @@
+- create a webui for this project.
+- vue3 + shdn vue components.
+- basic login page.
+- BFF implementation.
+- run in differe server.
+- allow the admin user to see all endpoints including; contacts, forms, banners, email templates etc.
+- for template management place pre configured templates.
+- it must be run fast.

@@ -9,6 +9,7 @@ import (
 	domainauth "github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/tenant"
 	"github.com/hekemen/automata/internal/infrastructure/config"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -36,7 +37,7 @@ func (s *service) ComparePassword(hash, password string) error {
 }
 
 // Login authenticates a user by email and password, returns a JWT token.
-func (s *service) Login(email, password, tenantSlug string) (string, string, error) {
+func (s *service) Login(email, password, tenantID string) (string, string, error) {
 	secretKey := config.Get("auth.secret_key")
 	if secretKey == "" {
 		secretKey = "automata-dev-secret-key-change-in-production"
@@ -47,7 +48,7 @@ func (s *service) Login(email, password, tenantSlug string) (string, string, err
 		return "", "", fmt.Errorf("user repository not initialized")
 	}
 
-	user, err := s.userRepo.GetByEmail(tenantSlug, email)
+	user, err := s.userRepo.GetByEmail(tenantID, email)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid email or password")
 	}
@@ -58,13 +59,14 @@ func (s *service) Login(email, password, tenantSlug string) (string, string, err
 
 	// Generate JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":    user.ID,
-		"tenant_slug": tenantSlug,
-		"exp":        time.Now().Add(24 * time.Hour).Unix(),
+		"user_id":     user.ID,
+		"tenant_slug": user.TenantID,
+		"exp":         time.Now().Add(24 * time.Hour).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(secretKey))
 	if err != nil {
+		log.Error().Err(err).Str("secret_key_prefix", string([]byte(secretKey)[:min(10, len(secretKey))])).Msg("token generation failed")
 		return "", "", fmt.Errorf("generate token: %w", err)
 	}
 

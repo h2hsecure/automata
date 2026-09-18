@@ -9,6 +9,7 @@ FROM alpine:3.20
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 COPY --from=builder /app/automata .
-COPY config.example.yaml .
+COPY config.example.yaml config.yaml
+COPY web/ web/
 EXPOSE 8080
 CMD ["./automata"]

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/rs/zerolog/log"
 )
 
@@ -23,22 +24,29 @@ type jobRow struct {
 
 // StartWorker polls for pending jobs and processes them.
 func (q *emailQueue) StartWorker(ctx context.Context, mailer Mailer) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
 
-	log.Info().Msg("email queue worker started")
+		log.Info().Msg("email queue worker started")
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info().Msg("email queue worker stopped")
-			return
-		case <-ticker.C:
-			if err := q.processNextBatch(ctx, mailer); err != nil {
-				log.Error().Err(err).Msg("error processing email batch")
+		for {
+			select {
+			case <-ctx.Done():
+				log.Info().Msg("email queue worker stopped")
+				return
+			case <-ticker.C:
+				if err := q.processNextBatch(ctx, mailer); err != nil {
+					log.Error().Err(err).Msg("error processing email batch")
+				}
 			}
 		}
-	}
+	}()
+}
+
+// StopWorker stops the worker by cancelling its context.
+func (q *emailQueue) StopWorker(cancel context.CancelFunc) {
+	cancel()
 }
 
 func (q *emailQueue) processNextBatch(ctx context.Context, mailer Mailer) error {
@@ -60,26 +68,18 @@ func (q *emailQueue) processNextBatch(ctx context.Context, mailer Mailer) error 
 	var jobs []jobRow
 	for rows.Next() {
 		j := jobRow{}
-		var toStr string
-		err := rows.Scan(&j.id, &j.tenantID, &toStr, &j.subject, &j.body, &j.htmlBody, &j.attempts, &j.maxRetries, &j.createdAt)
+		var toAddresses pgtype.Array[string]
+		err := rows.Scan(&j.id, &j.tenantID, &toAddresses, &j.subject, &j.body, &j.htmlBody, &j.attempts, &j.maxRetries, &j.createdAt)
 		if err != nil {
 			return fmt.Errorf("scan job: %w", err)
 		}
 
-		// Parse to_addresses from PostgreSQL array format {a,b,c}
-		toStr = strings.Trim(toStr, "{}")
+		// Parse to_addresses from PostgreSQL array format
 		var to []string
-		if toStr != "" {
-			parts := strings.Split(toStr, ",")
-			for _, p := range parts {
-				p = strings.Trim(p, "\"")
-				if p != "" {
-					to = append(to, p)
-				}
-			}
+		if toAddresses.Valid && len(toAddresses.Elements) > 0 {
+			to = toAddresses.Elements
 		}
-		j.toStr = toStr
-		j.toStr = toStr
+		j.toStr = strings.Join(to, ",")
 
 		jobs = append(jobs, j)
 	}

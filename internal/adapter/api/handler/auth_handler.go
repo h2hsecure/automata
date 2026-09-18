@@ -9,6 +9,7 @@ import (
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/tenant"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
+	"github.com/rs/zerolog/log"
 )
 
 type AuthHandler struct {
@@ -40,9 +41,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	log.Info().Str("tenant_slug", req.Tenant).Msg("login attempt")
+
 	t, err := h.tenantRepo.GetBySlug(req.Tenant)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		log.Error().Err(err).Str("tenant_slug", req.Tenant).Msg("tenant lookup failed")
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found", "debug": req.Tenant})
 		return
 	}
 
@@ -57,9 +61,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, _, err := h.authService.Login(req.Email, req.Password, req.Tenant)
+	token, _, err := h.authService.Login(req.Email, req.Password, t.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		log.Error().Err(err).Msg("auth service login failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token", "detail": err.Error()})
 		return
 	}
 
@@ -96,7 +101,7 @@ func (h *AuthHandler) CreateAPIKey(c *gin.Context) {
 		expiresAt = &exp
 	}
 
-	apiKey, err := h.authService.CreateAPIKey(userID, "", req.Name, plaintextKey, expiresAt)
+	apiKey, err := h.authService.CreateAPIKey(userID, c.GetString("tenant_id"), req.Name, plaintextKey, expiresAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
