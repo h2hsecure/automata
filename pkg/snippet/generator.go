@@ -6,14 +6,14 @@ import (
 )
 
 // Generate produces a self-contained JavaScript tracking snippet for the given tenant.
-func Generate(tenantID string, options map[string]interface{}) (string, error) {
+func Generate(tenantID string, trackingURL string, options map[string]interface{}) (string, error) {
 	if tenantID == "" {
 		return "", fmt.Errorf("tenantID required")
 	}
 
-	apiHost, _ := options["apiHost"].(string)
+	apiHost := trackingURL
 	if apiHost == "" {
-		apiHost = "https://api.automata.io"
+		apiHost = "http://localhost:8081"
 	}
 
 	trackEndpoint, _ := options["trackEndpoint"].(string)
@@ -43,8 +43,8 @@ func Generate(tenantID string, options map[string]interface{}) (string, error) {
 }
 
 // GenerateMinified is an alias for Generate that returns the snippet ready for inline use.
-func GenerateMinified(tenantID string, options map[string]interface{}) (string, error) {
-	return Generate(tenantID, options)
+func GenerateMinified(tenantID string, trackingURL string, options map[string]interface{}) (string, error) {
+	return Generate(tenantID, trackingURL, options)
 }
 
 // GenerateBannerSnippet produces a self-contained JavaScript banner snippet for the given tenant.

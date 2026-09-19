@@ -39,7 +39,7 @@ type SubmitFormInput struct {
 }
 
 func (h *FormHandler) List(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
+	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
 		return
@@ -55,7 +55,7 @@ func (h *FormHandler) List(c *gin.Context) {
 }
 
 func (h *FormHandler) Get(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
+	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
 		return
@@ -77,7 +77,7 @@ func (h *FormHandler) Get(c *gin.Context) {
 }
 
 func (h *FormHandler) Create(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
+	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
 		return
@@ -107,7 +107,7 @@ func (h *FormHandler) Create(c *gin.Context) {
 }
 
 func (h *FormHandler) Update(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
+	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
 		return
@@ -139,7 +139,7 @@ func (h *FormHandler) Update(c *gin.Context) {
 }
 
 func (h *FormHandler) Delete(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
+	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
 		return
@@ -169,7 +169,7 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 		input.Data = make(map[string]interface{})
 	}
 
-	tenantID := c.GetString("tenant_id")
+	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
 		return
@@ -194,7 +194,7 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 }
 
 func (h *FormHandler) ListSubmissions(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
+	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
 		return

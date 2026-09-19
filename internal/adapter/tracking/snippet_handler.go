@@ -18,7 +18,7 @@ func (h *SnippetHandler) ServeSnippet(c *gin.Context) {
 		return
 	}
 
-	js, err := snippet.Generate(tenantID, nil)
+	js, err := snippet.Generate(tenantID, "", nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -12,7 +12,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		It("should generate tracking snippet with tenant ID", func() {
 			tenantID := support.NewTestTenantID()
 
-			js, err := snippet.Generate(tenantID, nil)
+			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(ContainSubstring(tenantID))
 			Expect(js).To(ContainSubstring("Automata"))
@@ -21,7 +21,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		It("should generate tracking pixel URL", func() {
 			tenantID := support.NewTestTenantID()
 
-			js, err := snippet.Generate(tenantID, nil)
+			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify snippet contains visitor ID handling
@@ -35,7 +35,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 				"apiHost": "https://custom.example.com",
 			}
 
-			js, err := snippet.Generate(tenantID, options)
+			js, err := snippet.Generate(tenantID, "https://custom.example.com", options)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(ContainSubstring("https://custom.example.com"))
 		})
@@ -47,7 +47,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 				"batchInterval": float64(60),
 			}
 
-			js, err := snippet.Generate(tenantID, options)
+			js, err := snippet.Generate(tenantID, "", options)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(ContainSubstring("50"))
 			Expect(js).To(ContainSubstring("60"))
@@ -56,7 +56,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		It("should verify snippet contains required script tags", func() {
 			tenantID := support.NewTestTenantID()
 
-			js, err := snippet.Generate(tenantID, nil)
+			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify snippet is a valid IIFE
@@ -72,7 +72,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		It("should verify pixel URL includes tenant and visitor IDs", func() {
 			tenantID := support.NewTestTenantID()
 
-			js, err := snippet.Generate(tenantID, nil)
+			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify snippet references tenant ID
@@ -109,7 +109,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		It("should remove leading/trailing whitespace", func() {
 			tenantID := support.NewTestTenantID()
 
-			js, err := snippet.Generate(tenantID, nil)
+			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			sanitized := snippet.Sanitize("  " + js + "  ")
@@ -121,7 +121,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 
 	Describe("Error handling", func() {
 		It("should return error for empty tenant ID", func() {
-			_, err := snippet.Generate("", nil)
+			_, err := snippet.Generate("", "", nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("tenantID required"))
 		})
@@ -137,12 +137,12 @@ var _ = Describe("Snippet Generator Tests", func() {
 		It("should generate minified snippet", func() {
 			tenantID := support.NewTestTenantID()
 
-			js, err := snippet.GenerateMinified(tenantID, nil)
+			js, err := snippet.GenerateMinified(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(ContainSubstring(tenantID))
 
 			// Verify minified is same as regular
-			regular, err := snippet.Generate(tenantID, nil)
+			regular, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(Equal(regular))
 		})

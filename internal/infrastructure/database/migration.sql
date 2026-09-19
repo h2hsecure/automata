@@ -34,3 +34,16 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_tenant_name ON api_keys(tenant_id, name);
+
+-- Admin config: per-tenant key-value settings
+CREATE TABLE IF NOT EXISTS admin_configs (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    key         VARCHAR(128) NOT NULL,
+    value       JSONB NOT NULL DEFAULT '{}',
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(tenant_id, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_configs_tenant ON admin_configs(tenant_id);

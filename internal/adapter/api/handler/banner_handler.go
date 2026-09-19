@@ -21,8 +21,8 @@ func NewBannerHandler(repo bdomain.Repository) *BannerHandler {
 
 // CreateBanner handles POST /api/banners — creates a new banner.
 func (h *BannerHandler) CreateBanner(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -33,7 +33,7 @@ func (h *BannerHandler) CreateBanner(c *gin.Context) {
 		return
 	}
 
-	banner, err := bannerUsecase.NewBannerUsecase(h.repo).CreateBanner(tenant, &req)
+	banner, err := bannerUsecase.NewBannerUsecase(h.repo).CreateBanner(tenantID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -44,8 +44,8 @@ func (h *BannerHandler) CreateBanner(c *gin.Context) {
 
 // UpdateBanner handles PUT /api/banners/:id — updates an existing banner.
 func (h *BannerHandler) UpdateBanner(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -58,7 +58,7 @@ func (h *BannerHandler) UpdateBanner(c *gin.Context) {
 		return
 	}
 
-	banner, err := bannerUsecase.NewBannerUsecase(h.repo).UpdateBanner(tenant, bannerID, &req)
+	banner, err := bannerUsecase.NewBannerUsecase(h.repo).UpdateBanner(tenantID, bannerID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -94,8 +94,8 @@ func (h *BannerHandler) GetBanner(c *gin.Context) {
 
 // ListBanners handles GET /api/banners — lists banners with optional filters.
 func (h *BannerHandler) ListBanners(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -121,7 +121,7 @@ func (h *BannerHandler) ListBanners(c *gin.Context) {
 		}
 	}
 
-	banners, total, err := bannerUsecase.NewBannerUsecase(h.repo).ListBanners(tenant, opts)
+	banners, total, err := bannerUsecase.NewBannerUsecase(h.repo).ListBanners(tenantID, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -145,8 +145,8 @@ func NewPlacementHandler(repo bdomain.Repository) *PlacementHandler {
 
 // CreatePlacement handles POST /api/placements — creates a new placement.
 func (h *PlacementHandler) CreatePlacement(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -157,7 +157,7 @@ func (h *PlacementHandler) CreatePlacement(c *gin.Context) {
 		return
 	}
 
-	placement, err := bannerUsecase.NewBannerUsecase(h.repo).CreatePlacement(tenant, &req)
+	placement, err := bannerUsecase.NewBannerUsecase(h.repo).CreatePlacement(tenantID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -168,8 +168,8 @@ func (h *PlacementHandler) CreatePlacement(c *gin.Context) {
 
 // UpdatePlacement handles PUT /api/placements/:id — updates an existing placement.
 func (h *PlacementHandler) UpdatePlacement(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -182,7 +182,7 @@ func (h *PlacementHandler) UpdatePlacement(c *gin.Context) {
 		return
 	}
 
-	placement, err := bannerUsecase.NewBannerUsecase(h.repo).UpdatePlacement(tenant, placementID, &req)
+	placement, err := bannerUsecase.NewBannerUsecase(h.repo).UpdatePlacement(tenantID, placementID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -218,8 +218,8 @@ func (h *PlacementHandler) GetPlacement(c *gin.Context) {
 
 // ListPlacements handles GET /api/placements — lists placements with optional filters.
 func (h *PlacementHandler) ListPlacements(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -229,7 +229,7 @@ func (h *PlacementHandler) ListPlacements(c *gin.Context) {
 		isActive = true
 	}
 
-	placements, err := bannerUsecase.NewBannerUsecase(h.repo).ListPlacements(tenant, isActive)
+	placements, err := bannerUsecase.NewBannerUsecase(h.repo).ListPlacements(tenantID, isActive)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -252,8 +252,8 @@ func NewCampaignHandler(repo bdomain.Repository) *CampaignHandler {
 
 // CreateCampaign handles POST /api/campaigns — creates a new campaign.
 func (h *CampaignHandler) CreateCampaign(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -264,7 +264,7 @@ func (h *CampaignHandler) CreateCampaign(c *gin.Context) {
 		return
 	}
 
-	campaign, err := bannerUsecase.NewBannerUsecase(h.repo).CreateCampaign(tenant, &req)
+	campaign, err := bannerUsecase.NewBannerUsecase(h.repo).CreateCampaign(tenantID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -275,8 +275,8 @@ func (h *CampaignHandler) CreateCampaign(c *gin.Context) {
 
 // UpdateCampaign handles PUT /api/campaigns/:id — updates an existing campaign.
 func (h *CampaignHandler) UpdateCampaign(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -289,7 +289,7 @@ func (h *CampaignHandler) UpdateCampaign(c *gin.Context) {
 		return
 	}
 
-	campaign, err := bannerUsecase.NewBannerUsecase(h.repo).UpdateCampaign(tenant, campaignID, &req)
+	campaign, err := bannerUsecase.NewBannerUsecase(h.repo).UpdateCampaign(tenantID, campaignID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -325,8 +325,8 @@ func (h *CampaignHandler) GetCampaign(c *gin.Context) {
 
 // ListCampaigns handles GET /api/campaigns — lists campaigns with optional filters.
 func (h *CampaignHandler) ListCampaigns(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
 		return
 	}
@@ -336,7 +336,7 @@ func (h *CampaignHandler) ListCampaigns(c *gin.Context) {
 		isActive = true
 	}
 
-	campaigns, err := bannerUsecase.NewBannerUsecase(h.repo).ListCampaigns(tenant, isActive)
+	campaigns, err := bannerUsecase.NewBannerUsecase(h.repo).ListCampaigns(tenantID, isActive)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

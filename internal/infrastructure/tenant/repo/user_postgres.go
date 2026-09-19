@@ -80,6 +80,38 @@ func (r *userPostgresRepo) GetByEmail(tenantID, email string) (*tenant.User, err
 	return u, nil
 }
 
+func (r *userPostgresRepo) GetByEmailGlobal(email string) ([]*tenant.User, error) {
+	query := `
+		SELECT id, tenant_id, email, password_hash, is_owner, created_at, updated_at
+		FROM tenant_users WHERE email = $1
+	`
+
+	rows, err := r.pool.Query(context.Background(), query, email)
+	if err != nil {
+		return nil, fmt.Errorf("get user by email (global): %w", err)
+	}
+	defer rows.Close()
+
+	var users []*tenant.User
+	for rows.Next() {
+		u := &tenant.User{}
+		err := rows.Scan(
+			&u.ID, &u.TenantID, &u.Email, &u.PasswordHash, &u.IsOwner,
+			&u.CreatedAt, &u.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, u)
+	}
+
+	if len(users) == 0 {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return users, nil
+}
+
 func (r *userPostgresRepo) Update(u *tenant.User) error {
 	query := `
 		UPDATE tenant_users SET email = $1, password_hash = $2, is_owner = $3, updated_at = NOW()

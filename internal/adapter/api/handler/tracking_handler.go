@@ -15,6 +15,11 @@ type TrackingHandler struct {
 	repo tracking.Repository
 }
 
+// NewTrackingHandler creates a new TrackingHandler.
+func NewTrackingHandler(repo tracking.Repository) *TrackingHandler {
+	return &TrackingHandler{repo: repo}
+}
+
 // GetDashboard handles GET /api/tracking/dashboard — returns dashboard metrics.
 func (h *TrackingHandler) GetDashboard(c *gin.Context) {
 	tenant := c.GetString("tenant")

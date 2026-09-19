@@ -12,4 +12,5 @@ COPY --from=builder /app/automata .
 COPY config.example.yaml config.yaml
 COPY web/ web/
 EXPOSE 8080
+EXPOSE 8081
 CMD ["./automata"]

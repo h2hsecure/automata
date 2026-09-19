@@ -22,7 +22,6 @@ type AuthHandler struct {
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
-	Tenant   string `json:"tenant" binding:"required"`
 }
 
 type CreateAPIKeyRequest struct {
@@ -41,38 +40,34 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	log.Info().Str("tenant_slug", req.Tenant).Msg("login attempt")
+	log.Info().Str("email", req.Email).Msg("login attempt")
 
-	t, err := h.tenantRepo.GetBySlug(req.Tenant)
+	token, userID, tenantInfos, err := h.authService.Login(req.Email, req.Password)
 	if err != nil {
-		log.Error().Err(err).Str("tenant_slug", req.Tenant).Msg("tenant lookup failed")
-		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found", "debug": req.Tenant})
-		return
-	}
-
-	u, err := h.userRepo.GetByEmail(t.ID, req.Email)
-	if err != nil {
+		log.Error().Err(err).Str("email", req.Email).Msg("auth service login failed")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
-	if err := h.authService.ComparePassword(u.PasswordHash, req.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
-
-	token, _, err := h.authService.Login(req.Email, req.Password, t.ID)
-	if err != nil {
-		log.Error().Err(err).Msg("auth service login failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token", "detail": err.Error()})
-		return
+	// Fill tenant details from tenantRepo
+	tenants := make([]gin.H, 0, len(tenantInfos))
+	for _, ti := range tenantInfos {
+		t, err := h.tenantRepo.GetByID(ti.ID)
+		if err != nil {
+			continue
+		}
+		tenants = append(tenants, gin.H{
+			"id":   t.ID,
+			"slug": t.Slug,
+			"name": t.Name,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"token":     token,
-		"user_id":   u.ID,
-		"tenant_id": t.ID,
-		"email":     u.Email,
+		"token":   token,
+		"user_id": userID,
+		"email":   req.Email,
+		"tenants": tenants,
 	})
 }
 

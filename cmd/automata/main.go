@@ -11,11 +11,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/adapter/api"
-	"github.com/hekemen/automata/internal/infrastructure/auth"
+	"github.com/hekemen/automata/internal/adapter/api/handler"
+	"github.com/hekemen/automata/internal/adapter/tracking"
+	auth "github.com/hekemen/automata/internal/infrastructure/auth"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
+	banner_repo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
 	"github.com/hekemen/automata/internal/infrastructure/config"
 	"github.com/hekemen/automata/internal/infrastructure/database"
+	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	tenant_repo "github.com/hekemen/automata/internal/infrastructure/tenant/repo"
+	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	"github.com/rs/zerolog/log"
 )
 
@@ -51,36 +56,76 @@ func main() {
 	tenantRepo := tenant_repo.NewPostgresRepo(pool)
 	userRepo := tenant_repo.NewUserPostgresRepo(pool)
 	apiKeyRepo := auth_repo.NewApiKeyPostgresRepo(pool)
+	formRepo := form_repo.New(pool)
+	bannerRepo := banner_repo.New(pool)
+	trackingRepo := tracking_repo.New(pool)
 
 	// Initialize auth service
 	authService := auth.NewService(userRepo)
 
-	// Create Gin engine
-	engine := gin.Default()
+	// Create handlers for tracking server
+	formHandler := handler.NewFormHandler(formRepo)
+	bannerHandler := handler.NewBannerHandler(bannerRepo)
+	placementHandler := handler.NewPlacementHandler(bannerRepo)
+	campaignHandler := handler.NewCampaignHandler(bannerRepo)
 
-	// Register API routes under /api
-	api.NewServer(engine, tenantRepo, userRepo, authService, apiKeyRepo, "/api")
+	// Admin server (port 8080)
+	adminEngine := gin.Default()
+	api.NewServer(adminEngine, pool, tenantRepo, userRepo, authService, apiKeyRepo, "/api")
 
-	// Serve static UI files at root
 	webDir := os.Getenv("WEB_DIR")
 	if webDir == "" {
 		webDir = "./web"
 	}
-	api.ServeStatic(engine, webDir)
+	api.ServeStatic(adminEngine, webDir)
 
-	// Start server
-	host := config.Get("server.host")
-	port := config.Get("server.port")
-	if host == "" {
-		host = "0.0.0.0"
-	}
-	if port == "" {
-		port = "8080"
+	adminPort := config.Get("server.port")
+	if adminPort == "" {
+		adminPort = "8080"
 	}
 
-	addr := fmt.Sprintf("%s:%s", host, port)
+	adminHost := config.Get("server.host")
+	if adminHost == "" {
+		adminHost = "0.0.0.0"
+	}
 
-	// Graceful shutdown
+	adminAddr := fmt.Sprintf("%s:%s", adminHost, adminPort)
+
+	adminSrv := &http.Server{
+		Addr:    adminAddr,
+		Handler: adminEngine,
+	}
+
+	go func() {
+		log.Info().Str("addr", adminAddr).Msg("starting admin server")
+		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("admin server failed")
+		}
+	}()
+
+	// Tracking server (port 8081)
+	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo)
+
+	trackingPort := config.Get("server.tracking_port")
+	if trackingPort == "" {
+		trackingPort = "8081"
+	}
+
+	trackingAddr := fmt.Sprintf(":%s", trackingPort)
+
+	trackingSrv := &http.Server{
+		Addr:    trackingAddr,
+		Handler: trackingEngine,
+	}
+
+	go func() {
+		log.Info().Str("addr", trackingAddr).Msg("starting tracking server")
+		if err := trackingSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("tracking server failed")
+		}
+	}()
+
+	// Graceful shutdown on SIGINT/SIGTERM
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -92,23 +137,17 @@ func main() {
 		cancel()
 	}()
 
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: engine,
-	}
-
-	go func() {
-		log.Info().Str("addr", addr).Msg("starting server")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("failed to start server")
-		}
-	}()
-
 	<-ctx.Done()
 
-	// Shutdown server
+	// Shutdown admin server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
-	srv.Shutdown(shutdownCtx)
-	log.Info().Msg("server stopped")
+
+	log.Info().Msg("shutting down admin server...")
+	adminSrv.Shutdown(shutdownCtx)
+
+	log.Info().Msg("shutting down tracking server...")
+	trackingSrv.Shutdown(shutdownCtx)
+
+	log.Info().Msg("all servers stopped")
 }

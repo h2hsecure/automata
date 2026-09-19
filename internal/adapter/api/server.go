@@ -11,6 +11,8 @@ import (
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/tenant"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
+	config_repo "github.com/hekemen/automata/internal/infrastructure/config/repo"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // NewServer creates and configures the API server, registering all routes
@@ -18,6 +20,7 @@ import (
 // so the caller can attach additional handlers (static files, etc.).
 func NewServer(
 	parent *gin.Engine,
+	pool *pgxpool.Pool,
 	tenantRepo tenant.Repository,
 	userRepo tenant.UserRepository,
 	authService auth.AuthService,
@@ -53,6 +56,14 @@ func NewServer(
 		}
 
 		admin.POST("/api-keys", authHandler.CreateAPIKey)
+
+		// Config routes
+		configRepo := config_repo.NewConfigRepo(pool)
+		configHandler := handler.NewConfigHandler(configRepo)
+		admin.GET("/configs/:tenantId", configHandler.GetConfig)
+		admin.PUT("/configs/:tenantId/cors", configHandler.UpdateCORS)
+		admin.PUT("/configs/:tenantId/domain", configHandler.UpdateDomain)
+		admin.PUT("/configs/:tenantId/display", configHandler.UpdateDisplay)
 	}
 
 	// Tenant-resolved routes (forms, snippets, static assets)

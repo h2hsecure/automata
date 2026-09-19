@@ -26,10 +26,9 @@ func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		userID, tenantSlug, err := authService.VerifyToken(token)
+		userID, err := authService.VerifyTokenUserOnly(token)
 		if err == nil {
 			c.Set("user_id", userID)
-			c.Set("tenant_id", tenantSlug)
 			c.Next()
 			return
 		}

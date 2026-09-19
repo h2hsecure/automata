@@ -2,8 +2,11 @@ services:
   automata:
     build: .
     ports:
-      - "8081:8080"
+      - "8080:8080"
+      - "8081:8081"
     environment:
+      - AUTOMATA_SERVER_PORT=8080
+      - AUTOMATA_TRACKING_PORT=8081
       - AUTOMATA_DATABASE_HOST=postgres
       - AUTOMATA_DATABASE_NAME=automata
       - AUTOMATA_DATABASE_USER=automata

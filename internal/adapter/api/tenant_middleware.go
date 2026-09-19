@@ -19,7 +19,7 @@ const TenantContextKey ContextKey = "tenant"
 var ErrNoTenant = fmt.Errorf("no tenant found")
 
 // TenantResolver is a Gin middleware that resolves the tenant from the request
-// and sets it in the context. It tries subdomain first, then path-based fallback.
+// and sets it in the context. It tries X-Tenant-ID header first, then subdomain, then path-based fallback.
 func TenantResolver(tenantRepo tenant.Repository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip tenant resolution for admin API routes
@@ -33,7 +33,21 @@ func TenantResolver(tenantRepo tenant.Repository) gin.HandlerFunc {
 			return
 		}
 
-		// Try subdomain resolution first
+		// Try X-Tenant-ID header first (preferred)
+		if tenantID := c.GetHeader("X-Tenant-ID"); tenantID != "" {
+			t, err := tenantRepo.GetByID(tenantID)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "tenant not found"})
+				c.Abort()
+				return
+			}
+			c.Set(string(TenantContextKey), t)
+			c.Set("tenant_id", tenantID)
+			c.Next()
+			return
+		}
+
+		// Try subdomain resolution
 		t, err := resolveBySubdomain(c, tenantRepo)
 		if err != nil && err != ErrNoTenant {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -42,6 +56,7 @@ func TenantResolver(tenantRepo tenant.Repository) gin.HandlerFunc {
 		}
 		if t != nil {
 			c.Set(string(TenantContextKey), t)
+			c.Set("tenant_id", t.ID)
 			c.Next()
 			return
 		}
@@ -55,6 +70,7 @@ func TenantResolver(tenantRepo tenant.Repository) gin.HandlerFunc {
 		}
 		if t != nil {
 			c.Set(string(TenantContextKey), t)
+			c.Set("tenant_id", t.ID)
 			c.Next()
 			return
 		}
