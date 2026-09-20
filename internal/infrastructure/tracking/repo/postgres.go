@@ -52,9 +52,13 @@ func (r *repo) CreateEventsBatch(events []*tracking.Event) error {
 		`
 		batch.Queue(query, e.ID, e.TenantID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
 	}
-	err := r.pool.SendBatch(ctx, batch)
-	if err != nil {
-		return fmt.Errorf("batch create events: %w", err)
+	results := r.pool.SendBatch(ctx, batch)
+	defer results.Close()
+	for i := range events {
+		_, err := results.Exec()
+		if err != nil {
+			return fmt.Errorf("batch create events (query %d): %w", i, err)
+		}
 	}
 	return nil
 }

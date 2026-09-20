@@ -10,9 +10,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/domain/tenant"
-	. "github.com/onsi/ginkgo/v2"
+	. 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+func strPtr(s string) *string { return &s }
 
 // mockTenantRepo is an in-memory implementation of tenant.Repository for testing.
 type mockTenantRepo struct {
@@ -131,7 +133,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			ID:        "550e8400-e29b-41d4-a716-446655440001",
 			Slug:      "tenant1",
 			Name:      "Tenant One",
-			Domain:    "tenant1.example.com",
+			Domain:    strPtr("tenant1.example.com"),
 			IsActive:  true,
 			Settings:  map[string]interface{}{},
 			CreatedAt: time.Now(),
@@ -141,7 +143,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			ID:        "550e8400-e29b-41d4-a716-446655440002",
 			Slug:      "myapp",
 			Name:      "My App",
-			Domain:    "myapp.example.com",
+			Domain:    strPtr("myapp.example.com"),
 			IsActive:  true,
 			Settings:  map[string]interface{}{},
 			CreatedAt: time.Now(),
@@ -151,7 +153,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			ID:        "550e8400-e29b-41d4-a716-446655440003",
 			Slug:      "acme",
 			Name:      "Acme Corp",
-			Domain:    "acme.example.com",
+			Domain:    strPtr("acme.example.com"),
 			IsActive:  true,
 			Settings:  map[string]interface{}{},
 			CreatedAt: time.Now(),

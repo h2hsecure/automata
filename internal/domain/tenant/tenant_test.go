@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+func strPtr(s string) *string { return &s }
+
 func TestTenantValidation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -37,7 +39,7 @@ func TestTenantValidation(t *testing.T) {
 				ID:       "550e8400-e29b-41d4-a716-446655440000",
 				Slug:     "myapp",
 				Name:     "My App",
-				Domain:   "myapp.example.com",
+				Domain:   strPtr("myapp.example.com"),
 				IsActive: true,
 				Settings: map[string]interface{}{"theme": "dark"},
 				CreatedAt: time.Now(),
