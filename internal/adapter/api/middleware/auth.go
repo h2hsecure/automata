@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/hekemen/automata/internal/domain/auth"
+	"github.com/hekemen/automata/internal/infrastructure/config"
 )
 
 // AuthMiddleware validates JWT tokens and API keys.
@@ -29,6 +31,21 @@ func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 		userID, err := authService.VerifyTokenUserOnly(token)
 		if err == nil {
 			c.Set("user_id", userID)
+			// Parse token to get is_admin claim
+			secretKey := config.Get("auth.secret_key")
+			if secretKey == "" {
+				secretKey = "automata-dev-secret-key-change-in-production"
+			}
+			parsedToken, parseErr := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+				return []byte(secretKey), nil
+			})
+			if parseErr == nil {
+				if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok {
+					if isAdmin, ok := claims["is_admin"].(bool); ok {
+						c.Set("is_admin", isAdmin)
+					}
+				}
+			}
 			c.Next()
 			return
 		}
@@ -36,7 +53,7 @@ func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 		apiKey, err := authService.ValidateAPIKey(token)
 		if err == nil {
 			c.Set("user_id", apiKey.UserID)
-			c.Set("tenant_id", apiKey.TenantID)
+			c.Set("context_id", apiKey.ContextID)
 			c.Next()
 			return
 		}
