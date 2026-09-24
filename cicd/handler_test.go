@@ -15,7 +15,7 @@ var (
 var _ = BeforeEach(func() {
 	ctx = context.Background()
 	pool = db.Pool
-	tenant = support.NewTestTenantID()
+	contextID = support.NewTestContextID()
 })
 
 var _ = Describe("API Handler Integration Tests", func() {
@@ -28,7 +28,7 @@ var _ = Describe("API Handler Integration Tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 		_, err = pool.Exec(ctx, "DELETE FROM banner_impressions")
 		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banners")
+		_, err = pool.Exec(ctx, "DELETE FROM banner_banners")
 		Expect(err).NotTo(HaveOccurred())
 		_, err = pool.Exec(ctx, "DELETE FROM form_submissions")
 		Expect(err).NotTo(HaveOccurred())
@@ -41,18 +41,18 @@ var _ = Describe("API Handler Integration Tests", func() {
 
 	Describe("Contact API endpoints", func() {
 		It("should create a contact via POST /api/contacts", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -74,18 +74,18 @@ var _ = Describe("API Handler Integration Tests", func() {
 		})
 
 		It("should retrieve a contact via GET /api/contacts/:id", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -107,18 +107,18 @@ var _ = Describe("API Handler Integration Tests", func() {
 		})
 
 		It("should update a contact via PUT /api/contacts/:id", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -149,18 +149,18 @@ var _ = Describe("API Handler Integration Tests", func() {
 		})
 
 		It("should delete a contact via DELETE /api/contacts/:id", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -186,22 +186,22 @@ var _ = Describe("API Handler Integration Tests", func() {
 		})
 
 		It("should list contacts with pagination via GET /api/contacts", func() {
-			tenant = support.NewTestTenantID()
+			contextID = support.NewTestContextID()
 
 			// Insert multiple contacts
 			for i := 0; i < 5; i++ {
-				contactData := support.NewTestContact(tenant)
+				contactData := support.NewTestContact(contextID)
 				contactData["email"] = "user" + string(rune('0'+i)) + "@example.com"
 
 				customFields, _ := json.Marshal(contactData["custom_fields"])
 
 				_, err := pool.Exec(ctx, `
-					INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+					INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 					                      custom_fields, source, source_id, created_at, updated_at)
 					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 				`,
 					contactData["id"],
-					contactData["tenant_id"],
+					contactData["context_id"],
 					contactData["email"],
 					contactData["first_name"],
 					contactData["last_name"],
@@ -228,19 +228,19 @@ var _ = Describe("API Handler Integration Tests", func() {
 
 	Describe("Form API endpoints", func() {
 		It("should submit a form via POST /api/forms/:slug/submit", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			// Insert form first
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -252,17 +252,17 @@ var _ = Describe("API Handler Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Submit form (insert submission)
-			submissionData := support.NewTestFormSubmission(formData["id"].(string), tenant)
+			submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 			data, _ := json.Marshal(submissionData["data"])
 			files, _ := json.Marshal(submissionData["files"])
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO form_submissions (id, form_id, tenant_id, data, files, created_at)
+				INSERT INTO form_submissions (id, form_id, context_id, data, files, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6)
 			`,
 				submissionData["id"],
 				submissionData["form_id"],
-				submissionData["tenant_id"],
+				submissionData["context_id"],
 				data,
 				files,
 				submissionData["created_at"],
@@ -277,19 +277,19 @@ var _ = Describe("API Handler Integration Tests", func() {
 		})
 
 		It("should retrieve a form via GET /api/forms/:slug", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			// Insert form first
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -310,17 +310,17 @@ var _ = Describe("API Handler Integration Tests", func() {
 
 	Describe("Tracking API endpoints", func() {
 		It("should record a tracking event via POST /api/tracking", func() {
-			tenant = support.NewTestTenantID()
-			visitorData := support.NewTestVisitor(tenant)
+			contextID = support.NewTestContextID()
+			visitorData := support.NewTestVisitor(contextID)
 			visitorID := visitorData["id"].(string)
 
 			// Insert visitor first
 			_, err := pool.Exec(ctx, `
-				INSERT INTO visitors (id, tenant_id, cookie_value, fingerprint, first_seen, last_seen, page_views)
+				INSERT INTO tracking_visitors (id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views)
 				VALUES ($1, $2, $3, $4, $5, $6, $7)
 			`,
 				visitorData["id"],
-				visitorData["tenant_id"],
+				visitorData["context_id"],
 				visitorData["cookie_value"],
 				visitorData["fingerprint"],
 				visitorData["first_seen"],
@@ -330,16 +330,16 @@ var _ = Describe("API Handler Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Record tracking event
-			eventData := support.NewTestEvent(tenant, visitorID)
+			eventData := support.NewTestEvent(contextID, visitorID)
 			properties, _ := json.Marshal(eventData["properties"])
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO events (id, tenant_id, visitor_id, type, url, title, referrer, event_name,
+				INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name,
 				                    properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 			`,
 				eventData["id"],
-				eventData["tenant_id"],
+				eventData["context_id"],
 				eventData["visitor_id"],
 				eventData["type"],
 				eventData["url"],
@@ -358,7 +358,7 @@ var _ = Describe("API Handler Integration Tests", func() {
 
 			// Verify event was recorded
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM events").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM tracking_events").Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 		})
@@ -366,21 +366,21 @@ var _ = Describe("API Handler Integration Tests", func() {
 
 	Describe("Banner API endpoints", func() {
 		It("should get active banners via GET /api/banners/:placement", func() {
-			tenant = support.NewTestTenantID()
-			bannerData := support.NewTestBanner(tenant)
+			contextID = support.NewTestContextID()
+			bannerData := support.NewTestBanner(contextID)
 
 			// Insert banner first
 			placements, _ := json.Marshal(bannerData["placements"])
 			abVariants, _ := json.Marshal(bannerData["ab_variants"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO banners (id, tenant_id, name, type, content, link_url, image_url, alt_text,
+				INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text,
 				                     campaign_id, placements, priority, start_date, end_date, is_active, 
 				                     ab_test, ab_variants, impressions, clicks, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			`,
 				bannerData["id"],
-				bannerData["tenant_id"],
+				bannerData["context_id"],
 				bannerData["name"],
 				bannerData["type"],
 				bannerData["content"],
@@ -405,9 +405,9 @@ var _ = Describe("API Handler Integration Tests", func() {
 			// Verify banner can be retrieved by placement
 			var count int
 			err = pool.QueryRow(ctx, `
-				SELECT COUNT(*) FROM banners 
-				WHERE tenant_id = $1 AND placements @> '["header"]'::jsonb
-			`, tenant).Scan(&count)
+				SELECT COUNT(*) FROM banner_banners 
+				WHERE context_id = $1 AND placements @> '["header"]'::jsonb
+			`, contextID).Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 		})

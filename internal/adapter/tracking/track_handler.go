@@ -22,8 +22,8 @@ type Repository interface {
 
 // Track handles POST /track — single event tracking.
 func (h *TrackHandler) Track(c *gin.Context) {
-	tenantID := ResolveTenant(c)
-	if tenantID == "" {
+	contextID := ResolveContext(c)
+	if contextID == "" {
 		return
 	}
 
@@ -46,7 +46,7 @@ func (h *TrackHandler) Track(c *gin.Context) {
 
 	event := &tracking.Event{
 		ID:          uuid.New().String(),
-		TenantID:    tenantID,
+		ContextID:    contextID,
 		VisitorID:   req.VisitorID,
 		Type:        tracking.EventType(req.Type),
 		URL:         req.URL,
@@ -58,7 +58,7 @@ func (h *TrackHandler) Track(c *gin.Context) {
 		CreatedAt:   time.Now(),
 	}
 
-	if err := trackingUsecase.TrackEvent(h.repo, tenantID, event); err != nil {
+	if err := trackingUsecase.TrackEvent(h.repo, contextID, event); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -68,8 +68,8 @@ func (h *TrackHandler) Track(c *gin.Context) {
 
 // TrackBatch handles POST /track/batch — batch event tracking.
 func (h *TrackHandler) TrackBatch(c *gin.Context) {
-	tenantID := ResolveTenant(c)
-	if tenantID == "" {
+	contextID := ResolveContext(c)
+	if contextID == "" {
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *TrackHandler) TrackBatch(c *gin.Context) {
 	for _, e := range req.Events {
 		event := &tracking.Event{
 			ID:        uuid.New().String(),
-			TenantID:  tenantID,
+			ContextID:  contextID,
 			CreatedAt: time.Now(),
 		}
 

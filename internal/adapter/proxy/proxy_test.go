@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/tenant"
+	"github.com/hekemen/automata/internal/domain/context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -24,28 +24,28 @@ var _ = Describe("Proxy Adapter", func() {
 	})
 
 	Describe("Form route", func() {
-		It("returns 400 when tenant is not in context", func() {
+		It("returns 400 when context is not in context", func() {
 			req := httptest.NewRequest("GET", "/form/test-form", nil)
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			Expect(w.Body.String()).To(ContainSubstring("tenant not found"))
+			Expect(w.Body.String()).To(ContainSubstring("context not found"))
 		})
 
-		It("returns HTML with tenant name when tenant is in context", func() {
-			// Register a middleware that sets the tenant before the handler
+		It("returns HTML with context name when context is in context", func() {
+			// Register a middleware that sets the context before the handler
 			engine.Use(func(c *gin.Context) {
-				t := &tenant.Tenant{ID: "550e8400-e29b-41d4-a716-446655440000", Name: "My App", Slug: "myapp"}
-				c.Set("tenant", t)
+				t := &context.Context{ID: "550e8400-e29b-41d4-a716-446655440000", Name: "My App", Slug: "myapp"}
+				c.Set("context", t)
 				c.Next()
 			})
 
 			// Create a fresh engine with the middleware to avoid the 400 test polluting
 			freshEngine := gin.New()
 			freshEngine.Use(func(c *gin.Context) {
-				t := &tenant.Tenant{ID: "550e8400-e29b-41d4-a716-446655440000", Name: "My App", Slug: "myapp"}
-				c.Set("tenant", t)
+				t := &context.Context{ID: "550e8400-e29b-41d4-a716-446655440000", Name: "My App", Slug: "myapp"}
+				c.Set("context", t)
 				c.Next()
 			})
 			proxyObj = NewProxy(&mockTenantRepo{}, freshEngine)
@@ -61,7 +61,7 @@ var _ = Describe("Proxy Adapter", func() {
 	})
 
 	Describe("Snippet route", func() {
-		It("returns JavaScript for a tenant ID", func() {
+		It("returns JavaScript for a context ID", func() {
 			req := httptest.NewRequest("GET", "/snippet/abc123.js", nil)
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
@@ -71,15 +71,15 @@ var _ = Describe("Proxy Adapter", func() {
 			Expect(w.Body.String()).To(ContainSubstring("abc123"))
 		})
 
-		It("strips .js extension from tenant ID in snippet", func() {
-			req := httptest.NewRequest("GET", "/snippet/tenant-123.js", nil)
+		It("strips .js extension from context ID in snippet", func() {
+			req := httptest.NewRequest("GET", "/snippet/context-123.js", nil)
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(w.Body.String()).To(ContainSubstring("tenant-123"))
+			Expect(w.Body.String()).To(ContainSubstring("context-123"))
 			// Should not contain .js in the tracking ID
-			Expect(w.Body.String()).NotTo(ContainSubstring("'tenant-123.js'"))
+			Expect(w.Body.String()).NotTo(ContainSubstring("'context-123.js'"))
 		})
 	})
 
@@ -96,8 +96,8 @@ var _ = Describe("Proxy Adapter", func() {
 
 	Describe("generateSnippet", func() {
 		It("generates a valid tracking snippet", func() {
-			snippet := generateSnippet("test-tenant-id")
-			Expect(snippet).To(ContainSubstring("test-tenant-id"))
+			snippet := generateSnippet("test-context-id")
+			Expect(snippet).To(ContainSubstring("test-context-id"))
 			Expect(snippet).To(ContainSubstring("automata.example.com"))
 			Expect(snippet).To(ContainSubstring("track.js"))
 			Expect(snippet).To(ContainSubstring("dataLayer"))
@@ -107,23 +107,23 @@ var _ = Describe("Proxy Adapter", func() {
 	_ = proxyObj // avoid unused variable warning
 })
 
-// mockTenantRepo implements tenant.Repository for testing
+// mockTenantRepo implements context.Repository for testing
 type mockTenantRepo struct{}
 
-func (m *mockTenantRepo) Create(t *tenant.Tenant) error {
+func (m *mockTenantRepo) Create(t *context.Context) error {
 	t.ID = "550e8400-e29b-41d4-a716-446655440000"
 	return nil
 }
-func (m *mockTenantRepo) GetByID(id string) (*tenant.Tenant, error) {
+func (m *mockTenantRepo) GetByID(id string) (*context.Context, error) {
 	return nil, nil
 }
-func (m *mockTenantRepo) GetBySlug(slug string) (*tenant.Tenant, error) {
+func (m *mockTenantRepo) GetBySlug(slug string) (*context.Context, error) {
 	return nil, nil
 }
-func (m *mockTenantRepo) List(offset, limit int) ([]*tenant.Tenant, error) {
+func (m *mockTenantRepo) List(offset, limit int) ([]*context.Context, error) {
 	return nil, nil
 }
-func (m *mockTenantRepo) Update(t *tenant.Tenant) error {
+func (m *mockTenantRepo) Update(t *context.Context) error {
 	return nil
 }
 func (m *mockTenantRepo) Delete(id string) error {

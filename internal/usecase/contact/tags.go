@@ -19,10 +19,10 @@ type Repository interface {
 	List(offset, limit int, filters contact.FilterOptions) ([]*contact.Contact, error)
 	Update(c *contact.Contact) error
 	Delete(id string) error
-	FindByEmail(tenantID, email string) (*contact.Contact, error)
+	FindByEmail(contextID, email string) (*contact.Contact, error)
 	Merge(keepID, mergeIntoID string) error
 	GetActivity(contactID string, offset, limit int) ([]contact.Activity, error)
-	CountByTenant(tenantID string) (int64, error)
+	CountByContext(contextID string) (int64, error)
 }
 
 // tagRepo handles tag and membership operations via raw SQL.
@@ -35,13 +35,13 @@ func newTagRepo(pool *pgxpool.Pool) *tagRepo {
 	return &tagRepo{pool: pool}
 }
 
-// ensureOrCreateTag ensures a tag exists for the tenant, creating it if necessary.
+// ensureOrCreateTag ensures a tag exists for the context, creating it if necessary.
 // Returns the tag ID.
-func (t *tagRepo) ensureOrCreateTag(ctx context.Context, tenantID, name string) (string, error) {
+func (t *tagRepo) ensureOrCreateTag(ctx context.Context, contextID, name string) (string, error) {
 	// Try to find existing tag
 	var tagID string
-	query := "SELECT id FROM contact_tags WHERE tenant_id = $1 AND name = $2"
-	err := t.pool.QueryRow(ctx, query, tenantID, name).Scan(&tagID)
+	query := "SELECT id FROM contact_tags WHERE context_id = $1 AND name = $2"
+	err := t.pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
 	if err == nil {
 		return tagID, nil
 	}
@@ -53,13 +53,13 @@ func (t *tagRepo) ensureOrCreateTag(ctx context.Context, tenantID, name string) 
 	tagID = uuid.New().String()
 	color := "#6366f1"
 	_, err = t.pool.Exec(ctx,
-		"INSERT INTO contact_tags (id, tenant_id, name, color) VALUES ($1, $2, $3, $4)",
-		tagID, tenantID, name, color,
+		"INSERT INTO contact_tags (id, context_id, name, color) VALUES ($1, $2, $3, $4)",
+		tagID, contextID, name, color,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
 			// Race condition: another goroutine created it, try to find again
-			err = t.pool.QueryRow(ctx, query, tenantID, name).Scan(&tagID)
+			err = t.pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
 			if err != nil {
 				return "", fmt.Errorf("find tag after race: %w", err)
 			}
@@ -105,7 +105,7 @@ func (t *tagRepo) deleteMemberships(ctx context.Context, contactID string) error
 
 // applyTags creates/looks up tags and assigns them to a contact.
 // It handles the full lifecycle: ensure tags exist, clear old memberships, add new ones.
-func applyTags(repo Repository, tenantID, contactID string, tagNames []string) error {
+func applyTags(repo Repository, contextID, contactID string, tagNames []string) error {
 	// We need the pool to do tag operations; the repo interface doesn't expose it.
 	// Since usecases can't directly access the pool, we'll use a different approach:
 	// The Repository interface needs to be extended, or we use a type assertion.
@@ -118,7 +118,7 @@ func applyTags(repo Repository, tenantID, contactID string, tagNames []string) e
 
 	if opener, ok := repo.(tagOpener); ok {
 		tagRepo := opener.TagRepository()
-		return tagRepo.ApplyTags(tenantID, contactID, tagNames)
+		return tagRepo.ApplyTags(contextID, contactID, tagNames)
 	}
 
 	return fmt.Errorf("repository does not support tag operations")
@@ -126,7 +126,7 @@ func applyTags(repo Repository, tenantID, contactID string, tagNames []string) e
 
 // TagRepository defines operations for tag management.
 type TagRepository interface {
-	ApplyTags(tenantID, contactID string, tagNames []string) error
+	ApplyTags(contextID, contactID string, tagNames []string) error
 }
 
 // poolRepo wraps a pgxpool.Pool to provide tag operations.
@@ -135,7 +135,7 @@ type poolRepo struct {
 }
 
 // ApplyTags ensures tags exist and assigns them to a contact.
-func (p *poolRepo) ApplyTags(tenantID, contactID string, tagNames []string) error {
+func (p *poolRepo) ApplyTags(contextID, contactID string, tagNames []string) error {
 	ctx := context.Background()
 
 	// Delete existing memberships
@@ -147,7 +147,7 @@ func (p *poolRepo) ApplyTags(tenantID, contactID string, tagNames []string) erro
 	// Ensure tags exist and collect IDs
 	tagIDs := make([]string, 0, len(tagNames))
 	for _, name := range tagNames {
-		tagID, err := ensureTag(ctx, p.pool, tenantID, name)
+		tagID, err := ensureTag(ctx, p.pool, contextID, name)
 		if err != nil {
 			return fmt.Errorf("ensure tag %q: %w", name, err)
 		}
@@ -171,11 +171,11 @@ func (p *poolRepo) ApplyTags(tenantID, contactID string, tagNames []string) erro
 	return nil
 }
 
-// ensureTag ensures a tag exists for the tenant, creating it if necessary.
-func ensureTag(ctx context.Context, pool *pgxpool.Pool, tenantID, name string) (string, error) {
+// ensureTag ensures a tag exists for the context, creating it if necessary.
+func ensureTag(ctx context.Context, pool *pgxpool.Pool, contextID, name string) (string, error) {
 	var tagID string
-	query := "SELECT id FROM contact_tags WHERE tenant_id = $1 AND name = $2"
-	err := pool.QueryRow(ctx, query, tenantID, name).Scan(&tagID)
+	query := "SELECT id FROM contact_tags WHERE context_id = $1 AND name = $2"
+	err := pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
 	if err == nil {
 		return tagID, nil
 	}
@@ -186,12 +186,12 @@ func ensureTag(ctx context.Context, pool *pgxpool.Pool, tenantID, name string) (
 	tagID = uuid.New().String()
 	color := "#6366f1"
 	_, err = pool.Exec(ctx,
-		"INSERT INTO contact_tags (id, tenant_id, name, color) VALUES ($1, $2, $3, $4)",
-		tagID, tenantID, name, color,
+		"INSERT INTO contact_tags (id, context_id, name, color) VALUES ($1, $2, $3, $4)",
+		tagID, contextID, name, color,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
-			err = pool.QueryRow(ctx, query, tenantID, name).Scan(&tagID)
+			err = pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
 			if err != nil {
 				return "", fmt.Errorf("find tag after race: %w", err)
 			}

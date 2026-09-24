@@ -4,7 +4,7 @@ import "time"
 
 type Visitor struct {
 	ID          string
-	TenantID    string
+	ContextID   string
 	CookieValue string
 	Fingerprint string
 	FirstSeen   time.Time

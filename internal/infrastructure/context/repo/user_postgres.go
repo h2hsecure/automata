@@ -168,12 +168,12 @@ func (r *userPostgresRepo) ListAll() ([]*domainctx.User, error) {
 
 func (r *userPostgresRepo) Update(u *domainctx.User) error {
 	query := `
-		UPDATE context_users SET email = $1, password_hash = $2, is_owner = $3, updated_at = NOW()
+		UPDATE users SET email = $1, password_hash = $2, is_admin = $3, updated_at = NOW()
 		WHERE id = $4
 	`
 
 	result, err := r.pool.Exec(context.Background(), query,
-		u.Email, u.PasswordHash, u.IsOwner, u.ID,
+		u.Email, u.PasswordHash, u.IsAdmin, u.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)
@@ -187,7 +187,7 @@ func (r *userPostgresRepo) Update(u *domainctx.User) error {
 }
 
 func (r *userPostgresRepo) Delete(id string) error {
-	query := `DELETE FROM context_users WHERE id = $1`
+	query := `DELETE FROM users WHERE id = $1`
 	result, err := r.pool.Exec(context.Background(), query, id)
 	if err != nil {
 		return fmt.Errorf("delete user: %w", err)

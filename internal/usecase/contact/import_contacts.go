@@ -18,13 +18,13 @@ type ImportCSVInput struct {
 
 // ImportContacts parses a CSV file and creates or skips contacts based on
 // email uniqueness.  Returns an aggregate ImportResult.
-func ImportContacts(repo Repository, tenantID string, input ImportCSVInput) (*csvimport.ImportResult, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenant_id is required")
+func ImportContacts(repo Repository, contextID string, input ImportCSVInput) (*csvimport.ImportResult, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("context_id is required")
 	}
 
 	// Parse CSV
-	contacts, result, err := csvimport.ParseCSV(input.CSVData, input.Mapping, tenantID)
+	contacts, result, err := csvimport.ParseCSV(input.CSVData, input.Mapping, contextID)
 	if err != nil {
 		return nil, fmt.Errorf("parse CSV: %w", err)
 	}
@@ -36,7 +36,7 @@ func ImportContacts(repo Repository, tenantID string, input ImportCSVInput) (*cs
 
 		// Check for existing contact by email
 		if email != "" {
-			existing, err := repo.FindByEmail(tenantID, email)
+			existing, err := repo.FindByEmail(contextID, email)
 			if err != nil {
 				if !strings.Contains(err.Error(), "contact not found") {
 					result.Errors = append(result.Errors, csvimport.ImportError{
@@ -74,7 +74,7 @@ func ImportContacts(repo Repository, tenantID string, input ImportCSVInput) (*cs
 		}
 
 		// Create the contact
-		if _, err := CreateContact(repo, tenantID, createInput); err != nil {
+		if _, err := CreateContact(repo, contextID, createInput); err != nil {
 			result.Errors = append(result.Errors, csvimport.ImportError{
 				Row:    result.Created + result.Updated + result.Skipped + 1,
 				Field:  "email",

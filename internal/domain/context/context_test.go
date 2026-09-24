@@ -1,4 +1,4 @@
-package tenant
+package context
 
 import (
 	"testing"
@@ -7,35 +7,35 @@ import (
 
 func strPtr(s string) *string { return &s }
 
-func TestTenantValidation(t *testing.T) {
+func TestContextValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		tenant  Tenant
+		ctx     Context
 		wantErr bool
 	}{
 		{
-			name:    "valid tenant",
-			tenant:  Tenant{Slug: "myapp", Name: "My App"},
+			name:    "valid context",
+			ctx:     Context{Slug: "myapp", Name: "My App"},
 			wantErr: false,
 		},
 		{
 			name:    "empty slug",
-			tenant:  Tenant{Name: "My App"},
+			ctx:     Context{Name: "My App"},
 			wantErr: true,
 		},
 		{
 			name:    "empty name",
-			tenant:  Tenant{Slug: "myapp"},
+			ctx:     Context{Slug: "myapp"},
 			wantErr: true,
 		},
 		{
 			name:    "empty slug and name",
-			tenant:  Tenant{},
+			ctx:     Context{},
 			wantErr: true,
 		},
 		{
-			name: "tenant with optional fields",
-			tenant: Tenant{
+			name: "context with optional fields",
+			ctx: Context{
 				ID:       "550e8400-e29b-41d4-a716-446655440000",
 				Slug:     "myapp",
 				Name:     "My App",
@@ -51,7 +51,7 @@ func TestTenantValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.tenant.Validate()
+			err := tt.ctx.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}

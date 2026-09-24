@@ -11,16 +11,16 @@ func NewTestUUID() string {
 	return uuid.New().String()
 }
 
-// NewTestTenantID generates a random tenant ID for tests.
-func NewTestTenantID() string {
+// NewTestContextID generates a random context ID for tests.
+func NewTestContextID() string {
 	return uuid.New().String()
 }
 
 // NewTestContact generates a test contact.
-func NewTestContact(tenantID string) map[string]interface{} {
+func NewTestContact(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":           uuid.New().String(),
-		"tenant_id":    tenantID,
+		"context_id":   contextID,
 		"email":        "test@example.com",
 		"first_name":   "Test",
 		"last_name":    "User",
@@ -35,10 +35,10 @@ func NewTestContact(tenantID string) map[string]interface{} {
 }
 
 // NewTestForm generates a test form.
-func NewTestForm(tenantID string) map[string]interface{} {
+func NewTestForm(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":          uuid.New().String(),
-		"tenant_id":   tenantID,
+		"context_id":  contextID,
 		"slug":        "test-form",
 		"name":        "Test Form",
 		"description": "A test form",
@@ -50,10 +50,10 @@ func NewTestForm(tenantID string) map[string]interface{} {
 }
 
 // NewTestVisitor generates a test visitor.
-func NewTestVisitor(tenantID string) map[string]interface{} {
+func NewTestVisitor(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":           uuid.New().String(),
-		"tenant_id":    tenantID,
+		"context_id":   contextID,
 		"cookie_value": "test-cookie-" + uuid.New().String(),
 		"fingerprint":  "test-fingerprint",
 		"first_seen":   time.Now().UTC(),
@@ -63,10 +63,10 @@ func NewTestVisitor(tenantID string) map[string]interface{} {
 }
 
 // NewTestBanner generates a test banner.
-func NewTestBanner(tenantID string) map[string]interface{} {
+func NewTestBanner(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"name":       "Test Banner",
 		"type":       "html",
 		"content":    "<div>Test</div>",
@@ -89,10 +89,10 @@ func NewTestBanner(tenantID string) map[string]interface{} {
 }
 
 // NewTestCampaign generates a test campaign.
-func NewTestCampaign(tenantID string) map[string]interface{} {
+func NewTestCampaign(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":            uuid.New().String(),
-		"tenant_id":     tenantID,
+		"context_id":     contextID,
 		"name":          "Test Campaign",
 		"description":   "A test campaign",
 		"start_date":    time.Now().Add(-24 * time.Hour).UTC(),
@@ -109,10 +109,10 @@ func NewTestCampaign(tenantID string) map[string]interface{} {
 }
 
 // NewTestPlacement generates a test placement.
-func NewTestPlacement(tenantID string) map[string]interface{} {
+func NewTestPlacement(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":          uuid.New().String(),
-		"tenant_id":   tenantID,
+		"context_id":   contextID,
 		"name":        "Test Placement",
 		"location":    "header",
 		"css_selector": "#header",
@@ -125,10 +125,10 @@ func NewTestPlacement(tenantID string) map[string]interface{} {
 }
 
 // NewTestEmailJob generates a test email job.
-func NewTestEmailJob(tenantID string) map[string]interface{} {
+func NewTestEmailJob(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":          uuid.New().String(),
-		"tenant_id":   tenantID,
+		"context_id":   contextID,
 		"to_addresses": []string{"recipient@example.com"},
 		"subject":     "Test Email",
 		"body":        "Test email body",
@@ -141,10 +141,10 @@ func NewTestEmailJob(tenantID string) map[string]interface{} {
 }
 
 // NewTestWebhookDelivery generates a test webhook delivery.
-func NewTestWebhookDelivery(tenantID, formID string) map[string]interface{} {
+func NewTestWebhookDelivery(contextID, formID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"form_id":    formID,
 		"url":        "https://example.com/webhook",
 		"payload":    map[string]interface{}{"key": "value"},
@@ -158,12 +158,12 @@ func NewTestWebhookDelivery(tenantID, formID string) map[string]interface{} {
 	}
 }
 
-// NewTestTenant generates a test tenant.
-func NewTestTenant() map[string]interface{} {
+// NewTestContext generates a test context.
+func NewTestContext() map[string]interface{} {
 	return map[string]interface{}{
 		"id":        uuid.New().String(),
-		"slug":      "test-tenant-" + uuid.New().String()[:8],
-		"name":      "Test Tenant",
+		"slug":      "test-context-" + uuid.New().String()[:8],
+		"name":      "Test Context",
 		"domain":    "test.example.com",
 		"is_active": true,
 		"settings":  map[string]interface{}{},
@@ -173,11 +173,11 @@ func NewTestTenant() map[string]interface{} {
 }
 
 // NewTestFormSubmission generates a test form submission.
-func NewTestFormSubmission(formID, tenantID string) map[string]interface{} {
+func NewTestFormSubmission(formID, contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":        uuid.New().String(),
 		"form_id":   formID,
-		"tenant_id": tenantID,
+		"context_id": contextID,
 		"data":      map[string]interface{}{"email": "user@example.com"},
 		"files":     []map[string]interface{}{},
 		"created_at": time.Now().UTC(),
@@ -185,10 +185,10 @@ func NewTestFormSubmission(formID, tenantID string) map[string]interface{} {
 }
 
 // NewTestEvent generates a test tracking event.
-func NewTestEvent(tenantID, visitorID string) map[string]interface{} {
+func NewTestEvent(contextID, visitorID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"visitor_id": visitorID,
 		"type":       "pageview",
 		"url":        "https://example.com",
@@ -206,10 +206,10 @@ func NewTestEvent(tenantID, visitorID string) map[string]interface{} {
 }
 
 // NewTestTag generates a test tag.
-func NewTestTag(tenantID string) map[string]interface{} {
+func NewTestTag(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"name":       "test-tag",
 		"color":      "#6366f1",
 		"created_at": time.Now().UTC(),
@@ -225,10 +225,10 @@ func NewTestContactTagMembership(contactID, tagID string) map[string]interface{}
 }
 
 // NewTestFieldDefinition generates a test field definition.
-func NewTestFieldDefinition(tenantID string) map[string]interface{} {
+func NewTestFieldDefinition(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"key":        "custom_field",
 		"label":      "Custom Field",
 		"type":       "text",
@@ -238,11 +238,11 @@ func NewTestFieldDefinition(tenantID string) map[string]interface{} {
 }
 
 // NewTestBannerImpression generates a test banner impression.
-func NewTestBannerImpression(bannerID, tenantID, visitorID string) map[string]interface{} {
+func NewTestBannerImpression(bannerID, contextID, visitorID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
 		"banner_id":  bannerID,
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"visitor_id": visitorID,
 		"placement_id": uuid.New().String(),
 		"created_at": time.Now().UTC(),
@@ -250,21 +250,21 @@ func NewTestBannerImpression(bannerID, tenantID, visitorID string) map[string]in
 }
 
 // NewTestBannerClick generates a test banner click.
-func NewTestBannerClick(bannerID, tenantID, visitorID string) map[string]interface{} {
+func NewTestBannerClick(bannerID, contextID, visitorID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
 		"banner_id":  bannerID,
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"visitor_id": visitorID,
 		"created_at": time.Now().UTC(),
 	}
 }
 
-// NewTestTenantUser generates a test tenant user.
-func NewTestTenantUser(tenantID string) map[string]interface{} {
+// NewTestTenantUser generates a test context user.
+func NewTestTenantUser(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":           uuid.New().String(),
-		"tenant_id":    tenantID,
+		"context_id":    contextID,
 		"email":        "admin@example.com",
 		"password_hash": "$2a$10$testhash",
 		"is_owner":     true,
@@ -274,10 +274,10 @@ func NewTestTenantUser(tenantID string) map[string]interface{} {
 }
 
 // NewTestAPIKey generates a test API key.
-func NewTestAPIKey(tenantID, userID string) map[string]interface{} {
+func NewTestAPIKey(contextID, userID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         uuid.New().String(),
-		"tenant_id":  tenantID,
+		"context_id":  contextID,
 		"user_id":    userID,
 		"key_hash":   "test-key-hash",
 		"name":       "test-key",

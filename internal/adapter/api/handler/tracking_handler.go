@@ -22,9 +22,9 @@ func NewTrackingHandler(repo tracking.Repository) *TrackingHandler {
 
 // GetDashboard handles GET /api/tracking/dashboard — returns dashboard metrics.
 func (h *TrackingHandler) GetDashboard(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
+	context := c.GetString("context")
+	if context == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
 	}
 
@@ -48,7 +48,7 @@ func (h *TrackingHandler) GetDashboard(c *gin.Context) {
 		TopN:      10,
 	}
 
-	metrics, err := trackingUsecase.GetDashboard(h.repo, tenant, opts)
+	metrics, err := trackingUsecase.GetDashboard(h.repo, context, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -67,9 +67,9 @@ func (h *TrackingHandler) GetDashboard(c *gin.Context) {
 
 // GetEvents handles GET /api/tracking/events — returns paginated events.
 func (h *TrackingHandler) GetEvents(c *gin.Context) {
-	tenant := c.GetString("tenant")
-	if tenant == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant required"})
+	context := c.GetString("context")
+	if context == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *TrackingHandler) GetEvents(c *gin.Context) {
 		}
 	}
 
-	events, total, err := trackingUsecase.GetEvents(h.repo, tenant, opts)
+	events, total, err := trackingUsecase.GetEvents(h.repo, context, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

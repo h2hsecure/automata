@@ -11,7 +11,7 @@ const (
 
 type Event struct {
 	ID          string
-	TenantID    string
+	ContextID   string
 	VisitorID   string
 	Type        EventType
 	URL         string

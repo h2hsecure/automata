@@ -87,7 +87,7 @@ func (w *WebhookWorker) deliver(ctx context.Context, d *WebhookDelivery) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Webhook-Source", "automata")
-	req.Header.Set("X-Tenant-ID", d.TenantID)
+	req.Header.Set("X-Tenant-ID", d.ContextID)
 	req.Header.Set("X-Form-ID", d.FormID)
 
 	resp, err := w.client.Do(req)

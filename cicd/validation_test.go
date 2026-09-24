@@ -76,7 +76,7 @@ var _ = Describe("Validation Tests", func() {
 
 	Describe("Form field validation", func() {
 		It("should validate required form fields", func() {
-			formData := support.NewTestForm("test-tenant")
+			formData := support.NewTestForm("test-context")
 
 			// Verify form has required fields
 			Expect(formData["slug"]).NotTo(BeEmpty())
@@ -137,9 +137,9 @@ var _ = Describe("Validation Tests", func() {
 	})
 
 	Describe("Tenant slug validation", func() {
-		It("should validate tenant slug format", func() {
+		It("should validate context slug format", func() {
 			validSlugs := []string{
-				"test-tenant",
+				"test-context",
 				"my-company",
 				"acme-corp",
 				"test123",
@@ -152,13 +152,13 @@ var _ = Describe("Validation Tests", func() {
 			}
 		})
 
-		It("should reject invalid tenant slug format", func() {
+		It("should reject invalid context slug format", func() {
 			invalidSlugs := []string{
 				"",
 				"Tenant With Spaces",
 				"tenant_with_underscores",
 				"Tenant123",
-				"tenant..double",
+				"context..double",
 			}
 
 			slugRegex := regexp.MustCompile(`^[a-z0-9\-]+$`)

@@ -4,8 +4,8 @@ package form
 type Repository interface {
 	Create(f *Form) error
 	GetByID(id string) (*Form, error)
-	GetBySlug(tenantID, slug string) (*Form, error)
-	List(tenantID string) ([]*Form, error)
+	GetBySlug(contextID, slug string) (*Form, error)
+	List(contextID string) ([]*Form, error)
 	Update(f *Form) error
 	Delete(id string) error
 	CreateSubmission(s *Submission) error

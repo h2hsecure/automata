@@ -6,18 +6,18 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/tenant"
+	"github.com/hekemen/automata/internal/domain/context"
 )
 
-type TenantHandler struct {
-	tenantRepo tenant.Repository
+type ContextHandler struct {
+	contextRepo context.Repository
 }
 
-func NewTenantHandler(tenantRepo tenant.Repository) *TenantHandler {
-	return &TenantHandler{tenantRepo: tenantRepo}
+func NewContextHandler(contextRepo context.Repository) *ContextHandler {
+	return &ContextHandler{contextRepo: contextRepo}
 }
 
-func (h *TenantHandler) List(c *gin.Context) {
+func (h *ContextHandler) List(c *gin.Context) {
 	offset := 0
 	limit := 20
 
@@ -32,16 +32,16 @@ func (h *TenantHandler) List(c *gin.Context) {
 		}
 	}
 
-	tenants, err := h.tenantRepo.List(offset, limit)
+	contexts, err := h.contextRepo.List(offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"tenants": tenants, "count": len(tenants)})
+	c.JSON(http.StatusOK, gin.H{"contexts": contexts, "count": len(contexts)})
 }
 
-func (h *TenantHandler) Create(c *gin.Context) {
+func (h *ContextHandler) Create(c *gin.Context) {
 	var req struct {
 		Slug     string                 `json:"slug" binding:"required"`
 		Name     string                 `json:"name" binding:"required"`
@@ -54,14 +54,14 @@ func (h *TenantHandler) Create(c *gin.Context) {
 		return
 	}
 
-	t := &tenant.Tenant{
+	t := &context.Context{
 		Slug:     strings.ToLower(req.Slug),
 		Name:     req.Name,
 		Domain:   &req.Domain,
 		Settings: req.Settings,
 	}
 
-	if err := h.tenantRepo.Create(t); err != nil {
+	if err := h.contextRepo.Create(t); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -69,23 +69,23 @@ func (h *TenantHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, t)
 }
 
-func (h *TenantHandler) Get(c *gin.Context) {
+func (h *ContextHandler) Get(c *gin.Context) {
 	id := c.Param("id")
-	t, err := h.tenantRepo.GetByID(id)
+	t, err := h.contextRepo.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "context not found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, t)
 }
 
-func (h *TenantHandler) Update(c *gin.Context) {
+func (h *ContextHandler) Update(c *gin.Context) {
 	id := c.Param("id")
 
-	existing, err := h.tenantRepo.GetByID(id)
+	existing, err := h.contextRepo.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *TenantHandler) Update(c *gin.Context) {
 		existing.Settings = req.Settings
 	}
 
-	if err := h.tenantRepo.Update(existing); err != nil {
+	if err := h.contextRepo.Update(existing); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -126,12 +126,12 @@ func (h *TenantHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, existing)
 }
 
-func (h *TenantHandler) Delete(c *gin.Context) {
+func (h *ContextHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.tenantRepo.Delete(id); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+	if err := h.contextRepo.Delete(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "context not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "tenant deleted"})
+	c.JSON(http.StatusOK, gin.H{"message": "context deleted"})
 }

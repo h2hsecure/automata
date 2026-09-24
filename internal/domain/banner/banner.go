@@ -23,18 +23,18 @@ type ABVariant struct {
 
 type Banner struct {
 	ID          string
-	TenantID    string
+	ContextID   string
 	Name        string
 	Type        BannerType
 	Content     string
 	LinkURL     string
-	ImageURL    string
-	AltText     string
-	CampaignID  string
+	ImageURL    *string
+	AltText     *string
+	CampaignID  *string
 	Placements  []string
 	Priority    int
-	StartDate   time.Time
-	EndDate     time.Time
+	StartDate   *time.Time
+	EndDate     *time.Time
 	IsActive    bool
 	ABTest      bool
 	ABVariants  []ABVariant
@@ -46,7 +46,7 @@ type Banner struct {
 
 type Placement struct {
 	ID          string
-	TenantID    string
+	ContextID   string
 	Name        string
 	Location    string
 	CSSSelector string
@@ -59,11 +59,11 @@ type Placement struct {
 
 type Campaign struct {
 	ID             string
-	TenantID       string
+	ContextID      string
 	Name           string
 	Description    string
-	StartDate      time.Time
-	EndDate        time.Time
+	StartDate      *time.Time
+	EndDate        *time.Time
 	IsActive       bool
 	TargetURL      string
 	TrackingCode   string
@@ -109,7 +109,7 @@ type DailyStat struct {
 type Impression struct {
 	ID        string
 	BannerID  string
-	TenantID  string
+	ContextID string
 	VisitorID string
 	CreatedAt time.Time
 }
@@ -118,7 +118,7 @@ type Impression struct {
 type Click struct {
 	ID        string
 	BannerID  string
-	TenantID  string
+	ContextID string
 	VisitorID string
 	CreatedAt time.Time
 }
@@ -179,21 +179,21 @@ type UpdatePlacementRequest struct {
 
 // CreateCampaignRequest is the request body for creating a campaign.
 type CreateCampaignRequest struct {
-	Name         string `json:"name" binding:"required"`
-	Description  string `json:"description"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	TargetURL    string `json:"target_url"`
-	TrackingCode string `json:"tracking_code"`
+	Name         string  `json:"name" binding:"required"`
+	Description  string  `json:"description"`
+	StartDate    *time.Time `json:"start_date"`
+	EndDate      *time.Time `json:"end_date"`
+	TargetURL    string  `json:"target_url"`
+	TrackingCode string  `json:"tracking_code"`
 }
 
 // UpdateCampaignRequest is the request body for updating a campaign.
 type UpdateCampaignRequest struct {
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	TargetURL    string    `json:"target_url"`
-	TrackingCode string    `json:"tracking_code"`
-	IsActive     *bool     `json:"is_active"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	StartDate    *time.Time `json:"start_date"`
+	EndDate      *time.Time `json:"end_date"`
+	TargetURL    string   `json:"target_url"`
+	TrackingCode string   `json:"tracking_code"`
+	IsActive     *bool    `json:"is_active"`
 }

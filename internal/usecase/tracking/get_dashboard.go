@@ -15,10 +15,10 @@ type GetDashboardOptions struct {
 	TopN      int
 }
 
-// GetDashboard retrieves dashboard metrics for a tenant.
-func GetDashboard(repo tracking.Repository, tenantID string, opts GetDashboardOptions) (*tracking.DashboardMetrics, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenantID required")
+// GetDashboard retrieves dashboard metrics for a context.
+func GetDashboard(repo tracking.Repository, contextID string, opts GetDashboardOptions) (*tracking.DashboardMetrics, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("contextID required")
 	}
 
 	if opts.ActiveMin <= 0 {
@@ -43,32 +43,32 @@ func GetDashboard(repo tracking.Repository, tenantID string, opts GetDashboardOp
 
 	var err error
 
-	metrics.TopPages, err = repo.GetTopPages(tenantID, dateRange, opts.TopN)
+	metrics.TopPages, err = repo.GetTopPages(contextID, dateRange, opts.TopN)
 	if err != nil {
 		return nil, fmt.Errorf("get top pages: %w", err)
 	}
 
-	metrics.TopReferrers, err = repo.GetTopReferrers(tenantID, dateRange, opts.TopN)
+	metrics.TopReferrers, err = repo.GetTopReferrers(contextID, dateRange, opts.TopN)
 	if err != nil {
 		return nil, fmt.Errorf("get top referrers: %w", err)
 	}
 
-	metrics.DeviceBreakdown, err = repo.GetDeviceBreakdown(tenantID, dateRange)
+	metrics.DeviceBreakdown, err = repo.GetDeviceBreakdown(contextID, dateRange)
 	if err != nil {
 		return nil, fmt.Errorf("get device breakdown: %w", err)
 	}
 
-	metrics.BrowserBreakdown, err = repo.GetBrowserBreakdown(tenantID, dateRange)
+	metrics.BrowserBreakdown, err = repo.GetBrowserBreakdown(contextID, dateRange)
 	if err != nil {
 		return nil, fmt.Errorf("get browser breakdown: %w", err)
 	}
 
-	metrics.ActiveVisitors, err = repo.GetActiveVisitors(tenantID, opts.ActiveMin)
+	metrics.ActiveVisitors, err = repo.GetActiveVisitors(contextID, opts.ActiveMin)
 	if err != nil {
 		return nil, fmt.Errorf("get active visitors: %w", err)
 	}
 
-	metrics, err = repo.GetDashboardMetrics(tenantID, dateRange)
+	metrics, err = repo.GetDashboardMetrics(contextID, dateRange)
 	if err != nil {
 		return nil, fmt.Errorf("get dashboard metrics: %w", err)
 	}

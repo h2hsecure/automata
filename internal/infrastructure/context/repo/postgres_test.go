@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/tenant"
+	"github.com/hekemen/automata/internal/domain/context"
 	"github.com/hekemen/automata/internal/infrastructure/tenant/repo"
 	"github.com/jackc/pgx/v5/pgxpool"
 	. "github.com/onsi/ginkgo/v2"
@@ -20,7 +20,7 @@ var _ = Describe("Postgres Tenant Repository", func() {
 		ctx               context.Context
 		container         *postgres.PostgresContainer
 		pool              *pgxpool.Pool
-		tenantRepo        tenant.Repository
+		tenantRepo        context.Repository
 		postgresContainer *postgres.PostgresContainer
 	)
 
@@ -66,9 +66,9 @@ var _ = Describe("Postgres Tenant Repository", func() {
 	})
 
 	Describe("Create", func() {
-		It("creates a tenant and returns an ID", func() {
-			t := &tenant.Tenant{
-				Slug: "test-tenant",
+		It("creates a context and returns an ID", func() {
+			t := &context.Context{
+				Slug: "test-context",
 				Name: "Test Tenant",
 			}
 
@@ -79,8 +79,8 @@ var _ = Describe("Postgres Tenant Repository", func() {
 			Expect(t.UpdatedAt).To(BeTemporally("~", time.Now(), 5*time.Second))
 		})
 
-		It("validates tenant before creating", func() {
-			t := &tenant.Tenant{
+		It("validates context before creating", func() {
+			t := &context.Context{
 				Slug: "",
 				Name: "Test",
 			}
@@ -91,8 +91,8 @@ var _ = Describe("Postgres Tenant Repository", func() {
 	})
 
 	Describe("GetByID", func() {
-		It("returns a tenant by ID", func() {
-			t := &tenant.Tenant{Slug: "getbyid-test", Name: "Get By ID Test"}
+		It("returns a context by ID", func() {
+			t := &context.Context{Slug: "getbyid-test", Name: "Get By ID Test"}
 			err := tenantRepo.Create(t)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -109,8 +109,8 @@ var _ = Describe("Postgres Tenant Repository", func() {
 	})
 
 	Describe("GetBySlug", func() {
-		It("returns a tenant by slug", func() {
-			t := &tenant.Tenant{Slug: "slug-test", Name: "Slug Test"}
+		It("returns a context by slug", func() {
+			t := &context.Context{Slug: "slug-test", Name: "Slug Test"}
 			err := tenantRepo.Create(t)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -128,7 +128,7 @@ var _ = Describe("Postgres Tenant Repository", func() {
 	Describe("List", func() {
 		It("returns created tenants", func() {
 			for i := 0; i < 3; i++ {
-				t := &tenant.Tenant{Slug: "list-test-" + string(rune('0'+i)), Name: "List Test"}
+				t := &context.Context{Slug: "list-test-" + string(rune('0'+i)), Name: "List Test"}
 				err := tenantRepo.Create(t)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -140,7 +140,7 @@ var _ = Describe("Postgres Tenant Repository", func() {
 
 		It("respects pagination", func() {
 			for i := 0; i < 5; i++ {
-				t := &tenant.Tenant{Slug: "pag-test-" + string(rune('0'+i)), Name: "Pag Test"}
+				t := &context.Context{Slug: "pag-test-" + string(rune('0'+i)), Name: "Pag Test"}
 				err := tenantRepo.Create(t)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -156,8 +156,8 @@ var _ = Describe("Postgres Tenant Repository", func() {
 	})
 
 	Describe("Update", func() {
-		It("updates a tenant", func() {
-			t := &tenant.Tenant{Slug: "update-test", Name: "Original"}
+		It("updates a context", func() {
+			t := &context.Context{Slug: "update-test", Name: "Original"}
 			err := tenantRepo.Create(t)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -172,16 +172,16 @@ var _ = Describe("Postgres Tenant Repository", func() {
 			Expect(found.IsActive).To(BeFalse())
 		})
 
-		It("returns error for non-existent tenant", func() {
-			t := &tenant.Tenant{ID: "00000000-0000-0000-0000-000000000000", Slug: "x", Name: "x"}
+		It("returns error for non-existent context", func() {
+			t := &context.Context{ID: "00000000-0000-0000-0000-000000000000", Slug: "x", Name: "x"}
 			err := tenantRepo.Update(t)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	Describe("Delete", func() {
-		It("deletes a tenant", func() {
-			t := &tenant.Tenant{Slug: "delete-test", Name: "Delete Me"}
+		It("deletes a context", func() {
+			t := &context.Context{Slug: "delete-test", Name: "Delete Me"}
 			err := tenantRepo.Create(t)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -192,7 +192,7 @@ var _ = Describe("Postgres Tenant Repository", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("returns error for non-existent tenant", func() {
+		It("returns error for non-existent context", func() {
 			err := tenantRepo.Delete("00000000-0000-0000-0000-000000000000")
 			Expect(err).To(HaveOccurred())
 		})

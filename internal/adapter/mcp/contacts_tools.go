@@ -13,10 +13,10 @@ import (
 
 // registerContactTools adds contact-related MCP tools.
 func (s *Server) registerContactTools() {
-	s.AddTool("contacts.list", "List contacts for a tenant", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+	s.AddTool("contacts.list", "List contacts for a context", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		var filters contact.FilterOptions
@@ -43,7 +43,7 @@ func (s *Server) registerContactTools() {
 		}
 		offset := (page - 1) * limit
 
-		result, err := contactuc.ListContacts(s.contactRepo, tenantID, contactuc.ListOptions{
+		result, err := contactuc.ListContacts(s.contactRepo, contextID, contactuc.ListOptions{
 			Offset: offset,
 			Limit:  limit,
 			Filters: filters,
@@ -66,16 +66,16 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.get", "Get a contact by ID", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
+		contextID, _ := args["context_id"].(string)
 		id, ok := args["id"].(string)
 		if !ok || id == "" {
 			return nil, fmt.Errorf("id is required")
 		}
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
-		contact, err := contactuc.GetContact(s.contactRepo, id, tenantID)
+		contact, err := contactuc.GetContact(s.contactRepo, id, contextID)
 		if err != nil {
 			return nil, fmt.Errorf("get contact: %w", err)
 		}
@@ -84,9 +84,9 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.create", "Create a new contact", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		var email *string
@@ -116,7 +116,7 @@ func (s *Server) registerContactTools() {
 			Tags:         tags,
 		}
 
-		contact, err := contactuc.CreateContact(s.contactRepo, tenantID, input)
+		contact, err := contactuc.CreateContact(s.contactRepo, contextID, input)
 		if err != nil {
 			return nil, fmt.Errorf("create contact: %w", err)
 		}
@@ -125,13 +125,13 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.update", "Update a contact", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
+		contextID, _ := args["context_id"].(string)
 		id, ok := args["id"].(string)
 		if !ok || id == "" {
 			return nil, fmt.Errorf("id is required")
 		}
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		var email *string
@@ -159,7 +159,7 @@ func (s *Server) registerContactTools() {
 			Tags:         tags,
 		}
 
-		contact, err := contactuc.UpdateContact(s.contactRepo, id, tenantID, input)
+		contact, err := contactuc.UpdateContact(s.contactRepo, id, contextID, input)
 		if err != nil {
 			return nil, fmt.Errorf("update contact: %w", err)
 		}
@@ -168,16 +168,16 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.delete", "Delete a contact", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
+		contextID, _ := args["context_id"].(string)
 		id, ok := args["id"].(string)
 		if !ok || id == "" {
 			return nil, fmt.Errorf("id is required")
 		}
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
-		err := contactuc.DeleteContact(s.contactRepo, id, tenantID)
+		err := contactuc.DeleteContact(s.contactRepo, id, contextID)
 		if err != nil {
 			return nil, fmt.Errorf("delete contact: %w", err)
 		}
@@ -186,17 +186,17 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.merge", "Merge two contacts", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
+		contextID, _ := args["context_id"].(string)
 		keepID, ok1 := args["keep_id"].(string)
 		mergeIntoID, ok2 := args["merge_into_id"].(string)
 		if !ok1 || keepID == "" || !ok2 || mergeIntoID == "" {
 			return nil, fmt.Errorf("keep_id and merge_into_id are required")
 		}
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
-		err := contactuc.MergeContacts(s.contactRepo, tenantID, keepID, mergeIntoID)
+		err := contactuc.MergeContacts(s.contactRepo, contextID, keepID, mergeIntoID)
 		if err != nil {
 			return nil, fmt.Errorf("merge contacts: %w", err)
 		}
@@ -205,9 +205,9 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.import", "Import contacts from CSV", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		csvData, ok := args["csv_data"].(string)
@@ -236,7 +236,7 @@ func (s *Server) registerContactTools() {
 			SourceID: getStringArg(args, "source_id"),
 		}
 
-		result, err := contactuc.ImportContacts(s.contactRepo, tenantID, input)
+		result, err := contactuc.ImportContacts(s.contactRepo, contextID, input)
 		if err != nil {
 			return nil, fmt.Errorf("import contacts: %w", err)
 		}
@@ -259,9 +259,9 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.export", "Export contacts to CSV", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		var filters contact.FilterOptions
@@ -276,7 +276,7 @@ func (s *Server) registerContactTools() {
 			fields = []string{"id", "email", "first_name", "last_name", "phone", "company", "source", "created_at"}
 		}
 
-		csvBytes, err := contactuc.ExportContacts(s.contactRepo, tenantID, filters, fields)
+		csvBytes, err := contactuc.ExportContacts(s.contactRepo, contextID, filters, fields)
 		if err != nil {
 			return nil, fmt.Errorf("export contacts: %w", err)
 		}
@@ -287,13 +287,13 @@ func (s *Server) registerContactTools() {
 	})
 
 	s.AddTool("contacts.get_activity", "Get contact activity timeline", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
+		contextID, _ := args["context_id"].(string)
 		contactID, ok := args["contact_id"].(string)
 		if !ok || contactID == "" {
 			return nil, fmt.Errorf("contact_id is required")
 		}
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		offset := 0
@@ -315,7 +315,7 @@ func (s *Server) registerContactTools() {
 			activityMaps = append(activityMaps, map[string]interface{}{
 				"id":         a.ID,
 				"contact_id": a.ContactID,
-				"tenant_id":  a.TenantID,
+				"context_id":  a.ContextID,
 				"type":       string(a.Type),
 				"data":       a.Data,
 				"source_id":  a.SourceID,
@@ -341,7 +341,7 @@ func contactToMap(c *contact.Contact) map[string]interface{} {
 
 	return map[string]interface{}{
 		"id":           c.ID,
-		"tenant_id":    c.TenantID,
+		"context_id":    c.ContextID,
 		"email":        email,
 		"first_name":   c.FirstName,
 		"last_name":    c.LastName,

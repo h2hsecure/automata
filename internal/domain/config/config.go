@@ -31,7 +31,7 @@ type DisplayConfig struct {
 // AdminConfig represents a stored configuration entry.
 type AdminConfig struct {
 	ID        string
-	TenantID  string
+	ContextID string
 	Key       ConfigKey
 	Value     map[string]interface{}
 	CreatedAt time.Time
@@ -40,8 +40,8 @@ type AdminConfig struct {
 
 // ConfigRepository defines the interface for admin config persistence.
 type ConfigRepository interface {
-	GetByTenant(tenantID string) (map[ConfigKey]map[string]interface{}, error)
-	GetByKey(tenantID string, key ConfigKey) (map[string]interface{}, error)
-	Upsert(tenantID string, key ConfigKey, value map[string]interface{}) error
-	Delete(tenantID string, key ConfigKey) error
+	GetByContext(contextID string) (map[ConfigKey]map[string]interface{}, error)
+	GetByKey(contextID string, key ConfigKey) (map[string]interface{}, error)
+	Upsert(contextID string, key ConfigKey, value map[string]interface{}) error
+	Delete(contextID string, key ConfigKey) error
 }

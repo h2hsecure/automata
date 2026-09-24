@@ -15,15 +15,15 @@ func NewConfigHandler(repo config.ConfigRepository) *ConfigHandler {
 	return &ConfigHandler{repo: repo}
 }
 
-// GetConfig handles GET /api/admin/configs/:tenantId — returns all config for a tenant.
+// GetConfig handles GET /api/admin/configs/:contextId — returns all config for a context.
 func (h *ConfigHandler) GetConfig(c *gin.Context) {
-	tenantID := c.Param("tenantId")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenantId required"})
+	contextID := c.Param("contextId")
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contextId required"})
 		return
 	}
 
-	configs, err := h.repo.GetByTenant(tenantID)
+	configs, err := h.repo.GetByContext(contextID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -32,11 +32,11 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"configs": configs})
 }
 
-// UpdateCORS handles PUT /api/admin/configs/:tenantId/cors — updates CORS origins.
+// UpdateCORS handles PUT /api/admin/configs/:contextId/cors — updates CORS origins.
 func (h *ConfigHandler) UpdateCORS(c *gin.Context) {
-	tenantID := c.Param("tenantId")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenantId required"})
+	contextID := c.Param("contextId")
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contextId required"})
 		return
 	}
 
@@ -48,7 +48,7 @@ func (h *ConfigHandler) UpdateCORS(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Upsert(tenantID, config.ConfigKeyCORS, map[string]interface{}{
+	if err := h.repo.Upsert(contextID, config.ConfigKeyCORS, map[string]interface{}{
 		"origins": req.Origins,
 	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -58,11 +58,11 @@ func (h *ConfigHandler) UpdateCORS(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "CORS config updated"})
 }
 
-// UpdateDomain handles PUT /api/admin/configs/:tenantId/domain — updates domain settings.
+// UpdateDomain handles PUT /api/admin/configs/:contextId/domain — updates domain settings.
 func (h *ConfigHandler) UpdateDomain(c *gin.Context) {
-	tenantID := c.Param("tenantId")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenantId required"})
+	contextID := c.Param("contextId")
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contextId required"})
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *ConfigHandler) UpdateDomain(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Upsert(tenantID, config.ConfigKeyDomain, map[string]interface{}{
+	if err := h.repo.Upsert(contextID, config.ConfigKeyDomain, map[string]interface{}{
 		"primary": req.Primary,
 		"aliases": req.Aliases,
 	}); err != nil {
@@ -86,11 +86,11 @@ func (h *ConfigHandler) UpdateDomain(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Domain config updated"})
 }
 
-// UpdateDisplay handles PUT /api/admin/configs/:tenantId/display — updates display settings.
+// UpdateDisplay handles PUT /api/admin/configs/:contextId/display — updates display settings.
 func (h *ConfigHandler) UpdateDisplay(c *gin.Context) {
-	tenantID := c.Param("tenantId")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenantId required"})
+	contextID := c.Param("contextId")
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contextId required"})
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h *ConfigHandler) UpdateDisplay(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Upsert(tenantID, config.ConfigKeyDisplay, map[string]interface{}{
+	if err := h.repo.Upsert(contextID, config.ConfigKeyDisplay, map[string]interface{}{
 		"name":     req.Name,
 		"logo_url": req.LogoURL,
 	}); err != nil {

@@ -8,7 +8,7 @@ import (
 // Tag represents a contact tag for categorization.
 type Tag struct {
 	ID        string
-	TenantID  string
+	ContextID string
 	Name      string
 	Color     string
 	CreatedAt time.Time

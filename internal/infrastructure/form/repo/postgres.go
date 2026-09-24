@@ -5,10 +5,22 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	_ "embed"
 
 	"github.com/hekemen/automata/internal/domain/form"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+//go:embed migration.sql
+var migrationSQL string
+
+// RunMigrations executes the embedded migration.sql against the provided database pool.
+func RunMigrations(db *pgxpool.Pool) error {
+	if _, err := db.Exec(context.Background(), migrationSQL); err != nil {
+		return fmt.Errorf("execute form migration: %w", err)
+	}
+	return nil
+}
 
 // repo implements the form.Repository interface using PostgreSQL.
 type repo struct {
@@ -31,10 +43,10 @@ func (r *repo) Create(f *form.Form) error {
 		return fmt.Errorf("marshal form settings: %w", err)
 	}
 	query := `
-		INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+		INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
 	`
-	_, err = r.pool.Exec(ctx, query, f.ID, f.TenantID, f.Slug, f.Name, f.Description, fieldsJSON, settingsJSON)
+	_, err = r.pool.Exec(ctx, query, f.ID, f.ContextID, f.Slug, f.Name, f.Description, fieldsJSON, settingsJSON)
 	if err != nil {
 		return fmt.Errorf("create form: %w", err)
 	}
@@ -44,14 +56,14 @@ func (r *repo) Create(f *form.Form) error {
 func (r *repo) GetByID(id string) (*form.Form, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, tenant_id, slug, name, description, fields, settings, created_at, updated_at
+		SELECT id, context_id, slug, name, description, fields, settings, created_at, updated_at
 		FROM forms
 		WHERE id = $1
 	`
 	f := &form.Form{}
 	var fieldsJSON, settingsJSON []byte
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&f.ID, &f.TenantID, &f.Slug, &f.Name, &f.Description,
+		&f.ID, &f.ContextID, &f.Slug, &f.Name, &f.Description,
 		&fieldsJSON, &settingsJSON, &f.CreatedAt, &f.UpdatedAt,
 	)
 	if err != nil {
@@ -69,17 +81,17 @@ func (r *repo) GetByID(id string) (*form.Form, error) {
 	return f, nil
 }
 
-func (r *repo) GetBySlug(tenantID, slug string) (*form.Form, error) {
+func (r *repo) GetBySlug(contextID, slug string) (*form.Form, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, tenant_id, slug, name, description, fields, settings, created_at, updated_at
+		SELECT id, context_id, slug, name, description, fields, settings, created_at, updated_at
 		FROM forms
-		WHERE tenant_id = $1 AND slug = $2
+		WHERE context_id = $1 AND slug = $2
 	`
 	f := &form.Form{}
 	var fieldsJSON, settingsJSON []byte
-	err := r.pool.QueryRow(ctx, query, tenantID, slug).Scan(
-		&f.ID, &f.TenantID, &f.Slug, &f.Name, &f.Description,
+	err := r.pool.QueryRow(ctx, query, contextID, slug).Scan(
+		&f.ID, &f.ContextID, &f.Slug, &f.Name, &f.Description,
 		&fieldsJSON, &settingsJSON, &f.CreatedAt, &f.UpdatedAt,
 	)
 	if err != nil {
@@ -97,15 +109,15 @@ func (r *repo) GetBySlug(tenantID, slug string) (*form.Form, error) {
 	return f, nil
 }
 
-func (r *repo) List(tenantID string) ([]*form.Form, error) {
+func (r *repo) List(contextID string) ([]*form.Form, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, tenant_id, slug, name, description, fields, settings, created_at, updated_at
+		SELECT id, context_id, slug, name, description, fields, settings, created_at, updated_at
 		FROM forms
-		WHERE tenant_id = $1
+		WHERE context_id = $1
 		ORDER BY created_at DESC
 	`
-	rows, err := r.pool.Query(ctx, query, tenantID)
+	rows, err := r.pool.Query(ctx, query, contextID)
 	if err != nil {
 		return nil, fmt.Errorf("list forms: %w", err)
 	}
@@ -116,7 +128,7 @@ func (r *repo) List(tenantID string) ([]*form.Form, error) {
 		f := &form.Form{}
 		var fieldsJSON, settingsJSON []byte
 		err := rows.Scan(
-			&f.ID, &f.TenantID, &f.Slug, &f.Name, &f.Description,
+			&f.ID, &f.ContextID, &f.Slug, &f.Name, &f.Description,
 			&fieldsJSON, &settingsJSON, &f.CreatedAt, &f.UpdatedAt,
 		)
 		if err != nil {
@@ -185,10 +197,10 @@ func (r *repo) CreateSubmission(s *form.Submission) error {
 		return fmt.Errorf("marshal submission files: %w", err)
 	}
 	query := `
-		INSERT INTO form_submissions (id, form_id, tenant_id, data, files, created_at)
+		INSERT INTO form_submissions (id, form_id, context_id, data, files, created_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
 	`
-	_, err = r.pool.Exec(ctx, query, s.ID, s.FormID, s.TenantID, dataJSON, filesJSON)
+	_, err = r.pool.Exec(ctx, query, s.ID, s.FormID, s.ContextID, dataJSON, filesJSON)
 	if err != nil {
 		return fmt.Errorf("create submission: %w", err)
 	}
@@ -198,14 +210,14 @@ func (r *repo) CreateSubmission(s *form.Submission) error {
 func (r *repo) GetSubmission(id string) (*form.Submission, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, form_id, tenant_id, data, files, created_at
+		SELECT id, form_id, context_id, data, files, created_at
 		FROM form_submissions
 		WHERE id = $1
 	`
 	s := &form.Submission{}
 	var dataJSON, filesJSON []byte
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&s.ID, &s.FormID, &s.TenantID, &dataJSON, &filesJSON, &s.CreatedAt,
+		&s.ID, &s.FormID, &s.ContextID, &dataJSON, &filesJSON, &s.CreatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -239,7 +251,7 @@ func (r *repo) ListSubmissions(formID string, opts form.ListSubmissionsOptions) 
 	}
 
 	dataQuery := `
-		SELECT id, form_id, tenant_id, data, files, created_at
+		SELECT id, form_id, context_id, data, files, created_at
 		FROM form_submissions
 		WHERE form_id = $1
 		ORDER BY created_at DESC
@@ -262,7 +274,7 @@ func (r *repo) ListSubmissions(formID string, opts form.ListSubmissionsOptions) 
 		s := &form.Submission{}
 		var dataJSON, filesJSON []byte
 		err := rows.Scan(
-			&s.ID, &s.FormID, &s.TenantID, &dataJSON, &filesJSON, &s.CreatedAt,
+			&s.ID, &s.FormID, &s.ContextID, &dataJSON, &filesJSON, &s.CreatedAt,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan submission: %w", err)

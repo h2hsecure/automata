@@ -6,10 +6,10 @@ import (
 	"github.com/hekemen/automata/internal/domain/form"
 )
 
-// UpdateForm updates an existing form, verifying tenant ownership.
-func UpdateForm(repo form.Repository, tenantID, id string, input CreateFormInput) (*form.Form, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenantID required")
+// UpdateForm updates an existing form, verifying context ownership.
+func UpdateForm(repo form.Repository, contextID, id string, input CreateFormInput) (*form.Form, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("contextID required")
 	}
 	if id == "" {
 		return nil, fmt.Errorf("form ID required")
@@ -20,8 +20,8 @@ func UpdateForm(repo form.Repository, tenantID, id string, input CreateFormInput
 		return nil, fmt.Errorf("get form: %w", err)
 	}
 
-	if f.TenantID != tenantID {
-		return nil, fmt.Errorf("form does not belong to tenant")
+	if f.ContextID != contextID {
+		return nil, fmt.Errorf("form does not belong to context")
 	}
 
 	f.Slug = input.Slug

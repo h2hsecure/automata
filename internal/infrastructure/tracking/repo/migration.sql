@@ -1,18 +1,19 @@
-CREATE TABLE IF NOT EXISTS visitors (
+CREATE TABLE IF NOT EXISTS tracking_visitors (
     id              VARCHAR(128) PRIMARY KEY,
-    tenant_id       UUID NOT NULL,
+    context_id       UUID NOT NULL,
     cookie_value    VARCHAR(128) NOT NULL,
     fingerprint     VARCHAR(64),
     first_seen      TIMESTAMPTZ DEFAULT NOW(),
     last_seen       TIMESTAMPTZ DEFAULT NOW(),
-    page_views      INT DEFAULT 0
+    page_views      INT DEFAULT 0,
+    UNIQUE(context_id, cookie_value)
 );
 
-CREATE INDEX IF NOT EXISTS idx_visitors_tenant ON visitors(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tracking_visitors_context ON tracking_visitors(context_id);
 
-CREATE TABLE IF NOT EXISTS events (
+CREATE TABLE IF NOT EXISTS tracking_events (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id       UUID NOT NULL,
+    context_id       UUID NOT NULL,
     visitor_id      VARCHAR(128),
     type            VARCHAR(32) NOT NULL,
     url             VARCHAR(2048),
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS events (
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_events_tenant_created ON events(tenant_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_events_visitor ON events(tenant_id, visitor_id);
-CREATE INDEX IF NOT EXISTS idx_events_type ON events(tenant_id, type);
-CREATE INDEX IF NOT EXISTS idx_events_url ON events(tenant_id, url) WHERE type = 'pageview';
+CREATE INDEX IF NOT EXISTS idx_tracking_events_context_created ON tracking_events(context_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tracking_events_visitor ON tracking_events(context_id, visitor_id);
+CREATE INDEX IF NOT EXISTS idx_tracking_events_type ON tracking_events(context_id, type);
+CREATE INDEX IF NOT EXISTS idx_tracking_events_url ON tracking_events(context_id, url) WHERE type = 'pageview';

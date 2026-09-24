@@ -19,9 +19,9 @@ type UpdateInput struct {
 }
 
 // UpdateContact updates an existing contact and replaces its tags.
-func UpdateContact(repo Repository, id, tenantID string, input UpdateInput) (*contact.Contact, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenant_id is required")
+func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*contact.Contact, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("context_id is required")
 	}
 
 	// Get existing contact
@@ -30,9 +30,9 @@ func UpdateContact(repo Repository, id, tenantID string, input UpdateInput) (*co
 		return nil, fmt.Errorf("get contact: %w", err)
 	}
 
-	// Verify contact belongs to tenant
-	if existing.TenantID != tenantID {
-		return nil, fmt.Errorf("contact does not belong to tenant")
+	// Verify contact belongs to context
+	if existing.ContextID != contextID {
+		return nil, fmt.Errorf("contact does not belong to context")
 	}
 
 	// Validate new email if provided
@@ -43,7 +43,7 @@ func UpdateContact(repo Repository, id, tenantID string, input UpdateInput) (*co
 
 		// Check for email conflicts with other contacts
 		if existing.Email == nil || *existing.Email != *input.Email {
-			existingContact, err := repo.FindByEmail(tenantID, *input.Email)
+			existingContact, err := repo.FindByEmail(contextID, *input.Email)
 			if err != nil {
 				if !strings.Contains(err.Error(), "contact not found") {
 					return nil, fmt.Errorf("check email conflict: %w", err)
@@ -75,7 +75,7 @@ func UpdateContact(repo Repository, id, tenantID string, input UpdateInput) (*co
 
 	// Update tags (delete old memberships, create new ones)
 	if len(input.Tags) > 0 {
-		if err := applyTags(repo, tenantID, id, input.Tags); err != nil {
+		if err := applyTags(repo, contextID, id, input.Tags); err != nil {
 			return nil, fmt.Errorf("apply tags: %w", err)
 		}
 	}

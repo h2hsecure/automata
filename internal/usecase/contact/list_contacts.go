@@ -13,11 +13,11 @@ type ListOptions struct {
 	Filters contact.FilterOptions
 }
 
-// ListContacts retrieves a paginated list of contacts for a tenant with optional filters.
+// ListContacts retrieves a paginated list of contacts for a context with optional filters.
 // Returns a ContactWithCount containing the contacts and total count.
-func ListContacts(repo Repository, tenantID string, opts ListOptions) (*contact.ContactWithCount, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenant_id is required")
+func ListContacts(repo Repository, contextID string, opts ListOptions) (*contact.ContactWithCount, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("context_id is required")
 	}
 
 	contacts, err := repo.List(opts.Offset, opts.Limit, opts.Filters)
@@ -25,7 +25,7 @@ func ListContacts(repo Repository, tenantID string, opts ListOptions) (*contact.
 		return nil, fmt.Errorf("list contacts: %w", err)
 	}
 
-	total, err := repo.CountByTenant(tenantID)
+	total, err := repo.CountByContext(contextID)
 	if err != nil {
 		return nil, fmt.Errorf("count contacts: %w", err)
 	}

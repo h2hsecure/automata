@@ -16,15 +16,15 @@ type CreateFormInput struct {
 	Settings    map[string]interface{}
 }
 
-// CreateForm creates a new form for the given tenant.
-func CreateForm(repo form.Repository, tenantID string, input CreateFormInput) (*form.Form, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenantID required")
+// CreateForm creates a new form for the given context.
+func CreateForm(repo form.Repository, contextID string, input CreateFormInput) (*form.Form, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("contextID required")
 	}
 
 	f := &form.Form{
 		ID:          uuid.New().String(),
-		TenantID:    tenantID,
+		ContextID:    contextID,
 		Slug:        input.Slug,
 		Name:        input.Name,
 		Description: input.Description,

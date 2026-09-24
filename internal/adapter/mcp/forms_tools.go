@@ -11,13 +11,13 @@ import (
 
 // registerFormTools adds form-related MCP tools.
 func (s *Server) registerFormTools(formRepo form.Repository) {
-	s.AddTool("forms.list", "List all forms for a tenant", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+	s.AddTool("forms.list", "List all forms for a context", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
-		forms, err := formusecase.ListForms(formRepo, tenantID)
+		forms, err := formusecase.ListForms(formRepo, contextID)
 		if err != nil {
 			return nil, err
 		}
@@ -26,7 +26,7 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 		for _, f := range forms {
 			result = append(result, map[string]interface{}{
 				"id":          f.ID,
-				"tenant_id":   f.TenantID,
+				"context_id":   f.ContextID,
 				"slug":        f.Slug,
 				"name":        f.Name,
 				"description": f.Description,
@@ -40,23 +40,23 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 	})
 
 	s.AddTool("forms.get", "Get a form by slug", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
+		contextID, _ := args["context_id"].(string)
 		slug, _ := args["slug"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 		if slug == "" {
 			return nil, fmt.Errorf("slug is required")
 		}
 
-		f, err := formusecase.GetForm(formRepo, tenantID, slug)
+		f, err := formusecase.GetForm(formRepo, contextID, slug)
 		if err != nil {
 			return nil, err
 		}
 
 		return map[string]interface{}{
 			"id":          f.ID,
-			"tenant_id":   f.TenantID,
+			"context_id":   f.ContextID,
 			"slug":        f.Slug,
 			"name":        f.Name,
 			"description": f.Description,
@@ -68,9 +68,9 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 	})
 
 	s.AddTool("forms.create", "Create a new form", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		slug, _ := args["slug"].(string)
@@ -97,14 +97,14 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 			Settings:    settings,
 		}
 
-		f, err := formusecase.CreateForm(formRepo, tenantID, input)
+		f, err := formusecase.CreateForm(formRepo, contextID, input)
 		if err != nil {
 			return nil, err
 		}
 
 		return map[string]interface{}{
 			"id":          f.ID,
-			"tenant_id":   f.TenantID,
+			"context_id":   f.ContextID,
 			"slug":        f.Slug,
 			"name":        f.Name,
 			"description": f.Description,
@@ -116,9 +116,9 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 	})
 
 	s.AddTool("forms.update", "Update a form", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		id, _ := args["id"].(string)
@@ -150,14 +150,14 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 			Settings:    settings,
 		}
 
-		f, err := formusecase.UpdateForm(formRepo, tenantID, id, input)
+		f, err := formusecase.UpdateForm(formRepo, contextID, id, input)
 		if err != nil {
 			return nil, err
 		}
 
 		return map[string]interface{}{
 			"id":          f.ID,
-			"tenant_id":   f.TenantID,
+			"context_id":   f.ContextID,
 			"slug":        f.Slug,
 			"name":        f.Name,
 			"description": f.Description,
@@ -169,9 +169,9 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 	})
 
 	s.AddTool("forms.delete", "Delete a form", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		id, _ := args["id"].(string)
@@ -179,7 +179,7 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 			return nil, fmt.Errorf("id is required")
 		}
 
-		err := formusecase.DeleteForm(formRepo, tenantID, id)
+		err := formusecase.DeleteForm(formRepo, contextID, id)
 		if err != nil {
 			return nil, err
 		}
@@ -191,9 +191,9 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 	})
 
 	s.AddTool("forms.submit", "Submit a form response", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenantID, _ := args["tenant_id"].(string)
-		if tenantID == "" {
-			return nil, fmt.Errorf("tenant_id is required")
+		contextID, _ := args["context_id"].(string)
+		if contextID == "" {
+			return nil, fmt.Errorf("context_id is required")
 		}
 
 		slug, _ := args["slug"].(string)
@@ -219,7 +219,7 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 			Files: files,
 		}
 
-		s, err := formusecase.SubmitForm(formRepo, tenantID, input)
+		s, err := formusecase.SubmitForm(formRepo, contextID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +227,7 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 		return map[string]interface{}{
 			"id":         s.ID,
 			"form_id":    s.FormID,
-			"tenant_id":  s.TenantID,
+			"context_id":  s.ContextID,
 			"data":       s.Data,
 			"files":      s.Files,
 			"created_at": s.CreatedAt,
@@ -264,7 +264,7 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 			result = append(result, map[string]interface{}{
 				"id":         s.ID,
 				"form_id":    s.FormID,
-				"tenant_id":  s.TenantID,
+				"context_id":  s.ContextID,
 				"data":       s.Data,
 				"files":      s.Files,
 				"created_at": s.CreatedAt,
@@ -293,7 +293,7 @@ func (s *Server) registerFormTools(formRepo form.Repository) {
 		return map[string]interface{}{
 			"id":         s.ID,
 			"form_id":    s.FormID,
-			"tenant_id":  s.TenantID,
+			"context_id":  s.ContextID,
 			"data":       s.Data,
 			"files":      s.Files,
 			"created_at": s.CreatedAt,

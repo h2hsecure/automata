@@ -38,14 +38,18 @@ type SubmitFormInput struct {
 	Data map[string]interface{} `json:"data" form:"data"`
 }
 
+type SubmitFormBody struct {
+	Data map[string]interface{} `json:"data" form:"data"`
+}
+
 func (h *FormHandler) List(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
-	forms, err := uc.ListForms(h.repo, tenantID)
+	forms, err := uc.ListForms(h.repo, contextID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -55,9 +59,9 @@ func (h *FormHandler) List(c *gin.Context) {
 }
 
 func (h *FormHandler) Get(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -68,7 +72,7 @@ func (h *FormHandler) Get(c *gin.Context) {
 		return
 	}
 
-	if f.TenantID != tenantID {
+	if f.ContextID != contextID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "form not found"})
 		return
 	}
@@ -77,9 +81,9 @@ func (h *FormHandler) Get(c *gin.Context) {
 }
 
 func (h *FormHandler) Create(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -97,7 +101,7 @@ func (h *FormHandler) Create(c *gin.Context) {
 		Settings:    input.Settings,
 	}
 
-	created, err := uc.CreateForm(h.repo, tenantID, createInput)
+	created, err := uc.CreateForm(h.repo, contextID, createInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -107,9 +111,9 @@ func (h *FormHandler) Create(c *gin.Context) {
 }
 
 func (h *FormHandler) Update(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -129,7 +133,7 @@ func (h *FormHandler) Update(c *gin.Context) {
 		Settings:    input.Settings,
 	}
 
-	updated, err := uc.UpdateForm(h.repo, tenantID, id, updateInput)
+	updated, err := uc.UpdateForm(h.repo, contextID, id, updateInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -139,15 +143,15 @@ func (h *FormHandler) Update(c *gin.Context) {
 }
 
 func (h *FormHandler) Delete(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
 	id := c.Param("id")
 
-	if err := uc.DeleteForm(h.repo, tenantID, id); err != nil {
+	if err := uc.DeleteForm(h.repo, contextID, id); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "form not found"})
 		return
 	}
@@ -156,31 +160,36 @@ func (h *FormHandler) Delete(c *gin.Context) {
 }
 
 func (h *FormHandler) SubmitForm(c *gin.Context) {
-	var input SubmitFormInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.ShouldBindQuery(&input)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "slug required"})
-			return
-		}
+	slug := c.Param("slug")
+	if slug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slug required"})
+		return
 	}
 
-	if input.Data == nil {
-		input.Data = make(map[string]interface{})
+	var body SubmitFormBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		_ = c.ShouldBindQuery(&body)
 	}
 
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	var data map[string]interface{}
+	if body.Data != nil {
+		data = body.Data
+	} else {
+		data = make(map[string]interface{})
+	}
+
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
 	submitInput := uc.SubmitFormInput{
-		Slug: input.Slug,
-		Data: input.Data,
+		Slug: slug,
+		Data: data,
 	}
 
-	_, err := uc.SubmitForm(h.repo, tenantID, submitInput)
+	sub, err := uc.SubmitForm(h.repo, contextID, submitInput)
 	if err != nil {
 		if err.Error() == "spam detected" {
 			c.JSON(http.StatusOK, gin.H{"status": "submitted"})
@@ -190,17 +199,17 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"id": "submission_id"})
+	c.JSON(http.StatusCreated, gin.H{"ID": sub.ID})
 }
 
 func (h *FormHandler) ListSubmissions(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
-	formID := c.Param("form_id")
+	formID := c.Param("id")
 
 	page := 1
 	if p := c.Query("page"); p != "" {

@@ -16,7 +16,7 @@ var (
 var _ = BeforeEach(func() {
 	ctx = context.Background()
 	pool = db.Pool
-	tenant = support.NewTestTenantID()
+	contextID = support.NewTestContextID()
 })
 
 var _ = Describe("Banner Repository Integration Tests", func() {
@@ -29,26 +29,26 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 		_, err = pool.Exec(ctx, "DELETE FROM banner_impressions")
 		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banners")
+		_, err = pool.Exec(ctx, "DELETE FROM banner_banners")
 		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM campaigns")
+		_, err = pool.Exec(ctx, "DELETE FROM banner_campaigns")
 		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM placements")
+		_, err = pool.Exec(ctx, "DELETE FROM banner_placements")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("Banner campaign CRUD", func() {
 		It("should create and retrieve a banner campaign", func() {
-			tenant = support.NewTestTenantID()
-			campaignData := support.NewTestCampaign(tenant)
+			contextID = support.NewTestContextID()
+			campaignData := support.NewTestCampaign(contextID)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO campaigns (id, tenant_id, name, description, start_date, end_date, is_active, 
+				INSERT INTO banner_campaigns (id, context_id, name, description, start_date, end_date, is_active, 
 				                       target_url, tracking_code, impressions, clicks, conversion_rate, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			`,
 				campaignData["id"],
-				campaignData["tenant_id"],
+				campaignData["context_id"],
 				campaignData["name"],
 				campaignData["description"],
 				campaignData["start_date"],
@@ -66,35 +66,35 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 			// Verify campaign was inserted
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM campaigns").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM banner_campaigns").Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 
 			// Retrieve and verify
 			var retrievedID, retrievedName string
-			err = pool.QueryRow(ctx, "SELECT id, name FROM campaigns WHERE id = $1", campaignData["id"]).Scan(&retrievedID, &retrievedName)
+			err = pool.QueryRow(ctx, "SELECT id, name FROM banner_campaigns WHERE id = $1", campaignData["id"]).Scan(&retrievedID, &retrievedName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(retrievedID).To(Equal(campaignData["id"]))
 			Expect(retrievedName).To(Equal("Test Campaign"))
 		})
 
 		It("should update a campaign", func() {
-			tenant = support.NewTestTenantID()
-			campaignData := support.NewTestCampaign(tenant)
+			contextID = support.NewTestContextID()
+			campaignData := support.NewTestCampaign(contextID)
 
 			// Insert campaign
 			campaignBytes, _ := json.Marshal(campaignData)
 			_ = campaignBytes
 
 			query := `
-				INSERT INTO campaigns (id, tenant_id, name, description, start_date, end_date, is_active, 
+				INSERT INTO banner_campaigns (id, context_id, name, description, start_date, end_date, is_active, 
 				                       target_url, tracking_code, impressions, clicks, conversion_rate, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				campaignData["id"],
-				campaignData["tenant_id"],
+				campaignData["context_id"],
 				campaignData["name"],
 				campaignData["description"],
 				campaignData["start_date"],
@@ -112,7 +112,7 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 			// Update campaign
 			_, err = pool.Exec(ctx, `
-				UPDATE campaigns SET name = $1, description = $2, is_active = $3
+				UPDATE banner_campaigns SET name = $1, description = $2, is_active = $3
 				WHERE id = $4
 			`, "Updated Campaign", "Updated description", false, campaignData["id"])
 			Expect(err).NotTo(HaveOccurred())
@@ -120,26 +120,26 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 			// Verify update
 			var name string
 			var isActive bool
-			err = pool.QueryRow(ctx, "SELECT name, is_active FROM campaigns WHERE id = $1", campaignData["id"]).Scan(&name, &isActive)
+			err = pool.QueryRow(ctx, "SELECT name, is_active FROM banner_campaigns WHERE id = $1", campaignData["id"]).Scan(&name, &isActive)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(name).To(Equal("Updated Campaign"))
 			Expect(isActive).To(BeFalse())
 		})
 
 		It("should delete a campaign", func() {
-			tenant = support.NewTestTenantID()
-			campaignData := support.NewTestCampaign(tenant)
+			contextID = support.NewTestContextID()
+			campaignData := support.NewTestCampaign(contextID)
 
 			// Insert campaign
 			query := `
-				INSERT INTO campaigns (id, tenant_id, name, description, start_date, end_date, is_active, 
+				INSERT INTO banner_campaigns (id, context_id, name, description, start_date, end_date, is_active, 
 				                       target_url, tracking_code, impressions, clicks, conversion_rate, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				campaignData["id"],
-				campaignData["tenant_id"],
+				campaignData["context_id"],
 				campaignData["name"],
 				campaignData["description"],
 				campaignData["start_date"],
@@ -156,12 +156,12 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Delete campaign
-			_, err = pool.Exec(ctx, "DELETE FROM campaigns WHERE id = $1", campaignData["id"])
+			_, err = pool.Exec(ctx, "DELETE FROM banner_campaigns WHERE id = $1", campaignData["id"])
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify deletion
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM campaigns").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM banner_campaigns").Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(0))
 		})
@@ -169,18 +169,18 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 	Describe("Banner placement CRUD", func() {
 		It("should create and retrieve a banner placement", func() {
-			tenant = support.NewTestTenantID()
-			placementData := support.NewTestPlacement(tenant)
+			contextID = support.NewTestContextID()
+			placementData := support.NewTestPlacement(contextID)
 
 			query := `
-				INSERT INTO placements (id, tenant_id, name, location, css_selector, max_banners, priority, 
+				INSERT INTO banner_placements (id, context_id, name, location, css_selector, max_banners, priority, 
 				                        is_active, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				placementData["id"],
-				placementData["tenant_id"],
+				placementData["context_id"],
 				placementData["name"],
 				placementData["location"],
 				placementData["css_selector"],
@@ -194,13 +194,13 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 			// Verify placement was inserted
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM placements").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM banner_placements").Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 
 			// Retrieve and verify
 			var retrievedID, retrievedName string
-			err = pool.QueryRow(ctx, "SELECT id, name FROM placements WHERE id = $1", placementData["id"]).Scan(&retrievedID, &retrievedName)
+			err = pool.QueryRow(ctx, "SELECT id, name FROM banner_placements WHERE id = $1", placementData["id"]).Scan(&retrievedID, &retrievedName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(retrievedID).To(Equal(placementData["id"]))
 			Expect(retrievedName).To(Equal("Test Placement"))
@@ -209,21 +209,21 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 	Describe("Banner CRUD", func() {
 		It("should create and retrieve a banner with campaign/placement links", func() {
-			tenant = support.NewTestTenantID()
-			campaignData := support.NewTestCampaign(tenant)
-			bannerData := support.NewTestBanner(tenant)
+			contextID = support.NewTestContextID()
+			campaignData := support.NewTestCampaign(contextID)
+			bannerData := support.NewTestBanner(contextID)
 
 			// Insert campaign first
 			campaignBytes, _ := json.Marshal(campaignData)
 			_ = campaignBytes
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO campaigns (id, tenant_id, name, description, start_date, end_date, is_active, 
+				INSERT INTO banner_campaigns (id, context_id, name, description, start_date, end_date, is_active, 
 				                       target_url, tracking_code, impressions, clicks, conversion_rate, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			`,
 				campaignData["id"],
-				campaignData["tenant_id"],
+				campaignData["context_id"],
 				campaignData["name"],
 				campaignData["description"],
 				campaignData["start_date"],
@@ -244,13 +244,13 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 			abVariants, _ := json.Marshal(bannerData["ab_variants"])
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO banners (id, tenant_id, name, type, content, link_url, image_url, alt_text,
+				INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text,
 				                     campaign_id, placements, priority, start_date, end_date, is_active, 
 				                     ab_test, ab_variants, impressions, clicks, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			`,
 				bannerData["id"],
-				bannerData["tenant_id"],
+				bannerData["context_id"],
 				bannerData["name"],
 				bannerData["type"],
 				bannerData["content"],
@@ -274,30 +274,30 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 			// Verify banner was inserted
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM banners").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM banner_banners").Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 		})
 
 		It("should list banners by placement code", func() {
-			tenant = support.NewTestTenantID()
+			contextID = support.NewTestContextID()
 
 			// Create multiple banners with same placement
 			for i := 0; i < 3; i++ {
-				bannerData := support.NewTestBanner(tenant)
+				bannerData := support.NewTestBanner(contextID)
 				bannerData["placements"] = []string{"header"}
 
 				placements, _ := json.Marshal(bannerData["placements"])
 				abVariants, _ := json.Marshal(bannerData["ab_variants"])
 
 				_, err := pool.Exec(ctx, `
-					INSERT INTO banners (id, tenant_id, name, type, content, link_url, image_url, alt_text,
+					INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text,
 					                     campaign_id, placements, priority, start_date, end_date, is_active, 
 					                     ab_test, ab_variants, impressions, clicks, created_at, updated_at)
 					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 				`,
 					bannerData["id"],
-					bannerData["tenant_id"],
+					bannerData["context_id"],
 					bannerData["name"],
 					bannerData["type"],
 					bannerData["content"],
@@ -323,29 +323,29 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 			// Query banners by placement
 			var count int
 			err := pool.QueryRow(ctx, `
-				SELECT COUNT(*) FROM banners 
-				WHERE tenant_id = $1 AND placements @> '["header"]'::jsonb
-			`, tenant).Scan(&count)
+				SELECT COUNT(*) FROM banner_banners 
+				WHERE context_id = $1 AND placements @> '["header"]'::jsonb
+			`, contextID).Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(3))
 		})
 
 		It("should filter banners by active campaign date range", func() {
-			tenant = support.NewTestTenantID()
-			bannerData := support.NewTestBanner(tenant)
+			contextID = support.NewTestContextID()
+			bannerData := support.NewTestBanner(contextID)
 
 			// Insert banner with future dates
 			placements, _ := json.Marshal(bannerData["placements"])
 			abVariants, _ := json.Marshal(bannerData["ab_variants"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO banners (id, tenant_id, name, type, content, link_url, image_url, alt_text,
+				INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text,
 				                     campaign_id, placements, priority, start_date, end_date, is_active, 
 				                     ab_test, ab_variants, impressions, clicks, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			`,
 				bannerData["id"],
-				bannerData["tenant_id"],
+				bannerData["context_id"],
 				bannerData["name"],
 				bannerData["type"],
 				bannerData["content"],
@@ -371,31 +371,31 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 			now := time.Now().UTC()
 			var count int
 			err = pool.QueryRow(ctx, `
-				SELECT COUNT(*) FROM banners 
-				WHERE tenant_id = $1 
+				SELECT COUNT(*) FROM banner_banners 
+				WHERE context_id = $1 
 				AND start_date <= $2 
 				AND end_date >= $2
-			`, tenant, now).Scan(&count)
+			`, contextID, now).Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 		})
 
 		It("should update banner impression/click counts", func() {
-			tenant = support.NewTestTenantID()
-			bannerData := support.NewTestBanner(tenant)
+			contextID = support.NewTestContextID()
+			bannerData := support.NewTestBanner(contextID)
 
 			// Insert banner
 			placements, _ := json.Marshal(bannerData["placements"])
 			abVariants, _ := json.Marshal(bannerData["ab_variants"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO banners (id, tenant_id, name, type, content, link_url, image_url, alt_text,
+				INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text,
 				                     campaign_id, placements, priority, start_date, end_date, is_active, 
 				                     ab_test, ab_variants, impressions, clicks, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			`,
 				bannerData["id"],
-				bannerData["tenant_id"],
+				bannerData["context_id"],
 				bannerData["name"],
 				bannerData["type"],
 				bannerData["content"],
@@ -419,22 +419,22 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 			// Update counts
 			_, err = pool.Exec(ctx, `
-				UPDATE banners SET impressions = impressions + 10, clicks = clicks + 2
+				UPDATE banner_banners SET impressions = impressions + 10, clicks = clicks + 2
 				WHERE id = $1
 			`, bannerData["id"])
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify counts
 			var impressions, clicks int64
-			err = pool.QueryRow(ctx, "SELECT impressions, clicks FROM banners WHERE id = $1", bannerData["id"]).Scan(&impressions, &clicks)
+			err = pool.QueryRow(ctx, "SELECT impressions, clicks FROM banner_banners WHERE id = $1", bannerData["id"]).Scan(&impressions, &clicks)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(impressions).To(Equal(int64(10)))
 			Expect(clicks).To(Equal(int64(2)))
 		})
 
 		It("should delete banner and verify cascade", func() {
-			tenant = support.NewTestTenantID()
-			bannerData := support.NewTestBanner(tenant)
+			contextID = support.NewTestContextID()
+			bannerData := support.NewTestBanner(contextID)
 			visitorID := support.NewTestUUID()
 
 			// Insert banner
@@ -442,13 +442,13 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 			abVariants, _ := json.Marshal(bannerData["ab_variants"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO banners (id, tenant_id, name, type, content, link_url, image_url, alt_text,
+				INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text,
 				                     campaign_id, placements, priority, start_date, end_date, is_active, 
 				                     ab_test, ab_variants, impressions, clicks, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			`,
 				bannerData["id"],
-				bannerData["tenant_id"],
+				bannerData["context_id"],
 				bannerData["name"],
 				bannerData["type"],
 				bannerData["content"],
@@ -472,19 +472,19 @@ var _ = Describe("Banner Repository Integration Tests", func() {
 
 			// Insert related impressions and clicks
 			_, err = pool.Exec(ctx, `
-				INSERT INTO banner_impressions (id, banner_id, tenant_id, visitor_id, placement_id, created_at)
+				INSERT INTO banner_impressions (id, banner_id, context_id, visitor_id, placement_id, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6)
-			`, support.NewTestUUID(), bannerData["id"], tenant, visitorID, support.NewTestUUID(), time.Now().UTC())
+			`, support.NewTestUUID(), bannerData["id"], contextID, visitorID, support.NewTestUUID(), time.Now().UTC())
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO banner_clicks (id, banner_id, tenant_id, visitor_id, created_at)
+				INSERT INTO banner_clicks (id, banner_id, context_id, visitor_id, created_at)
 				VALUES ($1, $2, $3, $4, $5)
-			`, support.NewTestUUID(), bannerData["id"], tenant, visitorID, time.Now().UTC())
+			`, support.NewTestUUID(), bannerData["id"], contextID, visitorID, time.Now().UTC())
 			Expect(err).NotTo(HaveOccurred())
 
 			// Delete banner (should cascade)
-			_, err = pool.Exec(ctx, "DELETE FROM banners WHERE id = $1", bannerData["id"])
+			_, err = pool.Exec(ctx, "DELETE FROM banner_banners WHERE id = $1", bannerData["id"])
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify cascade deletion

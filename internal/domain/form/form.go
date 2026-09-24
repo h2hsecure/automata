@@ -18,7 +18,7 @@ type FormField struct {
 // Form represents a user-defined form with fields and settings.
 type Form struct {
 	ID          string
-	TenantID    string
+	ContextID   string
 	Slug        string
 	Name        string
 	Description string

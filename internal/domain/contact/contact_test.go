@@ -13,7 +13,7 @@ func TestContactValidation(t *testing.T) {
 		{
 			name: "valid contact with email",
 			contact: Contact{
-				TenantID: "550e8400-e29b-41d4-a716-446655440000",
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
 				Email:    strPtr("user@example.com"),
 			},
 			wantErr: false,
@@ -21,7 +21,7 @@ func TestContactValidation(t *testing.T) {
 		{
 			name: "valid contact without email (unverified)",
 			contact: Contact{
-				TenantID: "550e8400-e29b-41d4-a716-446655440000",
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
 				Email:    nil,
 			},
 			wantErr: false,
@@ -36,7 +36,7 @@ func TestContactValidation(t *testing.T) {
 		{
 			name: "invalid email format",
 			contact: Contact{
-				TenantID: "550e8400-e29b-41d4-a716-446655440000",
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
 				Email:    strPtr("not-an-email"),
 			},
 			wantErr: true,
@@ -44,7 +44,7 @@ func TestContactValidation(t *testing.T) {
 		{
 			name: "email with @ but no domain",
 			contact: Contact{
-				TenantID: "550e8400-e29b-41d4-a716-446655440000",
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
 				Email:    strPtr("user@"),
 			},
 			wantErr: true,
@@ -52,7 +52,7 @@ func TestContactValidation(t *testing.T) {
 		{
 			name: "email with @ but no local part",
 			contact: Contact{
-				TenantID: "550e8400-e29b-41d4-a716-446655440000",
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
 				Email:    strPtr("@domain.com"),
 			},
 			wantErr: true,
@@ -60,7 +60,7 @@ func TestContactValidation(t *testing.T) {
 		{
 			name: "empty email string",
 			contact: Contact{
-				TenantID: "550e8400-e29b-41d4-a716-446655440000",
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
 				Email:    strPtr(""),
 			},
 			wantErr: false,
@@ -68,7 +68,7 @@ func TestContactValidation(t *testing.T) {
 		{
 			name: "email too long",
 			contact: Contact{
-				TenantID: "550e8400-e29b-41d4-a716-446655440000",
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
 				Email:    strPtr("a" + string(make([]byte, 255)) + "@example.com"),
 			},
 			wantErr: true,

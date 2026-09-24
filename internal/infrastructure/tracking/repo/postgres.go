@@ -5,11 +5,24 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	_ "embed"
 
+	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/tracking"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+//go:embed migration.sql
+var migrationSQL string
+
+// RunMigrations executes the embedded migration.sql against the provided database pool.
+func RunMigrations(db *pgxpool.Pool) error {
+	if _, err := db.Exec(context.Background(), migrationSQL); err != nil {
+		return fmt.Errorf("execute tracking migration: %w", err)
+	}
+	return nil
+}
 
 // repo implements the tracking.Repository interface using PostgreSQL.
 type repo struct {
@@ -28,10 +41,10 @@ func (r *repo) CreateEvent(e *tracking.Event) error {
 		return fmt.Errorf("marshal event properties: %w", err)
 	}
 	query := `
-		INSERT INTO tracking_events (id, tenant_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
+		INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
 	`
-	_, err = r.pool.Exec(ctx, query, e.ID, e.TenantID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
+	_, err = r.pool.Exec(ctx, query, e.ID, e.ContextID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
 	if err != nil {
 		return fmt.Errorf("create event: %w", err)
 	}
@@ -47,10 +60,10 @@ func (r *repo) CreateEventsBatch(events []*tracking.Event) error {
 			return fmt.Errorf("marshal event properties: %w", err)
 		}
 		query := `
-			INSERT INTO tracking_events (id, tenant_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
+			INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
 		`
-		batch.Queue(query, e.ID, e.TenantID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
+		batch.Queue(query, e.ID, e.ContextID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
 	}
 	results := r.pool.SendBatch(ctx, batch)
 	defer results.Close()
@@ -63,16 +76,16 @@ func (r *repo) CreateEventsBatch(events []*tracking.Event) error {
 	return nil
 }
 
-func (r *repo) GetVisitor(tenantID, visitorID string) (*tracking.Visitor, error) {
+func (r *repo) GetVisitor(contextID, visitorID string) (*tracking.Visitor, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, tenant_id, cookie_value, fingerprint, first_seen, last_seen, page_views
+		SELECT id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views
 		FROM tracking_visitors
-		WHERE tenant_id = $1 AND cookie_value = $2
+		WHERE context_id = $1 AND cookie_value = $2
 	`
 	v := &tracking.Visitor{}
-	err := r.pool.QueryRow(ctx, query, tenantID, visitorID).Scan(
-		&v.ID, &v.TenantID, &v.CookieValue, &v.Fingerprint,
+	err := r.pool.QueryRow(ctx, query, contextID, visitorID).Scan(
+		&v.ID, &v.ContextID, &v.CookieValue, &v.Fingerprint,
 		&v.FirstSeen, &v.LastSeen, &v.PageViews,
 	)
 	if err != nil {
@@ -86,21 +99,24 @@ func (r *repo) GetVisitor(tenantID, visitorID string) (*tracking.Visitor, error)
 
 func (r *repo) UpsertVisitor(v *tracking.Visitor) error {
 	ctx := context.Background()
+	if v.ID == "" {
+		v.ID = uuid.New().String()
+	}
 	query := `
-		INSERT INTO tracking_visitors (id, tenant_id, cookie_value, fingerprint, first_seen, last_seen, page_views)
+		INSERT INTO tracking_visitors (id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (tenant_id, cookie_value) DO UPDATE
+		ON CONFLICT (context_id, cookie_value) DO UPDATE
 			SET last_seen = EXCLUDED.last_seen,
 				page_views = tracking_visitors.page_views + EXCLUDED.page_views
 	`
-	_, err := r.pool.Exec(ctx, query, v.ID, v.TenantID, v.CookieValue, v.Fingerprint, v.FirstSeen, v.LastSeen, v.PageViews)
+	_, err := r.pool.Exec(ctx, query, v.ID, v.ContextID, v.CookieValue, v.Fingerprint, v.FirstSeen, v.LastSeen, v.PageViews)
 	if err != nil {
 		return fmt.Errorf("upsert visitor: %w", err)
 	}
 	return nil
 }
 
-func (r *repo) GetDashboardMetrics(tenantID string, dateRange tracking.DateRange) (*tracking.DashboardMetrics, error) {
+func (r *repo) GetDashboardMetrics(contextID string, dateRange tracking.DateRange) (*tracking.DashboardMetrics, error) {
 	ctx := context.Background()
 	metrics := &tracking.DashboardMetrics{}
 
@@ -108,8 +124,8 @@ func (r *repo) GetDashboardMetrics(tenantID string, dateRange tracking.DateRange
 	err := r.pool.QueryRow(ctx, `
 		SELECT COUNT(DISTINCT visitor_id), COUNT(*)
 		FROM tracking_events
-		WHERE tenant_id = $1 AND created_at BETWEEN $2 AND $3
-	`, tenantID, dateRange.Start, dateRange.End).Scan(&totalVisitors, &pageViews)
+		WHERE context_id = $1 AND created_at BETWEEN $2 AND $3
+	`, contextID, dateRange.Start, dateRange.End).Scan(&totalVisitors, &pageViews)
 	if err != nil {
 		return nil, fmt.Errorf("get dashboard counts: %w", err)
 	}
@@ -119,15 +135,15 @@ func (r *repo) GetDashboardMetrics(tenantID string, dateRange tracking.DateRange
 	return metrics, nil
 }
 
-func (r *repo) GetEvents(tenantID string, opts tracking.EventFilter) ([]*tracking.Event, int64, error) {
+func (r *repo) GetEvents(contextID string, opts tracking.EventFilter) ([]*tracking.Event, int64, error) {
 	ctx := context.Background()
 
-	countQuery := `SELECT COUNT(*) FROM tracking_events WHERE tenant_id = $1`
+	countQuery := `SELECT COUNT(*) FROM tracking_events WHERE context_id = $1`
 	dataQuery := `
-		SELECT id, tenant_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at
-		FROM tracking_events WHERE tenant_id = $1
+		SELECT id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at
+		FROM tracking_events WHERE context_id = $1
 	`
-	args := []interface{}{tenantID}
+	args := []interface{}{contextID}
 	argIdx := 2
 
 	if opts.Type != "" {
@@ -174,7 +190,7 @@ func (r *repo) GetEvents(tenantID string, opts tracking.EventFilter) ([]*trackin
 		e := &tracking.Event{}
 		var propertiesJSON []byte
 		err := rows.Scan(
-			&e.ID, &e.TenantID, &e.VisitorID, &e.Type, &e.URL, &e.Title,
+			&e.ID, &e.ContextID, &e.VisitorID, &e.Type, &e.URL, &e.Title,
 			&e.Referrer, &e.EventName, &propertiesJSON, &e.UserAgent, &e.IPHash,
 			&e.UTMSource, &e.UTMMedium, &e.UTMCampaign, &e.CreatedAt,
 		)
@@ -192,15 +208,15 @@ func (r *repo) GetEvents(tenantID string, opts tracking.EventFilter) ([]*trackin
 	return events, total, nil
 }
 
-func (r *repo) GetTopPages(tenantID string, dateRange tracking.DateRange, limit int) ([]tracking.PageViewCount, error) {
+func (r *repo) GetTopPages(contextID string, dateRange tracking.DateRange, limit int) ([]tracking.PageViewCount, error) {
 	ctx := context.Background()
 	query := `
 		SELECT url, COUNT(*) as count
 		FROM tracking_events
-		WHERE tenant_id = $1 AND type = 'pageview' AND created_at BETWEEN $2 AND $3
+		WHERE context_id = $1 AND type = 'pageview' AND created_at BETWEEN $2 AND $3
 		GROUP BY url ORDER BY count DESC LIMIT $4
 	`
-	rows, err := r.pool.Query(ctx, query, tenantID, dateRange.Start, dateRange.End, limit)
+	rows, err := r.pool.Query(ctx, query, contextID, dateRange.Start, dateRange.End, limit)
 	if err != nil {
 		return nil, fmt.Errorf("get top pages: %w", err)
 	}
@@ -218,15 +234,15 @@ func (r *repo) GetTopPages(tenantID string, dateRange tracking.DateRange, limit 
 	return pages, nil
 }
 
-func (r *repo) GetTopReferrers(tenantID string, dateRange tracking.DateRange, limit int) ([]tracking.ReferrerCount, error) {
+func (r *repo) GetTopReferrers(contextID string, dateRange tracking.DateRange, limit int) ([]tracking.ReferrerCount, error) {
 	ctx := context.Background()
 	query := `
 		SELECT referrer, COUNT(*) as count
 		FROM tracking_events
-		WHERE tenant_id = $1 AND referrer != '' AND created_at BETWEEN $2 AND $3
+		WHERE context_id = $1 AND referrer != '' AND created_at BETWEEN $2 AND $3
 		GROUP BY referrer ORDER BY count DESC LIMIT $4
 	`
-	rows, err := r.pool.Query(ctx, query, tenantID, dateRange.Start, dateRange.End, limit)
+	rows, err := r.pool.Query(ctx, query, contextID, dateRange.Start, dateRange.End, limit)
 	if err != nil {
 		return nil, fmt.Errorf("get top referrers: %w", err)
 	}
@@ -244,15 +260,15 @@ func (r *repo) GetTopReferrers(tenantID string, dateRange tracking.DateRange, li
 	return referrers, nil
 }
 
-func (r *repo) GetDeviceBreakdown(tenantID string, dateRange tracking.DateRange) (map[string]int, error) {
+func (r *repo) GetDeviceBreakdown(contextID string, dateRange tracking.DateRange) (map[string]int, error) {
 	ctx := context.Background()
 	query := `
 		SELECT user_agent, COUNT(*) as count
 		FROM tracking_events
-		WHERE tenant_id = $1 AND created_at BETWEEN $2 AND $3
+		WHERE context_id = $1 AND created_at BETWEEN $2 AND $3
 		GROUP BY user_agent ORDER BY count DESC
 	`
-	rows, err := r.pool.Query(ctx, query, tenantID, dateRange.Start, dateRange.End)
+	rows, err := r.pool.Query(ctx, query, contextID, dateRange.Start, dateRange.End)
 	if err != nil {
 		return nil, fmt.Errorf("get device breakdown: %w", err)
 	}
@@ -271,15 +287,15 @@ func (r *repo) GetDeviceBreakdown(tenantID string, dateRange tracking.DateRange)
 	return breakdown, nil
 }
 
-func (r *repo) GetBrowserBreakdown(tenantID string, dateRange tracking.DateRange) (map[string]int, error) {
+func (r *repo) GetBrowserBreakdown(contextID string, dateRange tracking.DateRange) (map[string]int, error) {
 	ctx := context.Background()
 	query := `
 		SELECT user_agent, COUNT(*) as count
 		FROM tracking_events
-		WHERE tenant_id = $1 AND created_at BETWEEN $2 AND $3
+		WHERE context_id = $1 AND created_at BETWEEN $2 AND $3
 		GROUP BY user_agent ORDER BY count DESC
 	`
-	rows, err := r.pool.Query(ctx, query, tenantID, dateRange.Start, dateRange.End)
+	rows, err := r.pool.Query(ctx, query, contextID, dateRange.Start, dateRange.End)
 	if err != nil {
 		return nil, fmt.Errorf("get browser breakdown: %w", err)
 	}
@@ -298,28 +314,28 @@ func (r *repo) GetBrowserBreakdown(tenantID string, dateRange tracking.DateRange
 	return breakdown, nil
 }
 
-func (r *repo) GetActiveVisitors(tenantID string, minutes int) (int64, error) {
+func (r *repo) GetActiveVisitors(contextID string, minutes int) (int64, error) {
 	ctx := context.Background()
 	query := `
 		SELECT COUNT(DISTINCT visitor_id)
 		FROM tracking_events
-		WHERE tenant_id = $1 AND created_at > NOW() - ($2 || ' minutes')::interval
+		WHERE context_id = $1 AND created_at > NOW() - ($2 || ' minutes')::interval
 	`
 	var count int64
-	err := r.pool.QueryRow(ctx, query, tenantID, minutes).Scan(&count)
+	err := r.pool.QueryRow(ctx, query, contextID, minutes).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get active visitors: %w", err)
 	}
 	return count, nil
 }
 
-func (r *repo) PurgeOldEvents(tenantID string, retentionDays int) (int64, error) {
+func (r *repo) PurgeOldEvents(contextID string, retentionDays int) (int64, error) {
 	ctx := context.Background()
 	query := `
 		DELETE FROM tracking_events
-		WHERE tenant_id = $1 AND created_at < NOW() - ($2 || ' days')::interval
+		WHERE context_id = $1 AND created_at < NOW() - ($2 || ' days')::interval
 	`
-	result, err := r.pool.Exec(ctx, query, tenantID, retentionDays)
+	result, err := r.pool.Exec(ctx, query, contextID, retentionDays)
 	if err != nil {
 		return 0, fmt.Errorf("purge old events: %w", err)
 	}

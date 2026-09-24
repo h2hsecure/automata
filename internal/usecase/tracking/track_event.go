@@ -8,19 +8,19 @@ import (
 )
 
 // TrackEvent tracks a visitor event and updates visitor metrics.
-func TrackEvent(repo tracking.Repository, tenantID string, event *tracking.Event) error {
-	if tenantID == "" {
-		return fmt.Errorf("tenantID required")
+func TrackEvent(repo tracking.Repository, contextID string, event *tracking.Event) error {
+	if contextID == "" {
+		return fmt.Errorf("contextID required")
 	}
 
-	event.TenantID = tenantID
+	event.ContextID = contextID
 
 	if err := repo.CreateEvent(event); err != nil {
 		return fmt.Errorf("create event: %w", err)
 	}
 
 	visitor := &tracking.Visitor{
-		TenantID:    tenantID,
+		ContextID:    contextID,
 		CookieValue: event.VisitorID,
 		PageViews:   1,
 		FirstSeen:   event.CreatedAt,
@@ -35,12 +35,12 @@ func TrackEvent(repo tracking.Repository, tenantID string, event *tracking.Event
 }
 
 // TrackEventWithTime is like TrackEvent but uses the provided time for event creation.
-func TrackEventWithTime(repo tracking.Repository, tenantID string, event *tracking.Event, now time.Time) error {
-	if tenantID == "" {
-		return fmt.Errorf("tenantID required")
+func TrackEventWithTime(repo tracking.Repository, contextID string, event *tracking.Event, now time.Time) error {
+	if contextID == "" {
+		return fmt.Errorf("contextID required")
 	}
 
-	event.TenantID = tenantID
+	event.ContextID = contextID
 	event.CreatedAt = now
 
 	if err := repo.CreateEvent(event); err != nil {
@@ -48,7 +48,7 @@ func TrackEventWithTime(repo tracking.Repository, tenantID string, event *tracki
 	}
 
 	visitor := &tracking.Visitor{
-		TenantID:    tenantID,
+		ContextID:    contextID,
 		CookieValue: event.VisitorID,
 		PageViews:   1,
 		FirstSeen:   now,

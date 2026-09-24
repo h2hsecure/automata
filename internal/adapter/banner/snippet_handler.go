@@ -10,15 +10,15 @@ import (
 // SnippetHandler serves the JavaScript banner snippet.
 type SnippetHandler struct{}
 
-// ServeBannerSnippet handles GET /snippet/banner/:id.js — returns the banner JS for a tenant.
+// ServeBannerSnippet handles GET /snippet/banner/:id.js — returns the banner JS for a context.
 func (h *SnippetHandler) ServeBannerSnippet(c *gin.Context) {
-	tenantID := c.Param("id")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant ID required"})
+	contextID := c.Param("id")
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context ID required"})
 		return
 	}
 
-	js, err := snippet.GenerateBannerSnippet(tenantID, nil)
+	js, err := snippet.GenerateBannerSnippet(contextID, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -4,20 +4,20 @@ import (
 	"fmt"
 )
 
-// DeleteContact removes a contact by ID after verifying it belongs to the tenant.
-func DeleteContact(repo Repository, id, tenantID string) error {
-	if tenantID == "" {
-		return fmt.Errorf("tenant_id is required")
+// DeleteContact removes a contact by ID after verifying it belongs to the context.
+func DeleteContact(repo Repository, id, contextID string) error {
+	if contextID == "" {
+		return fmt.Errorf("context_id is required")
 	}
 
-	// Get existing contact to verify it belongs to tenant
+	// Get existing contact to verify it belongs to context
 	existing, err := repo.GetByID(id)
 	if err != nil {
 		return fmt.Errorf("get contact: %w", err)
 	}
 
-	if existing.TenantID != tenantID {
-		return fmt.Errorf("contact does not belong to tenant")
+	if existing.ContextID != contextID {
+		return fmt.Errorf("contact does not belong to context")
 	}
 
 	// Delete contact (tags cascade via FK)

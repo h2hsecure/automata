@@ -18,7 +18,7 @@ const (
 type Activity struct {
 	ID        string
 	ContactID string
-	TenantID  string
+	ContextID  string
 	Type      ActivityType
 	Data      map[string]interface{}
 	SourceID  string

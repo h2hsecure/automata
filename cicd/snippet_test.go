@@ -9,8 +9,8 @@ import (
 
 var _ = Describe("Snippet Generator Tests", func() {
 	Describe("JavaScript snippet generation", func() {
-		It("should generate tracking snippet with tenant ID", func() {
-			tenantID := support.NewTestTenantID()
+		It("should generate tracking snippet with context ID", func() {
+			tenantID := support.NewTestContextID()
 
 			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -19,7 +19,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		})
 
 		It("should generate tracking pixel URL", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 
 			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -30,7 +30,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		})
 
 		It("should generate snippet with custom domain", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			options := map[string]interface{}{
 				"apiHost": "https://custom.example.com",
 			}
@@ -41,7 +41,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		})
 
 		It("should generate snippet with event tracking enabled", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			options := map[string]interface{}{
 				"batchSize":     float64(50),
 				"batchInterval": float64(60),
@@ -54,7 +54,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		})
 
 		It("should verify snippet contains required script tags", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 
 			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -69,14 +69,14 @@ var _ = Describe("Snippet Generator Tests", func() {
 			Expect(js).To(ContainSubstring("_sendEvent"))
 		})
 
-		It("should verify pixel URL includes tenant and visitor IDs", func() {
-			tenantID := support.NewTestTenantID()
+		It("should verify pixel URL includes context and visitor IDs", func() {
+			tenantID := support.NewTestContextID()
 
 			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify snippet references tenant ID
-			Expect(js).To(ContainSubstring("a.tenantId=\"" + tenantID + "\""))
+			// Verify snippet references context ID
+			Expect(js).To(ContainSubstring("a.contextId=\"" + tenantID + "\""))
 
 			// Verify snippet handles visitor ID
 			Expect(js).To(ContainSubstring("visitorId"))
@@ -84,8 +84,8 @@ var _ = Describe("Snippet Generator Tests", func() {
 	})
 
 	Describe("Banner snippet generation", func() {
-		It("should generate banner snippet with tenant ID", func() {
-			tenantID := support.NewTestTenantID()
+		It("should generate banner snippet with context ID", func() {
+			tenantID := support.NewTestContextID()
 
 			js, err := snippet.GenerateBannerSnippet(tenantID, nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -94,7 +94,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 		})
 
 		It("should generate banner snippet with custom server host", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			options := map[string]interface{}{
 				"serverHost": "https://banners.example.com",
 			}
@@ -107,7 +107,7 @@ var _ = Describe("Snippet Generator Tests", func() {
 
 	Describe("Snippet sanitization", func() {
 		It("should remove leading/trailing whitespace", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 
 			js, err := snippet.Generate(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -120,22 +120,22 @@ var _ = Describe("Snippet Generator Tests", func() {
 	})
 
 	Describe("Error handling", func() {
-		It("should return error for empty tenant ID", func() {
+		It("should return error for empty context ID", func() {
 			_, err := snippet.Generate("", "", nil)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("tenantID required"))
+			Expect(err.Error()).To(ContainSubstring("contextID required"))
 		})
 
-		It("should return error for empty tenant ID in banner snippet", func() {
+		It("should return error for empty context ID in banner snippet", func() {
 			_, err := snippet.GenerateBannerSnippet("", nil)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("tenantID required"))
+			Expect(err.Error()).To(ContainSubstring("contextID required"))
 		})
 	})
 
 	Describe("Minified generation", func() {
 		It("should generate minified snippet", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 
 			js, err := snippet.GenerateMinified(tenantID, "", nil)
 			Expect(err).NotTo(HaveOccurred())

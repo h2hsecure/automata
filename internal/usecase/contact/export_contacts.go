@@ -7,11 +7,11 @@ import (
 	"github.com/hekemen/automata/pkg/export"
 )
 
-// ExportContacts retrieves contacts for a tenant, converts them to CSV,
+// ExportContacts retrieves contacts for a context, converts them to CSV,
 // and returns the CSV bytes.
-func ExportContacts(repo Repository, tenantID string, filters contact.FilterOptions, fields []string) ([]byte, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenant_id is required")
+func ExportContacts(repo Repository, contextID string, filters contact.FilterOptions, fields []string) ([]byte, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("context_id is required")
 	}
 	if len(fields) == 0 {
 		return nil, fmt.Errorf("at least one field is required for export")

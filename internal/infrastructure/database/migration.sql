@@ -1,6 +1,6 @@
--- Core platform migration: tenants, tenant_users, api_keys
+-- Core platform migration: contexts, context_users, api_keys
 
-CREATE TABLE IF NOT EXISTS tenants (
+CREATE TABLE IF NOT EXISTS contexts (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug            TEXT NOT NULL UNIQUE,
     name            TEXT NOT NULL,
@@ -11,9 +11,9 @@ CREATE TABLE IF NOT EXISTS tenants (
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS tenant_users (
+CREATE TABLE IF NOT EXISTS context_users (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    context_id   UUID NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
     email       VARCHAR(254) NOT NULL,
     password_hash TEXT NOT NULL,
     is_owner    BOOLEAN DEFAULT false,
@@ -21,29 +21,29 @@ CREATE TABLE IF NOT EXISTS tenant_users (
     updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_users_tenant_email ON tenant_users(tenant_id, email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_context_users_context_email ON context_users(context_id, email);
 
 CREATE TABLE IF NOT EXISTS api_keys (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    user_id     UUID NOT NULL REFERENCES tenant_users(id) ON DELETE CASCADE,
+    context_id   UUID NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
+    user_id     UUID NOT NULL REFERENCES context_users(id) ON DELETE CASCADE,
     key_hash    VARCHAR(64) NOT NULL,
     name        TEXT NOT NULL,
     expires_at  TIMESTAMPTZ,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_tenant_name ON api_keys(tenant_id, name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_context_name ON api_keys(context_id, name);
 
--- Admin config: per-tenant key-value settings
+-- Admin config: per-context key-value settings
 CREATE TABLE IF NOT EXISTS admin_configs (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    context_id   UUID NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
     key         VARCHAR(128) NOT NULL,
     value       JSONB NOT NULL DEFAULT '{}',
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     updated_at  TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(tenant_id, key)
+    UNIQUE(context_id, key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_admin_configs_tenant ON admin_configs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_admin_configs_context ON admin_configs(context_id);

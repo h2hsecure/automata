@@ -93,22 +93,27 @@ var _ = Describe("Contact Migration", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("creates unique constraint on tenant+email", func() {
+		It("creates unique constraint on context+email", func() {
 			err := contact.RunMigrations(pool)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Generate a single context_id to use for both inserts
+			var contextID string
+			err = pool.QueryRow(ctx, "SELECT gen_random_uuid()::text").Scan(&contextID)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Insert first contact with email
 			_, err = pool.Exec(ctx, `
-				INSERT INTO contacts (tenant_id, email, first_name)
-				VALUES (gen_random_uuid(), 'test@example.com', 'Test')
-			`)
+				INSERT INTO contacts (context_id, email, first_name)
+				VALUES ($1, 'test@example.com', 'Test')
+			`, contextID)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Try to insert duplicate email — should fail
+			// Try to insert duplicate email in same context — should fail
 			_, err = pool.Exec(ctx, `
-				INSERT INTO contacts (tenant_id, email, first_name)
-				VALUES (gen_random_uuid(), 'test@example.com', 'Duplicate')
-			`)
+				INSERT INTO contacts (context_id, email, first_name)
+				VALUES ($1, 'test@example.com', 'Duplicate')
+			`, contextID)
 			Expect(err).To(HaveOccurred())
 		})
 	})

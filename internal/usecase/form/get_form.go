@@ -6,13 +6,13 @@ import (
 	"github.com/hekemen/automata/internal/domain/form"
 )
 
-// GetForm retrieves a form by slug for the given tenant.
-func GetForm(repo form.Repository, tenantID, slug string) (*form.Form, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenantID required")
+// GetForm retrieves a form by slug for the given context.
+func GetForm(repo form.Repository, contextID, slug string) (*form.Form, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("contextID required")
 	}
 
-	f, err := repo.GetBySlug(tenantID, slug)
+	f, err := repo.GetBySlug(contextID, slug)
 	if err != nil {
 		return nil, fmt.Errorf("get form: %w", err)
 	}

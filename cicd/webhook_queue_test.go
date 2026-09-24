@@ -32,7 +32,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 
 	Describe("Webhook delivery enqueueing", func() {
 		It("should enqueue a webhook with pending status", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"key": "value", "form_id": formID}
 
@@ -53,7 +53,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 		})
 
 		It("should enqueue webhook with payload data", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{
 				"contact_email": "test@example.com",
@@ -78,7 +78,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 
 	Describe("Webhook processing", func() {
 		It("should process pending webhook and mark as delivered", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"test": "data"}
 
@@ -103,7 +103,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 		})
 
 		It("should retry failed webhooks up to max_attempts", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"test": "data"}
 
@@ -128,7 +128,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 		})
 
 		It("should mark webhook as permanently failed after max_attempts exceeded", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"test": "data"}
 
@@ -157,7 +157,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 
 	Describe("Mock webhook capture", func() {
 		It("should capture delivered webhooks in mock server", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"contact_email": "test@example.com"}
 
@@ -192,7 +192,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 		})
 
 		It("should capture multiple webhook deliveries", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 
 			// Enqueue multiple webhooks
 			for i := 0; i < 3; i++ {
@@ -226,7 +226,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 
 	Describe("Webhook listing", func() {
 		It("should list pending webhooks for worker processing", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 
 			// Enqueue multiple webhooks
 			for i := 0; i < 5; i++ {
@@ -244,7 +244,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 		})
 
 		It("should only return pending webhooks", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			formID := support.NewTestUUID()
 
 			// Enqueue a webhook

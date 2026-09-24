@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS webhook_deliveries (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   UUID NOT NULL,
+    context_id   UUID NOT NULL,
     form_id     UUID NOT NULL,
     url         TEXT NOT NULL,
     payload     JSONB NOT NULL,

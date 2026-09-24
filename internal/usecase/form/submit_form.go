@@ -16,12 +16,12 @@ type SubmitFormInput struct {
 }
 
 // SubmitForm submits a form by slug, validating data against form fields.
-func SubmitForm(repo form.Repository, tenantID string, input SubmitFormInput) (*form.Submission, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenantID required")
+func SubmitForm(repo form.Repository, contextID string, input SubmitFormInput) (*form.Submission, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("contextID required")
 	}
 
-	f, err := repo.GetBySlug(tenantID, input.Slug)
+	f, err := repo.GetBySlug(contextID, input.Slug)
 	if err != nil {
 		return nil, fmt.Errorf("get form: %w", err)
 	}
@@ -37,7 +37,7 @@ func SubmitForm(repo form.Repository, tenantID string, input SubmitFormInput) (*
 	s := &form.Submission{
 		ID:       uuid.New().String(),
 		FormID:   f.ID,
-		TenantID: tenantID,
+		ContextID: contextID,
 		Data:     input.Data,
 		Files:    input.Files,
 	}

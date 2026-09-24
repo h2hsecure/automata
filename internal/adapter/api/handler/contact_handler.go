@@ -44,9 +44,9 @@ func NewContactHandler(repo contact.Repository) *ContactHandler {
 }
 
 func (h *ContactHandler) List(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -94,7 +94,7 @@ func (h *ContactHandler) List(c *gin.Context) {
 		},
 	}
 
-	result, err := uc.ListContacts(h.repo, tenantID, opts)
+	result, err := uc.ListContacts(h.repo, contextID, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -114,9 +114,9 @@ func (h *ContactHandler) List(c *gin.Context) {
 }
 
 func (h *ContactHandler) Get(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -127,7 +127,7 @@ func (h *ContactHandler) Get(c *gin.Context) {
 		return
 	}
 
-	if contact.TenantID != tenantID {
+	if contact.ContextID != contextID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contact not found"})
 		return
 	}
@@ -136,9 +136,9 @@ func (h *ContactHandler) Get(c *gin.Context) {
 }
 
 func (h *ContactHandler) Create(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *ContactHandler) Create(c *gin.Context) {
 		Tags:         input.Tags,
 	}
 
-	created, err := uc.CreateContact(h.repo, tenantID, createInput)
+	created, err := uc.CreateContact(h.repo, contextID, createInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -169,9 +169,9 @@ func (h *ContactHandler) Create(c *gin.Context) {
 }
 
 func (h *ContactHandler) Update(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -193,7 +193,7 @@ func (h *ContactHandler) Update(c *gin.Context) {
 		Tags:         input.Tags,
 	}
 
-	updated, err := uc.UpdateContact(h.repo, id, tenantID, updateInput)
+	updated, err := uc.UpdateContact(h.repo, id, contextID, updateInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -203,15 +203,15 @@ func (h *ContactHandler) Update(c *gin.Context) {
 }
 
 func (h *ContactHandler) Delete(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
 	id := c.Param("id")
 
-	if err := uc.DeleteContact(h.repo, id, tenantID); err != nil {
+	if err := uc.DeleteContact(h.repo, id, contextID); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contact not found"})
 		return
 	}
@@ -220,9 +220,9 @@ func (h *ContactHandler) Delete(c *gin.Context) {
 }
 
 func (h *ContactHandler) Merge(c *gin.Context) {
-	tenantID := c.GetString("tenant_id")
-	if tenantID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
 
@@ -234,7 +234,7 @@ func (h *ContactHandler) Merge(c *gin.Context) {
 		return
 	}
 
-	if err := uc.MergeContacts(h.repo, tenantID, keepID, input.MergeWith); err != nil {
+	if err := uc.MergeContacts(h.repo, contextID, keepID, input.MergeWith); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

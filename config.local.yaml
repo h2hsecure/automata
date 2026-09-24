@@ -1,0 +1,15 @@
+server:
+  host: 0.0.0.0
+  port: "8080"
+  tracking_port: "8081"
+
+database:
+  host: localhost
+  port: "5432"
+  name: automata
+  user: automata
+  password: changeme
+  max_connections: "4"
+
+auth:
+  secret_key: change-this-in-production

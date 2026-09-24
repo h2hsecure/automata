@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/hekemen/automata/internal/domain/contact"
-	"github.com/hekemen/automata/internal/domain/tenant"
+	domainctx "github.com/hekemen/automata/internal/domain/context"
 )
 
 // Tool represents an MCP tool.
@@ -16,14 +16,14 @@ type Tool struct {
 
 // Server is the MCP server that exposes tools for AI integration.
 type Server struct {
-	tenantRepo   tenant.Repository
-	contactRepo  contact.Repository
+	contextRepo domainctx.Repository
+	contactRepo contact.Repository
 	tools        []*Tool
 }
 
 // NewServer creates a new MCP server.
-func NewServer(tenantRepo tenant.Repository, contactRepo contact.Repository) *Server {
-	s := &Server{tenantRepo: tenantRepo, contactRepo: contactRepo}
+func NewServer(contextRepo domainctx.Repository, contactRepo contact.Repository) *Server {
+	s := &Server{contextRepo: contextRepo, contactRepo: contactRepo}
 	s.registerBaseTools()
 	s.registerContactTools()
 	return s
@@ -44,13 +44,13 @@ func (s *Server) GetTools() []*Tool {
 }
 
 func (s *Server) registerBaseTools() {
-	s.AddTool("tenants.list", "List all tenants", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		tenants, err := s.tenantRepo.List(0, 100)
+	s.AddTool("contexts.list", "List all contexts", func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+		contexts, err := s.contextRepo.List(0, 100)
 		if err != nil {
 			return nil, err
 		}
-		result := make([]map[string]interface{}, 0, len(tenants))
-		for _, t := range tenants {
+		result := make([]map[string]interface{}, 0, len(contexts))
+		for _, t := range contexts {
 			domain := ""
 			if t.Domain != nil {
 				domain = *t.Domain

@@ -6,10 +6,10 @@ import (
 	"github.com/hekemen/automata/internal/domain/form"
 )
 
-// DeleteForm deletes a form, verifying tenant ownership.
-func DeleteForm(repo form.Repository, tenantID, id string) error {
-	if tenantID == "" {
-		return fmt.Errorf("tenantID required")
+// DeleteForm deletes a form, verifying context ownership.
+func DeleteForm(repo form.Repository, contextID, id string) error {
+	if contextID == "" {
+		return fmt.Errorf("contextID required")
 	}
 	if id == "" {
 		return fmt.Errorf("form ID required")
@@ -20,8 +20,8 @@ func DeleteForm(repo form.Repository, tenantID, id string) error {
 		return fmt.Errorf("get form: %w", err)
 	}
 
-	if f.TenantID != tenantID {
-		return fmt.Errorf("form does not belong to tenant")
+	if f.ContextID != contextID {
+		return fmt.Errorf("form does not belong to context")
 	}
 
 	if err := repo.Delete(id); err != nil {

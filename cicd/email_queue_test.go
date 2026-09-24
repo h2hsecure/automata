@@ -33,19 +33,19 @@ var _ = Describe("Email Queue Integration Tests", func() {
 
 	Describe("Email job enqueueing", func() {
 		It("should enqueue an email job with pending status", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			jobData := support.NewTestEmailJob(tenantID)
 
 			toStr := fmt.Sprintf("{%s}", jobData["to_addresses"].([]string)[0])
 
 			query := `
-				INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+				INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				jobData["id"],
-				jobData["tenant_id"],
+				jobData["context_id"],
 				toStr,
 				jobData["subject"],
 				jobData["body"],
@@ -65,20 +65,20 @@ var _ = Describe("Email Queue Integration Tests", func() {
 		})
 
 		It("should enqueue email with multiple recipients", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			jobData := support.NewTestEmailJob(tenantID)
 			jobData["to_addresses"] = []string{"user1@example.com", "user2@example.com", "user3@example.com"}
 
 			toStr := "{user1@example.com,user2@example.com,user3@example.com}"
 
 			query := `
-				INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+				INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				jobData["id"],
-				jobData["tenant_id"],
+				jobData["context_id"],
 				toStr,
 				jobData["subject"],
 				jobData["body"],
@@ -100,20 +100,20 @@ var _ = Describe("Email Queue Integration Tests", func() {
 
 	Describe("Email worker processing", func() {
 		It("should process pending email and mark as sent", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			jobData := support.NewTestEmailJob(tenantID)
 
 			toStr := fmt.Sprintf("{%s}", jobData["to_addresses"].([]string)[0])
 
 			// Insert job
 			query := `
-				INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+				INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				jobData["id"],
-				jobData["tenant_id"],
+				jobData["context_id"],
 				toStr,
 				jobData["subject"],
 				jobData["body"],
@@ -147,7 +147,7 @@ var _ = Describe("Email Queue Integration Tests", func() {
 		})
 
 		It("should retry failed emails up to max_attempts", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			jobData := support.NewTestEmailJob(tenantID)
 			jobData["attempts"] = 2
 			jobData["max_retries"] = 3
@@ -156,13 +156,13 @@ var _ = Describe("Email Queue Integration Tests", func() {
 
 			// Insert job with 2 attempts
 			query := `
-				INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+				INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				jobData["id"],
-				jobData["tenant_id"],
+				jobData["context_id"],
 				toStr,
 				jobData["subject"],
 				jobData["body"],
@@ -182,7 +182,7 @@ var _ = Describe("Email Queue Integration Tests", func() {
 		})
 
 		It("should mark email as permanently failed after max_attempts exceeded", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			jobData := support.NewTestEmailJob(tenantID)
 			jobData["attempts"] = 3
 			jobData["max_retries"] = 3
@@ -191,13 +191,13 @@ var _ = Describe("Email Queue Integration Tests", func() {
 
 			// Insert job with max attempts
 			query := `
-				INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+				INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				jobData["id"],
-				jobData["tenant_id"],
+				jobData["context_id"],
 				toStr,
 				jobData["subject"],
 				jobData["body"],
@@ -219,20 +219,20 @@ var _ = Describe("Email Queue Integration Tests", func() {
 
 	Describe("Mock SMTP capture", func() {
 		It("should capture sent emails in mock SMTP", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			jobData := support.NewTestEmailJob(tenantID)
 
 			toStr := fmt.Sprintf("{%s}", jobData["to_addresses"].([]string)[0])
 
 			// Insert job
 			query := `
-				INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+				INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				jobData["id"],
-				jobData["tenant_id"],
+				jobData["context_id"],
 				toStr,
 				jobData["subject"],
 				jobData["body"],
@@ -265,7 +265,7 @@ var _ = Describe("Email Queue Integration Tests", func() {
 		})
 
 		It("should capture email with HTML body", func() {
-			tenantID := support.NewTestTenantID()
+			tenantID := support.NewTestContextID()
 			jobData := support.NewTestEmailJob(tenantID)
 			jobData["html_body"] = "<html><body><h1>Test</h1></body></html>"
 
@@ -273,13 +273,13 @@ var _ = Describe("Email Queue Integration Tests", func() {
 
 			// Insert job
 			query := `
-				INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+				INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				jobData["id"],
-				jobData["tenant_id"],
+				jobData["context_id"],
 				toStr,
 				jobData["subject"],
 				jobData["body"],

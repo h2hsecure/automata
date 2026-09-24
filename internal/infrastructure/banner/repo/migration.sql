@@ -1,6 +1,6 @@
-CREATE TABLE IF NOT EXISTS banners (
+CREATE TABLE IF NOT EXISTS banner_banners (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id     UUID NOT NULL,
+    context_id     UUID NOT NULL,
     name          VARCHAR(255) NOT NULL,
     type          VARCHAR(32) NOT NULL,
     content       TEXT,
@@ -21,9 +21,9 @@ CREATE TABLE IF NOT EXISTS banners (
     updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS placements (
+CREATE TABLE IF NOT EXISTS banner_placements (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id     UUID NOT NULL,
+    context_id     UUID NOT NULL,
     name          VARCHAR(255) NOT NULL,
     location      VARCHAR(128),
     css_selector  VARCHAR(512),
@@ -34,9 +34,9 @@ CREATE TABLE IF NOT EXISTS placements (
     updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS campaigns (
+CREATE TABLE IF NOT EXISTS banner_campaigns (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id       UUID NOT NULL,
+    context_id       UUID NOT NULL,
     name            VARCHAR(255) NOT NULL,
     description     TEXT,
     start_date      TIMESTAMPTZ,
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
 
 CREATE TABLE IF NOT EXISTS banner_impressions (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    banner_id     UUID NOT NULL REFERENCES banners(id) ON DELETE CASCADE,
-    tenant_id     UUID NOT NULL,
+    banner_id     UUID NOT NULL REFERENCES banner_banners(id) ON DELETE CASCADE,
+    context_id     UUID NOT NULL,
     visitor_id    VARCHAR(128),
     placement_id  UUID,
     created_at    TIMESTAMPTZ DEFAULT NOW()
@@ -62,14 +62,14 @@ CREATE TABLE IF NOT EXISTS banner_impressions (
 
 CREATE TABLE IF NOT EXISTS banner_clicks (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    banner_id     UUID NOT NULL REFERENCES banners(id) ON DELETE CASCADE,
-    tenant_id     UUID NOT NULL,
+    banner_id     UUID NOT NULL REFERENCES banner_banners(id) ON DELETE CASCADE,
+    context_id     UUID NOT NULL,
     visitor_id    VARCHAR(128),
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_banners_tenant_active ON banners(tenant_id, is_active, priority DESC);
-CREATE INDEX IF NOT EXISTS idx_banners_campaign ON banners(tenant_id, campaign_id);
-CREATE INDEX IF NOT EXISTS idx_banners_dates ON banners(tenant_id, start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_banners_context_active ON banner_banners(context_id, is_active, priority DESC);
+CREATE INDEX IF NOT EXISTS idx_banners_campaign ON banner_banners(context_id, campaign_id);
+CREATE INDEX IF NOT EXISTS idx_banners_dates ON banner_banners(context_id, start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_impressions_banner ON banner_impressions(banner_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_clicks_banner ON banner_clicks(banner_id, created_at);

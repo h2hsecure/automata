@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/tenant"
+	domainctx "github.com/hekemen/automata/internal/domain/context"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -14,12 +14,12 @@ type postgresRepo struct {
 	pool *pgxpool.Pool
 }
 
-// NewPostgresRepo creates a new PostgreSQL tenant repository.
-func NewPostgresRepo(pool *pgxpool.Pool) tenant.Repository {
+// NewPostgresRepo creates a new PostgreSQL context repository.
+func NewPostgresRepo(pool *pgxpool.Pool) domainctx.Repository {
 	return &postgresRepo{pool: pool}
 }
 
-func (r *postgresRepo) Create(t *tenant.Tenant) error {
+func (r *postgresRepo) Create(t *domainctx.Context) error {
 	if t.ID == "" {
 		t.ID = uuid.New().String()
 	}
@@ -36,7 +36,7 @@ func (r *postgresRepo) Create(t *tenant.Tenant) error {
 	}
 
 	query := `
-		INSERT INTO tenants (id, slug, name, domain, is_active, settings, created_at, updated_at)
+		INSERT INTO contexts (id, slug, name, domain, is_active, settings, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
 		RETURNING id, created_at, updated_at
 	`
@@ -46,18 +46,18 @@ func (r *postgresRepo) Create(t *tenant.Tenant) error {
 	).Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
-		return fmt.Errorf("create tenant: %w", err)
+		return fmt.Errorf("create context: %w", err)
 	}
 	return nil
 }
 
-func (r *postgresRepo) GetByID(id string) (*tenant.Tenant, error) {
-	t := &tenant.Tenant{}
+func (r *postgresRepo) GetByID(id string) (*domainctx.Context, error) {
+	t := &domainctx.Context{}
 	var settingsBytes []byte
 
 	query := `
 		SELECT id, slug, name, domain, is_active, settings, created_at, updated_at
-		FROM tenants WHERE id = $1
+		FROM contexts WHERE id = $1
 	`
 
 	err := r.pool.QueryRow(context.Background(), query, id).Scan(
@@ -65,7 +65,7 @@ func (r *postgresRepo) GetByID(id string) (*tenant.Tenant, error) {
 		&settingsBytes, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get tenant by ID: %w", err)
+		return nil, fmt.Errorf("get context by ID: %w", err)
 	}
 
 	if len(settingsBytes) > 0 {
@@ -74,13 +74,13 @@ func (r *postgresRepo) GetByID(id string) (*tenant.Tenant, error) {
 	return t, nil
 }
 
-func (r *postgresRepo) GetBySlug(slug string) (*tenant.Tenant, error) {
-	t := &tenant.Tenant{}
+func (r *postgresRepo) GetBySlug(slug string) (*domainctx.Context, error) {
+	t := &domainctx.Context{}
 	var settingsBytes []byte
 
 	query := `
 		SELECT id, slug, name, domain, is_active, settings, created_at, updated_at
-		FROM tenants WHERE slug = $1
+		FROM contexts WHERE slug = $1
 	`
 
 	err := r.pool.QueryRow(context.Background(), query, slug).Scan(
@@ -88,7 +88,7 @@ func (r *postgresRepo) GetBySlug(slug string) (*tenant.Tenant, error) {
 		&settingsBytes, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get tenant by slug: %w (slug=%s, err_detail=%v)", err, slug, err)
+		return nil, fmt.Errorf("get context by slug: %w (slug=%s, err_detail=%v)", err, slug, err)
 	}
 
 	if len(settingsBytes) > 0 {
@@ -97,7 +97,7 @@ func (r *postgresRepo) GetBySlug(slug string) (*tenant.Tenant, error) {
 	return t, nil
 }
 
-func (r *postgresRepo) List(offset, limit int) ([]*tenant.Tenant, error) {
+func (r *postgresRepo) List(offset, limit int) ([]*domainctx.Context, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -107,25 +107,25 @@ func (r *postgresRepo) List(offset, limit int) ([]*tenant.Tenant, error) {
 
 	query := `
 		SELECT id, slug, name, domain, is_active, settings, created_at, updated_at
-		FROM tenants ORDER BY created_at DESC LIMIT $1 OFFSET $2
+		FROM contexts ORDER BY created_at DESC LIMIT $1 OFFSET $2
 	`
 
 	rows, err := r.pool.Query(context.Background(), query, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("list tenants: %w", err)
+		return nil, fmt.Errorf("list contexts: %w", err)
 	}
 	defer rows.Close()
 
-	var tenants []*tenant.Tenant
+	var tenants []*domainctx.Context
 	for rows.Next() {
-		t := &tenant.Tenant{}
+		t := &domainctx.Context{}
 		var settingsBytes []byte
 		err := rows.Scan(
 			&t.ID, &t.Slug, &t.Name, &t.Domain, &t.IsActive,
 			&settingsBytes, &t.CreatedAt, &t.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("scan tenant: %w", err)
+			return nil, fmt.Errorf("scan context: %w", err)
 		}
 		if len(settingsBytes) > 0 {
 			_ = json.Unmarshal(settingsBytes, &t.Settings)
@@ -136,7 +136,7 @@ func (r *postgresRepo) List(offset, limit int) ([]*tenant.Tenant, error) {
 	return tenants, rows.Err()
 }
 
-func (r *postgresRepo) Update(t *tenant.Tenant) error {
+func (r *postgresRepo) Update(t *domainctx.Context) error {
 	settingsBytes, err := json.Marshal(t.Settings)
 	if err != nil {
 		return fmt.Errorf("marshal settings: %w", err)
@@ -146,7 +146,7 @@ func (r *postgresRepo) Update(t *tenant.Tenant) error {
 	}
 
 	query := `
-		UPDATE tenants SET slug = $1, name = $2, domain = $3, is_active = $4,
+		UPDATE contexts SET slug = $1, name = $2, domain = $3, is_active = $4,
 			settings = $5, updated_at = NOW()
 		WHERE id = $6
 	`
@@ -155,25 +155,25 @@ func (r *postgresRepo) Update(t *tenant.Tenant) error {
 		t.Slug, t.Name, t.Domain, t.IsActive, settingsBytes, t.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("update tenant: %w", err)
+		return fmt.Errorf("update context: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("tenant not found: %s", t.ID)
+		return fmt.Errorf("context not found: %s", t.ID)
 	}
 
 	return nil
 }
 
 func (r *postgresRepo) Delete(id string) error {
-	query := `DELETE FROM tenants WHERE id = $1`
+	query := `DELETE FROM contexts WHERE id = $1`
 	result, err := r.pool.Exec(context.Background(), query, id)
 	if err != nil {
-		return fmt.Errorf("delete tenant: %w", err)
+		return fmt.Errorf("delete context: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("tenant not found: %s", id)
+		return fmt.Errorf("context not found: %s", id)
 	}
 
 	return nil

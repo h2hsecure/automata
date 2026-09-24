@@ -33,12 +33,12 @@ type PlacementsResponse struct {
 
 // GetPlacements handles GET /api/banners/placements — returns placements with active banners.
 func (h *ServingHandler) GetPlacements(c *gin.Context) {
-	tenantID := ResolveTenant(c)
-	if tenantID == "" {
+	contextID := ResolveContext(c)
+	if contextID == "" {
 		return
 	}
 
-	placements, err := bannerUsecase.NewBannerUsecase(h.repo).ListPlacements(tenantID, true)
+	placements, err := bannerUsecase.NewBannerUsecase(h.repo).ListPlacements(contextID, true)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -52,7 +52,7 @@ func (h *ServingHandler) GetPlacements(c *gin.Context) {
 		opts := bdomain.ListOptions{
 			IsActive: true,
 		}
-		banners, _, err := bannerUsecase.NewBannerUsecase(h.repo).ListBanners(tenantID, opts)
+		banners, _, err := bannerUsecase.NewBannerUsecase(h.repo).ListBanners(contextID, opts)
 		if err != nil {
 			continue
 		}
@@ -70,8 +70,8 @@ func (h *ServingHandler) GetPlacements(c *gin.Context) {
 
 // TrackBanner handles GET /track/banner — tracks banner impressions and clicks.
 func (h *ServingHandler) TrackBanner(c *gin.Context) {
-	tenantID := ResolveTenant(c)
-	if tenantID == "" {
+	contextID := ResolveContext(c)
+	if contextID == "" {
 		return
 	}
 

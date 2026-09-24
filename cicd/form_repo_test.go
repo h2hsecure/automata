@@ -15,7 +15,7 @@ var (
 var _ = BeforeEach(func() {
 	ctx = context.Background()
 	pool = db.Pool
-	tenant = support.NewTestTenantID()
+	contextID = support.NewTestContextID()
 })
 
 var _ = Describe("Form Repository Integration Tests", func() {
@@ -32,20 +32,20 @@ var _ = Describe("Form Repository Integration Tests", func() {
 
 	Describe("Form CRUD", func() {
 		It("should create and retrieve a form", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			query := `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`
 
 			_, err := pool.Exec(ctx, query,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -71,19 +71,19 @@ var _ = Describe("Form Repository Integration Tests", func() {
 		})
 
 		It("should update form fields and settings", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			// Insert form
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -118,19 +118,19 @@ var _ = Describe("Form Repository Integration Tests", func() {
 		})
 
 		It("should delete a form", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			// Insert form
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -152,12 +152,12 @@ var _ = Describe("Form Repository Integration Tests", func() {
 			Expect(count).To(Equal(0))
 		})
 
-		It("should list forms by tenant", func() {
-			tenant = support.NewTestTenantID()
+		It("should list forms by contextID", func() {
+			contextID = support.NewTestContextID()
 
 			// Insert multiple forms
 			for i := 0; i < 5; i++ {
-				formData := support.NewTestForm(tenant)
+				formData := support.NewTestForm(contextID)
 				formData["slug"] = "form-" + string(rune('0'+i))
 				formData["name"] = "Form " + string(rune('0'+i))
 
@@ -165,11 +165,11 @@ var _ = Describe("Form Repository Integration Tests", func() {
 				settings, _ := json.Marshal(formData["settings"])
 
 				_, err := pool.Exec(ctx, `
-					INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+					INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 				`,
 					formData["id"],
-					formData["tenant_id"],
+					formData["context_id"],
 					formData["slug"],
 					formData["name"],
 					formData["description"],
@@ -181,9 +181,9 @@ var _ = Describe("Form Repository Integration Tests", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			// Query forms by tenant
+			// Query forms by contextID
 			var count int
-			err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM forms WHERE tenant_id = $1", tenant).Scan(&count)
+			err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM forms WHERE context_id = $1", contextID).Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(5))
 		})
@@ -191,20 +191,20 @@ var _ = Describe("Form Repository Integration Tests", func() {
 
 	Describe("Form submissions", func() {
 		It("should create a form submission", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
-			submissionData := support.NewTestFormSubmission(formData["id"].(string), tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
+			submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 
 			// Insert form first
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -220,12 +220,12 @@ var _ = Describe("Form Repository Integration Tests", func() {
 			files, _ := json.Marshal(submissionData["files"])
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO form_submissions (id, form_id, tenant_id, data, files, created_at)
+				INSERT INTO form_submissions (id, form_id, context_id, data, files, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6)
 			`,
 				submissionData["id"],
 				submissionData["form_id"],
-				submissionData["tenant_id"],
+				submissionData["context_id"],
 				data,
 				files,
 				submissionData["created_at"],
@@ -240,19 +240,19 @@ var _ = Describe("Form Repository Integration Tests", func() {
 		})
 
 		It("should retrieve form submissions with pagination", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			// Insert form
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -265,19 +265,19 @@ var _ = Describe("Form Repository Integration Tests", func() {
 
 			// Insert multiple submissions
 			for i := 0; i < 10; i++ {
-				submissionData := support.NewTestFormSubmission(formData["id"].(string), tenant)
+				submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 				submissionData["id"] = support.NewTestUUID()
 
 				data, _ := json.Marshal(submissionData["data"])
 				files, _ := json.Marshal(submissionData["files"])
 
 				_, err := pool.Exec(ctx, `
-					INSERT INTO form_submissions (id, form_id, tenant_id, data, files, created_at)
+					INSERT INTO form_submissions (id, form_id, context_id, data, files, created_at)
 					VALUES ($1, $2, $3, $4, $5, $6)
 				`,
 					submissionData["id"],
 					submissionData["form_id"],
-					submissionData["tenant_id"],
+					submissionData["context_id"],
 					data,
 					files,
 					submissionData["created_at"],
@@ -296,19 +296,19 @@ var _ = Describe("Form Repository Integration Tests", func() {
 		})
 
 		It("should validate form submission data against schema", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			// Insert form
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -320,17 +320,17 @@ var _ = Describe("Form Repository Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Insert submission with valid data
-			submissionData := support.NewTestFormSubmission(formData["id"].(string), tenant)
+			submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 			data, _ := json.Marshal(submissionData["data"])
 			files, _ := json.Marshal(submissionData["files"])
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO form_submissions (id, form_id, tenant_id, data, files, created_at)
+				INSERT INTO form_submissions (id, form_id, context_id, data, files, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6)
 			`,
 				submissionData["id"],
 				submissionData["form_id"],
-				submissionData["tenant_id"],
+				submissionData["context_id"],
 				data,
 				files,
 				submissionData["created_at"],
@@ -345,19 +345,19 @@ var _ = Describe("Form Repository Integration Tests", func() {
 		})
 
 		It("should handle file attachments in submissions", func() {
-			tenant = support.NewTestTenantID()
-			formData := support.NewTestForm(tenant)
+			contextID = support.NewTestContextID()
+			formData := support.NewTestForm(contextID)
 
 			// Insert form
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO forms (id, tenant_id, slug, name, description, fields, settings, created_at, updated_at)
+				INSERT INTO forms (id, context_id, slug, name, description, fields, settings, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			`,
 				formData["id"],
-				formData["tenant_id"],
+				formData["context_id"],
 				formData["slug"],
 				formData["name"],
 				formData["description"],
@@ -369,7 +369,7 @@ var _ = Describe("Form Repository Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Insert submission with file attachments
-			submissionData := support.NewTestFormSubmission(formData["id"].(string), tenant)
+			submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 			submissionData["files"] = []map[string]interface{}{
 				{"name": "document.pdf", "size": 1024, "url": "/uploads/document.pdf"},
 			}
@@ -378,12 +378,12 @@ var _ = Describe("Form Repository Integration Tests", func() {
 			files, _ := json.Marshal(submissionData["files"])
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO form_submissions (id, form_id, tenant_id, data, files, created_at)
+				INSERT INTO form_submissions (id, form_id, context_id, data, files, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6)
 			`,
 				submissionData["id"],
 				submissionData["form_id"],
-				submissionData["tenant_id"],
+				submissionData["context_id"],
 				data,
 				files,
 				submissionData["created_at"],

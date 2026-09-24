@@ -15,7 +15,7 @@ var (
 var _ = BeforeEach(func() {
 	ctx = context.Background()
 	pool = db.Pool
-	tenant = support.NewTestTenantID()
+	contextID = support.NewTestContextID()
 })
 
 var _ = Describe("Contact Repository Integration Tests", func() {
@@ -36,13 +36,13 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 
 	Describe("Contact CRUD", func() {
 		It("should create and retrieve a contact", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			email := contactData["email"].(string)
 
 			query := `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`
@@ -51,7 +51,7 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 
 			_, err := pool.Exec(ctx, query,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -79,19 +79,19 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 		})
 
 		It("should update contact fields", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			// Insert contact
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -122,19 +122,19 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 		})
 
 		It("should delete a contact", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			// Insert contact
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -160,22 +160,22 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 		})
 
 		It("should list contacts with pagination", func() {
-			tenant = support.NewTestTenantID()
+			contextID = support.NewTestContextID()
 
 			// Insert multiple contacts
 			for i := 0; i < 10; i++ {
-				contactData := support.NewTestContact(tenant)
+				contactData := support.NewTestContact(contextID)
 				contactData["email"] = "user" + string(rune('0'+i)) + "@example.com"
 
 				customFields, _ := json.Marshal(contactData["custom_fields"])
 
 				_, err := pool.Exec(ctx, `
-					INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+					INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 					                      custom_fields, source, source_id, created_at, updated_at)
 					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 				`,
 					contactData["id"],
-					contactData["tenant_id"],
+					contactData["context_id"],
 					contactData["email"],
 					contactData["first_name"],
 					contactData["last_name"],
@@ -200,19 +200,19 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 		})
 
 		It("should search contacts by email", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
 
 			// Insert contact
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -236,20 +236,20 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 
 	Describe("Tag management", func() {
 		It("should add and remove contact tags", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
-			tagData := support.NewTestTag(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
+			tagData := support.NewTestTag(contextID)
 
 			// Insert contact
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -265,11 +265,11 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 
 			// Insert tag
 			_, err = pool.Exec(ctx, `
-				INSERT INTO contact_tags (id, tenant_id, name, color, created_at)
+				INSERT INTO contact_tags (id, context_id, name, color, created_at)
 				VALUES ($1, $2, $3, $4, $5)
 			`,
 				tagData["id"],
-				tagData["tenant_id"],
+				tagData["context_id"],
 				tagData["name"],
 				tagData["color"],
 				tagData["created_at"],
@@ -306,20 +306,20 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 		})
 
 		It("should list contacts by tag", func() {
-			tenant = support.NewTestTenantID()
-			contactData := support.NewTestContact(tenant)
-			tagData := support.NewTestTag(tenant)
+			contextID = support.NewTestContextID()
+			contactData := support.NewTestContact(contextID)
+			tagData := support.NewTestTag(contextID)
 
 			// Insert contact and tag
 			email := contactData["email"].(string)
 
 			_, err := pool.Exec(ctx, `
-				INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company,
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
 				                      custom_fields, source, source_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				contactData["id"],
-				contactData["tenant_id"],
+				contactData["context_id"],
 				email,
 				contactData["first_name"],
 				contactData["last_name"],
@@ -334,11 +334,11 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = pool.Exec(ctx, `
-				INSERT INTO contact_tags (id, tenant_id, name, color, created_at)
+				INSERT INTO contact_tags (id, context_id, name, color, created_at)
 				VALUES ($1, $2, $3, $4, $5)
 			`,
 				tagData["id"],
-				tagData["tenant_id"],
+				tagData["context_id"],
 				tagData["name"],
 				tagData["color"],
 				tagData["created_at"],

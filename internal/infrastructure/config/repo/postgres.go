@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/config"
@@ -20,13 +21,13 @@ func NewConfigRepo(pool *pgxpool.Pool) config.ConfigRepository {
 	return &configRepo{pool: pool}
 }
 
-func (r *configRepo) GetByTenant(tenantID string) (map[config.ConfigKey]map[string]interface{}, error) {
+func (r *configRepo) GetByContext(contextID string) (map[config.ConfigKey]map[string]interface{}, error) {
 	ctx := context.Background()
-	query := `SELECT key, value FROM admin_configs WHERE tenant_id = $1 ORDER BY key`
+	query := `SELECT key, value FROM admin_configs WHERE context_id = $1 ORDER BY key`
 
-	rows, err := r.pool.Query(ctx, query, tenantID)
+	rows, err := r.pool.Query(ctx, query, contextID)
 	if err != nil {
-		return nil, fmt.Errorf("get configs by tenant: %w", err)
+		return nil, fmt.Errorf("get configs by context: %w", err)
 	}
 	defer rows.Close()
 
@@ -46,12 +47,12 @@ func (r *configRepo) GetByTenant(tenantID string) (map[config.ConfigKey]map[stri
 	return result, nil
 }
 
-func (r *configRepo) GetByKey(tenantID string, key config.ConfigKey) (map[string]interface{}, error) {
+func (r *configRepo) GetByKey(contextID string, key config.ConfigKey) (map[string]interface{}, error) {
 	ctx := context.Background()
-	query := `SELECT value FROM admin_configs WHERE tenant_id = $1 AND key = $2`
+	query := `SELECT value FROM admin_configs WHERE context_id = $1 AND key = $2`
 
 	var valueJSON []byte
-	err := r.pool.QueryRow(ctx, query, tenantID, string(key)).Scan(&valueJSON)
+	err := r.pool.QueryRow(ctx, query, contextID, string(key)).Scan(&valueJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -66,7 +67,7 @@ func (r *configRepo) GetByKey(tenantID string, key config.ConfigKey) (map[string
 	return value, nil
 }
 
-func (r *configRepo) Upsert(tenantID string, key config.ConfigKey, value map[string]interface{}) error {
+func (r *configRepo) Upsert(contextID string, key config.ConfigKey, value map[string]interface{}) error {
 	ctx := context.Background()
 	valueJSON, err := json.Marshal(value)
 	if err != nil {
@@ -74,29 +75,30 @@ func (r *configRepo) Upsert(tenantID string, key config.ConfigKey, value map[str
 	}
 
 	query := `
-		INSERT INTO admin_configs (id, tenant_id, key, value, created_at, updated_at)
+		INSERT INTO admin_configs (id, context_id, key, value, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())
-		ON CONFLICT (tenant_id, key) DO UPDATE
+		ON CONFLICT (context_id, key) DO UPDATE
 			SET value = $4, updated_at = NOW()
-		RETURNING id, tenant_id, key, value, created_at, updated_at
+		RETURNING id, context_id, key, value, created_at, updated_at
 	`
 
-	var id, storedKey string
-	var storedValueJSON, createdAt, updatedAt []byte
+	var id, storedContextID, storedKey string
+	var storedValueJSON []byte
+	var createdAt, updatedAt time.Time
 	err = r.pool.QueryRow(ctx, query,
-		uuid.New().String(), tenantID, string(key), valueJSON,
-	).Scan(&id, &storedKey, &storedKey, &storedValueJSON, &createdAt, &updatedAt)
+		uuid.New().String(), contextID, string(key), valueJSON,
+	).Scan(&id, &storedContextID, &storedKey, &storedValueJSON, &createdAt, &updatedAt)
 	if err != nil {
 		return fmt.Errorf("upsert config: %w", err)
 	}
 	return nil
 }
 
-func (r *configRepo) Delete(tenantID string, key config.ConfigKey) error {
+func (r *configRepo) Delete(contextID string, key config.ConfigKey) error {
 	ctx := context.Background()
-	query := `DELETE FROM admin_configs WHERE tenant_id = $1 AND key = $2`
+	query := `DELETE FROM admin_configs WHERE context_id = $1 AND key = $2`
 
-	result, err := r.pool.Exec(ctx, query, tenantID, string(key))
+	result, err := r.pool.Exec(ctx, query, contextID, string(key))
 	if err != nil {
 		return fmt.Errorf("delete config: %w", err)
 	}

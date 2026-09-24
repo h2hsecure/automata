@@ -63,13 +63,13 @@ var _ = Describe("Migration", func() {
 		err := database.RunMigrations(pool)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify tenants table exists
+		// Verify contexts table exists
 		var count int
-		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM tenants").Scan(&count)
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM contexts").Scan(&count)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify tenant_users table exists
-		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM tenant_users").Scan(&count)
+		// Verify context_users table exists
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM context_users").Scan(&count)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify api_keys table exists
@@ -85,19 +85,19 @@ var _ = Describe("Migration", func() {
 		err := database.RunMigrations(pool)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify idx_tenant_users_tenant_email index exists
+		// Verify idx_context_users_context_email index exists
 		var idxCount int
 		err = pool.QueryRow(ctx, `
 			SELECT COUNT(*) FROM pg_indexes 
-			WHERE indexname = 'idx_tenant_users_tenant_email'
+			WHERE indexname = 'idx_context_users_context_email'
 		`).Scan(&idxCount)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(idxCount).To(Equal(1))
 
-		// Verify idx_api_keys_tenant_name index exists
+		// Verify idx_api_keys_context_name index exists
 		err = pool.QueryRow(ctx, `
 			SELECT COUNT(*) FROM pg_indexes 
-			WHERE indexname = 'idx_api_keys_tenant_name'
+			WHERE indexname = 'idx_api_keys_context_name'
 		`).Scan(&idxCount)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -116,7 +116,7 @@ var _ = Describe("Migration", func() {
 
 		// Tables should still be accessible
 		var count int
-		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM tenants").Scan(&count)
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM contexts").Scan(&count)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })

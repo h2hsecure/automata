@@ -22,7 +22,7 @@ func NewApiKeyPostgresRepo(pool *pgxpool.Pool) ApiKeyRepository {
 type ApiKeyRepository interface {
 	Create(key *auth.APIKey) error
 	GetByHash(hash string) (*auth.APIKey, error)
-	GetByPrefix(prefix string, tenantID string) (*auth.APIKey, error)
+	GetByPrefix(prefix string, contextID string) (*auth.APIKey, error)
 }
 
 func (r *apiKeyPostgresRepo) Create(key *auth.APIKey) error {
@@ -31,13 +31,13 @@ func (r *apiKeyPostgresRepo) Create(key *auth.APIKey) error {
 	}
 
 	query := `
-		INSERT INTO api_keys (id, tenant_id, user_id, key_hash, name, expires_at, created_at)
+		INSERT INTO api_keys (id, context_id, user_id, key_hash, name, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW())
 		RETURNING id, created_at
 	`
 
 	err := r.pool.QueryRow(context.Background(), query,
-		key.ID, key.TenantID, key.UserID, key.KeyHash, key.Name, key.ExpiresAt,
+		key.ID, key.ContextID, key.UserID, key.KeyHash, key.Name, key.ExpiresAt,
 	).Scan(&key.ID, &key.CreatedAt)
 
 	if err != nil {
@@ -50,12 +50,12 @@ func (r *apiKeyPostgresRepo) GetByHash(hash string) (*auth.APIKey, error) {
 	key := &auth.APIKey{}
 
 	query := `
-		SELECT id, tenant_id, user_id, key_hash, name, expires_at, created_at
+		SELECT id, context_id, user_id, key_hash, name, expires_at, created_at
 		FROM api_keys WHERE key_hash = $1
 	`
 
 	err := r.pool.QueryRow(context.Background(), query, hash).Scan(
-		&key.ID, &key.TenantID, &key.UserID, &key.KeyHash,
+		&key.ID, &key.ContextID, &key.UserID, &key.KeyHash,
 		&key.Name, &key.ExpiresAt, &key.CreatedAt,
 	)
 	if err != nil {
@@ -65,17 +65,17 @@ func (r *apiKeyPostgresRepo) GetByHash(hash string) (*auth.APIKey, error) {
 	return key, nil
 }
 
-func (r *apiKeyPostgresRepo) GetByPrefix(prefix, tenantID string) (*auth.APIKey, error) {
+func (r *apiKeyPostgresRepo) GetByPrefix(prefix, contextID string) (*auth.APIKey, error) {
 	key := &auth.APIKey{}
 
 	query := `
-		SELECT id, tenant_id, user_id, key_hash, name, expires_at, created_at
-		FROM api_keys WHERE tenant_id = $1 AND key_hash LIKE $2
+		SELECT id, context_id, user_id, key_hash, name, expires_at, created_at
+		FROM api_keys WHERE context_id = $1 AND key_hash LIKE $2
 		LIMIT 1
 	`
 
-	err := r.pool.QueryRow(context.Background(), query, tenantID, prefix+"%").Scan(
-		&key.ID, &key.TenantID, &key.UserID, &key.KeyHash,
+	err := r.pool.QueryRow(context.Background(), query, contextID, prefix+"%").Scan(
+		&key.ID, &key.ContextID, &key.UserID, &key.KeyHash,
 		&key.Name, &key.ExpiresAt, &key.CreatedAt,
 	)
 	if err != nil {

@@ -14,7 +14,7 @@ var (
 	db     *support.TestDB
 	ctx    context.Context
 	pool   *pgxpool.Pool
-	tenant string
+	contextID string
 )
 
 var _ = BeforeSuite(func() {
@@ -22,6 +22,7 @@ var _ = BeforeSuite(func() {
 	db, err = support.SetupTestDB(GinkgoT())
 	Expect(err).NotTo(HaveOccurred())
 	ctx = context.Background()
+	pool = db.Pool
 
 	err = db.RunMigrations(ctx)
 	Expect(err).NotTo(HaveOccurred())
@@ -29,6 +30,13 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	db.Close()
+})
+
+var _ = AfterEach(func() {
+	// Clean up contexts table between tests to avoid count mismatches
+	if pool != nil {
+		_, _ = pool.Exec(ctx, "DELETE FROM contexts")
+	}
 })
 
 func TestCICD(t *testing.T) {

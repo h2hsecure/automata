@@ -18,20 +18,20 @@ func NewBannerUsecase(repo bdomain.Repository) *BannerUsecase {
 }
 
 // CreateBanner creates a new banner.
-func (u *BannerUsecase) CreateBanner(tenantID string, req *bdomain.CreateBannerRequest) (*bdomain.Banner, error) {
+func (u *BannerUsecase) CreateBanner(contextID string, req *bdomain.CreateBannerRequest) (*bdomain.Banner, error) {
 	b := &bdomain.Banner{
-		TenantID:   tenantID,
+		ContextID:   contextID,
 		Name:       req.Name,
 		Type:       req.Type,
 		Content:    req.Content,
 		LinkURL:    req.LinkURL,
-		ImageURL:   req.ImageURL,
-		AltText:    req.AltText,
-		CampaignID: req.CampaignID,
+		ImageURL:   &req.ImageURL,
+		AltText:    &req.AltText,
+		CampaignID: &req.CampaignID,
 		Placements: req.Placements,
 		Priority:   req.Priority,
-		StartDate:  req.StartDate,
-		EndDate:    req.EndDate,
+		StartDate:  &req.StartDate,
+		EndDate:    &req.EndDate,
 		IsActive:   true,
 		ABTest:     req.ABTest,
 		ABVariants: req.ABVariants,
@@ -47,7 +47,7 @@ func (u *BannerUsecase) CreateBanner(tenantID string, req *bdomain.CreateBannerR
 }
 
 // UpdateBanner updates an existing banner.
-func (u *BannerUsecase) UpdateBanner(tenantID, bannerID string, req *bdomain.UpdateBannerRequest) (*bdomain.Banner, error) {
+func (u *BannerUsecase) UpdateBanner(contextID, bannerID string, req *bdomain.UpdateBannerRequest) (*bdomain.Banner, error) {
 	b, err := u.repo.GetBanner(bannerID)
 	if err != nil {
 		return nil, fmt.Errorf("banner not found: %w", err)
@@ -66,13 +66,13 @@ func (u *BannerUsecase) UpdateBanner(tenantID, bannerID string, req *bdomain.Upd
 		b.LinkURL = req.LinkURL
 	}
 	if req.ImageURL != "" {
-		b.ImageURL = req.ImageURL
+		b.ImageURL = &req.ImageURL
 	}
 	if req.AltText != "" {
-		b.AltText = req.AltText
+		b.AltText = &req.AltText
 	}
 	if req.CampaignID != "" {
-		b.CampaignID = req.CampaignID
+		b.CampaignID = &req.CampaignID
 	}
 	if req.Placements != nil {
 		b.Placements = req.Placements
@@ -81,10 +81,10 @@ func (u *BannerUsecase) UpdateBanner(tenantID, bannerID string, req *bdomain.Upd
 		b.Priority = req.Priority
 	}
 	if !req.StartDate.IsZero() {
-		b.StartDate = req.StartDate
+		b.StartDate = &req.StartDate
 	}
 	if !req.EndDate.IsZero() {
-		b.EndDate = req.EndDate
+		b.EndDate = &req.EndDate
 	}
 	if req.IsActive != nil {
 		b.IsActive = *req.IsActive
@@ -122,8 +122,8 @@ func (u *BannerUsecase) GetBanner(bannerID string) (*bdomain.Banner, error) {
 }
 
 // ListBanners lists banners with optional filters.
-func (u *BannerUsecase) ListBanners(tenantID string, opts bdomain.ListOptions) ([]*bdomain.Banner, int64, error) {
-	banners, total, err := u.repo.ListBanners(tenantID, opts)
+func (u *BannerUsecase) ListBanners(contextID string, opts bdomain.ListOptions) ([]*bdomain.Banner, int64, error) {
+	banners, total, err := u.repo.ListBanners(contextID, opts)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list banners: %w", err)
 	}
@@ -131,9 +131,9 @@ func (u *BannerUsecase) ListBanners(tenantID string, opts bdomain.ListOptions) (
 }
 
 // CreatePlacement creates a new placement.
-func (u *BannerUsecase) CreatePlacement(tenantID string, req *bdomain.CreatePlacementRequest) (*bdomain.Placement, error) {
+func (u *BannerUsecase) CreatePlacement(contextID string, req *bdomain.CreatePlacementRequest) (*bdomain.Placement, error) {
 	p := &bdomain.Placement{
-		TenantID:    tenantID,
+		ContextID:    contextID,
 		Name:        req.Name,
 		Location:    req.Location,
 		CSSSelector: req.CSSSelector,
@@ -152,7 +152,7 @@ func (u *BannerUsecase) CreatePlacement(tenantID string, req *bdomain.CreatePlac
 }
 
 // UpdatePlacement updates an existing placement.
-func (u *BannerUsecase) UpdatePlacement(tenantID, placementID string, req *bdomain.UpdatePlacementRequest) (*bdomain.Placement, error) {
+func (u *BannerUsecase) UpdatePlacement(contextID, placementID string, req *bdomain.UpdatePlacementRequest) (*bdomain.Placement, error) {
 	p, err := u.repo.GetPlacement(placementID)
 	if err != nil {
 		return nil, fmt.Errorf("placement not found: %w", err)
@@ -203,8 +203,8 @@ func (u *BannerUsecase) GetPlacement(placementID string) (*bdomain.Placement, er
 }
 
 // ListPlacements lists placements with optional active filter.
-func (u *BannerUsecase) ListPlacements(tenantID string, isActive bool) ([]*bdomain.Placement, error) {
-	placements, err := u.repo.ListPlacements(tenantID, isActive)
+func (u *BannerUsecase) ListPlacements(contextID string, isActive bool) ([]*bdomain.Placement, error) {
+	placements, err := u.repo.ListPlacements(contextID, isActive)
 	if err != nil {
 		return nil, fmt.Errorf("list placements: %w", err)
 	}
@@ -212,9 +212,9 @@ func (u *BannerUsecase) ListPlacements(tenantID string, isActive bool) ([]*bdoma
 }
 
 // CreateCampaign creates a new campaign.
-func (u *BannerUsecase) CreateCampaign(tenantID string, req *bdomain.CreateCampaignRequest) (*bdomain.Campaign, error) {
+func (u *BannerUsecase) CreateCampaign(contextID string, req *bdomain.CreateCampaignRequest) (*bdomain.Campaign, error) {
 	c := &bdomain.Campaign{
-		TenantID:    tenantID,
+		ContextID:    contextID,
 		Name:        req.Name,
 		Description: req.Description,
 		StartDate:   req.StartDate,
@@ -234,7 +234,7 @@ func (u *BannerUsecase) CreateCampaign(tenantID string, req *bdomain.CreateCampa
 }
 
 // UpdateCampaign updates an existing campaign.
-func (u *BannerUsecase) UpdateCampaign(tenantID, campaignID string, req *bdomain.UpdateCampaignRequest) (*bdomain.Campaign, error) {
+func (u *BannerUsecase) UpdateCampaign(contextID, campaignID string, req *bdomain.UpdateCampaignRequest) (*bdomain.Campaign, error) {
 	c, err := u.repo.GetCampaign(campaignID)
 	if err != nil {
 		return nil, fmt.Errorf("campaign not found: %w", err)
@@ -246,10 +246,10 @@ func (u *BannerUsecase) UpdateCampaign(tenantID, campaignID string, req *bdomain
 	if req.Description != "" {
 		c.Description = req.Description
 	}
-	if !req.StartDate.IsZero() {
+	if req.StartDate != nil {
 		c.StartDate = req.StartDate
 	}
-	if !req.EndDate.IsZero() {
+	if req.EndDate != nil {
 		c.EndDate = req.EndDate
 	}
 	if req.IsActive != nil {
@@ -288,8 +288,8 @@ func (u *BannerUsecase) GetCampaign(campaignID string) (*bdomain.Campaign, error
 }
 
 // ListCampaigns lists campaigns with optional active filter.
-func (u *BannerUsecase) ListCampaigns(tenantID string, isActive bool) ([]*bdomain.Campaign, error) {
-	campaigns, err := u.repo.ListCampaigns(tenantID, isActive)
+func (u *BannerUsecase) ListCampaigns(contextID string, isActive bool) ([]*bdomain.Campaign, error) {
+	campaigns, err := u.repo.ListCampaigns(contextID, isActive)
 	if err != nil {
 		return nil, fmt.Errorf("list campaigns: %w", err)
 	}

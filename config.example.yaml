@@ -13,3 +13,8 @@ database:
 
 auth:
   secret_key: change-this-in-production
+  admin_email: admin@automata.local
+
+context:
+  resolution: path
+  default_path: /

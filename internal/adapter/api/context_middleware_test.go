@@ -9,75 +9,75 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/tenant"
+	"github.com/hekemen/automata/internal/domain/context"
 	. 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 func strPtr(s string) *string { return &s }
 
-// mockTenantRepo is an in-memory implementation of tenant.Repository for testing.
-type mockTenantRepo struct {
-	tenants map[string]*tenant.Tenant
+// mockContextRepo is an in-memory implementation of context.Repository for testing.
+type mockContextRepo struct {
+	contexts map[string]*context.Context
 }
 
-func newMockTenantRepo() *mockTenantRepo {
-	return &mockTenantRepo{tenants: make(map[string]*tenant.Tenant)}
+func newMockContextRepo() *mockContextRepo {
+	return &mockContextRepo{contexts: make(map[string]*context.Context)}
 }
 
-func (m *mockTenantRepo) Create(t *tenant.Tenant) error {
+func (m *mockContextRepo) Create(t *context.Context) error {
 	if t.ID == "" {
 		t.ID = "550e8400-e29b-41d4-a716-446655440000"
 	}
-	m.tenants[t.Slug] = t
+	m.contexts[t.Slug] = t
 	return nil
 }
 
-func (m *mockTenantRepo) GetByID(id string) (*tenant.Tenant, error) {
-	for _, t := range m.tenants {
+func (m *mockContextRepo) GetByID(id string) (*context.Context, error) {
+	for _, t := range m.contexts {
 		if t.ID == id {
 			return t, nil
 		}
 	}
-	return nil, errors.New("tenant not found")
+	return nil, errors.New("context not found")
 }
 
-func (m *mockTenantRepo) GetBySlug(slug string) (*tenant.Tenant, error) {
-	t, ok := m.tenants[slug]
+func (m *mockContextRepo) GetBySlug(slug string) (*context.Context, error) {
+	t, ok := m.contexts[slug]
 	if !ok {
-		return nil, errors.New("tenant not found")
+		return nil, errors.New("context not found")
 	}
 	return t, nil
 }
 
-func (m *mockTenantRepo) List(offset, limit int) ([]*tenant.Tenant, error) {
-	var result []*tenant.Tenant
-	for _, t := range m.tenants {
+func (m *mockContextRepo) List(offset, limit int) ([]*context.Context, error) {
+	var result []*context.Context
+	for _, t := range m.contexts {
 		result = append(result, t)
 	}
 	return result, nil
 }
 
-func (m *mockTenantRepo) Update(t *tenant.Tenant) error {
-	m.tenants[t.Slug] = t
+func (m *mockContextRepo) Update(t *context.Context) error {
+	m.contexts[t.Slug] = t
 	return nil
 }
 
-func (m *mockTenantRepo) Delete(id string) error {
-	for slug, t := range m.tenants {
+func (m *mockContextRepo) Delete(id string) error {
+	for slug, t := range m.contexts {
 		if t.ID == id {
-			delete(m.tenants, slug)
+			delete(m.contexts, slug)
 			return nil
 		}
 	}
-	return errors.New("tenant not found")
+	return errors.New("context not found")
 }
 
-var _ tenant.Repository = (*mockTenantRepo)(nil)
+var _ context.Repository = (*mockContextRepo)(nil)
 
-func TestTenantMiddleware(t *testing.T) {
+func TestContextMiddleware(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Tenant Middleware Suite")
+	RunSpecs(t, "Context Middleware Suite")
 }
 
 // requestWithHost creates an HTTP request and sets the Host header.
@@ -94,23 +94,25 @@ func performRequest(engine *gin.Engine, req *http.Request) *httptest.ResponseRec
 	return w
 }
 
-// tenantCapture holds the captured tenant from a middleware execution.
+// tenantCapture holds the captured context from a middleware execution.
 type tenantCapture struct {
-	Tenant *tenant.Tenant
-	Found  bool
+	Context *context.Context
+	Found   bool
 }
 
 // runWithCapture creates a fresh engine with the middleware and a capture handler,
-// then executes the request to capture the tenant from context.
-func runWithCapture(middleware gin.HandlerFunc, repo *mockTenantRepo, req *http.Request) (*httptest.ResponseRecorder, *tenantCapture) {
+// then executes the request to capture the context from context.
+func runWithCapture(middleware gin.HandlerFunc, repo *mockContextRepo, req *http.Request) (*httptest.ResponseRecorder, *tenantCapture) {
 	captured := &tenantCapture{}
 	engine := gin.New()
 	engine.Use(middleware)
 	engine.GET(req.URL.Path, func(c *gin.Context) {
-		val, exists := c.Get(string(TenantContextKey))
+		val, exists := c.Get(string(ContextKey))
 		captured.Found = exists
 		if exists {
-			captured.Tenant = val.(*tenant.Tenant)
+			if ctx, ok := val.(context.Context); ok {
+				captured.Context = &ctx
+			}
 		}
 		c.String(http.StatusOK, "ok")
 	})
@@ -118,28 +120,28 @@ func runWithCapture(middleware gin.HandlerFunc, repo *mockTenantRepo, req *http.
 	return w, captured
 }
 
-var _ = Describe("TenantResolver middleware", func() {
+var _ = Describe("ContextResolver middleware", func() {
 	var (
-		mockRepo   *mockTenantRepo
+		mockRepo   *mockContextRepo
 		middleware gin.HandlerFunc
 	)
 
 	BeforeEach(func() {
 		gin.SetMode(gin.TestMode)
-		mockRepo = newMockTenantRepo()
+		mockRepo = newMockContextRepo()
 
-		// Seed test tenants
-		mockRepo.tenants["tenant1"] = &tenant.Tenant{
+		// Seed test contexts
+		mockRepo.contexts["context1"] = &context.Context{
 			ID:        "550e8400-e29b-41d4-a716-446655440001",
-			Slug:      "tenant1",
-			Name:      "Tenant One",
-			Domain:    strPtr("tenant1.example.com"),
+			Slug:      "context1",
+			Name:      "Context One",
+			Domain:    strPtr("context1.example.com"),
 			IsActive:  true,
 			Settings:  map[string]interface{}{},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		mockRepo.tenants["myapp"] = &tenant.Tenant{
+		mockRepo.contexts["myapp"] = &context.Context{
 			ID:        "550e8400-e29b-41d4-a716-446655440002",
 			Slug:      "myapp",
 			Name:      "My App",
@@ -149,7 +151,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		mockRepo.tenants["acme"] = &tenant.Tenant{
+		mockRepo.contexts["acme"] = &context.Context{
 			ID:        "550e8400-e29b-41d4-a716-446655440003",
 			Slug:      "acme",
 			Name:      "Acme Corp",
@@ -160,24 +162,24 @@ var _ = Describe("TenantResolver middleware", func() {
 			UpdatedAt: time.Now(),
 		}
 
-		middleware = TenantResolver(mockRepo)
+		middleware = ContextResolver(mockRepo)
 	})
 
 	Describe("subdomain resolution", func() {
-		It("resolves tenant from subdomain", func() {
-			req := requestWithHost("GET", "/test", "tenant1.example.com")
+		It("resolves context from subdomain", func() {
+			req := requestWithHost("GET", "/test", "context1.example.com")
 			w, captured := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(captured.Found).To(BeTrue())
-			Expect(captured.Tenant.Slug).To(Equal("tenant1"))
+			Expect(captured.Context.Slug).To(Equal("context1"))
 		})
 
-		It("resolves tenant from subdomain with port", func() {
+		It("resolves context from subdomain with port", func() {
 			req := requestWithHost("GET", "/test", "myapp.example.com:8080")
 			w, captured := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(captured.Found).To(BeTrue())
-			Expect(captured.Tenant.Slug).To(Equal("myapp"))
+			Expect(captured.Context.Slug).To(Equal("myapp"))
 		})
 
 		It("skips www subdomain", func() {
@@ -185,7 +187,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 
 		It("skips api subdomain", func() {
@@ -193,7 +195,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 
 		It("skips mail subdomain", func() {
@@ -201,7 +203,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 
 		It("returns error for non-existent subdomain", func() {
@@ -209,7 +211,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 
 		It("returns error for no subdomain (single part host)", func() {
@@ -217,33 +219,33 @@ var _ = Describe("TenantResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 	})
 
 	Describe("path-based resolution", func() {
-		It("resolves tenant from /tenant/<slug>/... path", func() {
-			req := requestWithHost("GET", "/tenant/acme/forms", "localhost")
+		It("resolves context from /context/<slug>/... path", func() {
+			req := requestWithHost("GET", "/context/acme/forms", "localhost")
 			w, captured := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(captured.Found).To(BeTrue())
-			Expect(captured.Tenant.Slug).To(Equal("acme"))
+			Expect(captured.Context.Slug).To(Equal("acme"))
 		})
 
-		It("resolves tenant from /t/<slug>/... path", func() {
+		It("resolves context from /t/<slug>/... path", func() {
 			req := requestWithHost("GET", "/t/acme/forms", "localhost")
 			w, captured := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(captured.Found).To(BeTrue())
-			Expect(captured.Tenant.Slug).To(Equal("acme"))
+			Expect(captured.Context.Slug).To(Equal("acme"))
 		})
 
-		It("returns error for /tenant/ with empty slug", func() {
-			req := requestWithHost("GET", "/tenant/", "localhost")
+		It("returns error for /context/ with empty slug", func() {
+			req := requestWithHost("GET", "/context/", "localhost")
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 
 		It("returns error for /t/ with empty slug", func() {
@@ -251,15 +253,15 @@ var _ = Describe("TenantResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 
-		It("returns error for non-existent tenant in path", func() {
-			req := requestWithHost("GET", "/tenant/nonexistent/forms", "localhost")
+		It("returns error for non-existent context in path", func() {
+			req := requestWithHost("GET", "/context/nonexistent/forms", "localhost")
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no tenant found"))
+			Expect(string(body)).To(ContainSubstring("no context found"))
 		})
 	})
 
@@ -268,7 +270,7 @@ var _ = Describe("TenantResolver middleware", func() {
 			req := requestWithHost("GET", "/admin/settings", "localhost")
 			w, captured := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusOK))
-			// No tenant should be set for skipped routes
+			// No context should be set for skipped routes
 			Expect(captured.Found).To(BeFalse())
 		})
 
@@ -289,13 +291,13 @@ var _ = Describe("TenantResolver middleware", func() {
 
 	Describe("subdomain takes priority over path", func() {
 		It("prefers subdomain resolution when both are valid", func() {
-			// tenant1.example.com has tenant "tenant1", but path /tenant/myapp would resolve "myapp"
-			req := requestWithHost("GET", "/tenant/myapp/forms", "tenant1.example.com")
+			// context1.example.com has context "context1", but path /context/myapp would resolve "myapp"
+			req := requestWithHost("GET", "/context/myapp/forms", "context1.example.com")
 			w, captured := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(captured.Found).To(BeTrue())
 			// Subdomain resolution should win
-			Expect(captured.Tenant.Slug).To(Equal("tenant1"))
+			Expect(captured.Context.Slug).To(Equal("context1"))
 		})
 	})
 })

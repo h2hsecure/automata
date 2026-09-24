@@ -50,7 +50,7 @@ func TestFormValidation(t *testing.T) {
 func TestSubmissionEntity(t *testing.T) {
 	s := &Submission{
 		FormID:   "550e8400-e29b-41d4-a716-446655440000",
-		TenantID: "550e8400-e29b-41d4-a716-446655440001",
+		ContextID: "550e8400-e29b-41d4-a716-446655440001",
 		Data:     map[string]interface{}{"name": "John", "email": "john@example.com"},
 		Files:    []FileUpload{{Field: "resume", Name: "cv.pdf", Size: 1024, Type: "application/pdf", URL: "/uploads/cv.pdf"}},
 	}

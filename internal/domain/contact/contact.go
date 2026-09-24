@@ -9,7 +9,7 @@ import (
 // Contact represents a marketing contact.
 type Contact struct {
 	ID           string
-	TenantID     string
+	ContextID    string
 	Email        *string
 	FirstName    string
 	LastName     string
@@ -25,8 +25,8 @@ type Contact struct {
 
 // Validate checks that the Contact has all required fields set.
 func (c *Contact) Validate() error {
-	if c.TenantID == "" {
-		return errors.New("tenant_id required")
+	if c.ContextID == "" {
+		return errors.New("context_id required")
 	}
 	if c.Email != nil && *c.Email != "" {
 		if !isValidEmail(*c.Email) {

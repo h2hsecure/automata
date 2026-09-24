@@ -16,8 +16,8 @@ type Repository interface {
 	List(offset, limit int, filters FilterOptions) ([]*Contact, error)
 	Update(c *Contact) error
 	Delete(id string) error
-	FindByEmail(tenantID, email string) (*Contact, error)
+	FindByEmail(contextID, email string) (*Contact, error)
 	Merge(keepID, mergeIntoID string) error
 	GetActivity(contactID string, offset, limit int) ([]Activity, error)
-	CountByTenant(tenantID string) (int64, error)
+	CountByContext(contextID string) (int64, error)
 }

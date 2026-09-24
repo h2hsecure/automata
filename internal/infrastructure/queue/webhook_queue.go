@@ -14,7 +14,7 @@ import (
 // WebhookDelivery represents a pending or completed webhook delivery.
 type WebhookDelivery struct {
 	ID         string
-	TenantID   string
+	ContextID   string
 	FormID     string
 	URL        string
 	Payload    map[string]interface{}
@@ -29,7 +29,7 @@ type WebhookDelivery struct {
 
 // WebhookQueue defines the interface for webhook delivery queue operations.
 type WebhookQueue interface {
-	Enqueue(url string, payload map[string]interface{}, tenantID, formID string) error
+	Enqueue(url string, payload map[string]interface{}, contextID, formID string) error
 	GetPending(limit int) ([]*WebhookDelivery, error)
 	MarkSuccess(id string) error
 	MarkFailed(id string, err string) error
@@ -48,7 +48,7 @@ func NewWebhookQueue(pool *pgxpool.Pool) WebhookQueue {
 }
 
 // Enqueue adds a webhook delivery to the queue.
-func (q *webhookQueue) Enqueue(url string, payload map[string]interface{}, tenantID, formID string) error {
+func (q *webhookQueue) Enqueue(url string, payload map[string]interface{}, contextID, formID string) error {
 	id := uuid.New().String()
 
 	payloadBytes, err := json.Marshal(payload)
@@ -57,12 +57,12 @@ func (q *webhookQueue) Enqueue(url string, payload map[string]interface{}, tenan
 	}
 
 	query := `
-		INSERT INTO webhook_deliveries (id, tenant_id, form_id, url, payload, status, attempts, max_retries, next_retry, created_at, updated_at)
+		INSERT INTO webhook_deliveries (id, context_id, form_id, url, payload, status, attempts, max_retries, next_retry, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, 'pending', 0, 3, NOW(), NOW(), NOW())
 	`
 
 	_, err = q.pool.Exec(context.Background(), query,
-		id, tenantID, formID, url, payloadBytes,
+		id, contextID, formID, url, payloadBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("enqueue webhook: %w", err)
@@ -75,7 +75,7 @@ func (q *webhookQueue) Enqueue(url string, payload map[string]interface{}, tenan
 // GetPending retrieves pending webhook deliveries ready for processing.
 func (q *webhookQueue) GetPending(limit int) ([]*WebhookDelivery, error) {
 	query := `
-		SELECT id, tenant_id, form_id, url, payload, status, attempts, max_retries, next_retry, error_msg, created_at, updated_at
+		SELECT id, context_id, form_id, url, payload, status, attempts, max_retries, next_retry, error_msg, created_at, updated_at
 		FROM webhook_deliveries
 		WHERE status = 'pending' AND next_retry <= NOW()
 		ORDER BY created_at ASC
@@ -94,7 +94,7 @@ func (q *webhookQueue) GetPending(limit int) ([]*WebhookDelivery, error) {
 		var payloadBytes []byte
 
 		err := rows.Scan(
-			&d.ID, &d.TenantID, &d.FormID, &d.URL,
+			&d.ID, &d.ContextID, &d.FormID, &d.URL,
 			&payloadBytes, &d.Status, &d.Attempts, &d.MaxRetries,
 			&d.NextRetry, &d.ErrorMsg, &d.CreatedAt, &d.UpdatedAt,
 		)

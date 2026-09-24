@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/contact"
+	uc "github.com/hekemen/automata/internal/usecase/contact"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,12 +25,12 @@ func New(pool *pgxpool.Pool) contact.Repository {
 }
 
 // Create inserts a new contact into the database.
-// Returns contact.ErrDuplicateEmail if a contact with the same email already exists for the tenant.
+// Returns contact.ErrDuplicateEmail if a contact with the same email already exists for the context.
 func (r *repo) Create(c *contact.Contact) error {
 	ctx := context.Background()
 
 	query := `
-		INSERT INTO contacts (id, tenant_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at)
+		INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
 	`
 
@@ -38,7 +41,7 @@ func (r *repo) Create(c *contact.Contact) error {
 
 	_, err = r.pool.Exec(ctx, query,
 		c.ID,
-		c.TenantID,
+		c.ContextID,
 		c.Email,
 		c.FirstName,
 		c.LastName,
@@ -63,7 +66,7 @@ func (r *repo) GetByID(id string) (*contact.Contact, error) {
 	ctx := context.Background()
 
 	query := `
-		SELECT id, tenant_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
+		SELECT id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
 		FROM contacts
 		WHERE id = $1
 	`
@@ -73,7 +76,7 @@ func (r *repo) GetByID(id string) (*contact.Contact, error) {
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&c.ID,
-		&c.TenantID,
+		&c.ContextID,
 		&c.Email,
 		&c.FirstName,
 		&c.LastName,
@@ -86,7 +89,7 @@ func (r *repo) GetByID(id string) (*contact.Contact, error) {
 		&c.UpdatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("contact not found: %w", err)
 		}
 		return nil, fmt.Errorf("get contact by ID: %w", err)
@@ -106,7 +109,7 @@ func (r *repo) GetByID(id string) (*contact.Contact, error) {
 }
 
 // List retrieves contacts with optional filters, ordered by created_at DESC.
-// Note: tenant scoping is not available via this interface — callers must scope at the handler level.
+// Note: context scoping is not available via this interface — callers must scope at the handler level.
 func (r *repo) List(offset, limit int, filters contact.FilterOptions) ([]*contact.Contact, error) {
 	ctx := context.Background()
 
@@ -146,7 +149,7 @@ func (r *repo) List(offset, limit int, filters contact.FilterOptions) ([]*contac
 			argIndex++
 		}
 		whereClauses = append(whereClauses, fmt.Sprintf(
-			"contact_id IN (SELECT contact_id FROM contact_tag_memberships WHERE tag_id IN (SELECT id FROM contact_tags WHERE tenant_id = $1 AND name IN (%s)))",
+			"contact_id IN (SELECT contact_id FROM contact_tag_memberships WHERE tag_id IN (SELECT id FROM contact_tags WHERE context_id = $1 AND name IN (%s)))",
 			strings.Join(placeholders, ", "),
 		))
 		allTagArgs := make([]interface{}, 0, len(filters.Tags)+1)
@@ -160,7 +163,7 @@ func (r *repo) List(offset, limit int, filters contact.FilterOptions) ([]*contac
 	whereClause := strings.Join(whereClauses, " AND ")
 
 	listQuery := fmt.Sprintf(`
-		SELECT id, tenant_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
+		SELECT id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
 		FROM contacts
 		WHERE %s
 		ORDER BY created_at DESC
@@ -184,7 +187,7 @@ func (r *repo) List(offset, limit int, filters contact.FilterOptions) ([]*contac
 
 		err := rows.Scan(
 			&c.ID,
-			&c.TenantID,
+			&c.ContextID,
 			&c.Email,
 			&c.FirstName,
 			&c.LastName,
@@ -267,14 +270,14 @@ func (r *repo) Delete(id string) error {
 	return nil
 }
 
-// FindByEmail retrieves a contact by tenant and email.
-func (r *repo) FindByEmail(tenantID, email string) (*contact.Contact, error) {
+// FindByEmail retrieves a contact by context and email.
+func (r *repo) FindByEmail(contextID, email string) (*contact.Contact, error) {
 	ctx := context.Background()
 
 	query := `
-		SELECT id, tenant_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
+		SELECT id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
 		FROM contacts
-		WHERE tenant_id = $1 AND email = $2
+		WHERE context_id = $1 AND email = $2
 	`
 
 	c := &contact.Contact{
@@ -282,9 +285,9 @@ func (r *repo) FindByEmail(tenantID, email string) (*contact.Contact, error) {
 	}
 	var customFieldsJSON []byte
 
-	err := r.pool.QueryRow(ctx, query, tenantID, email).Scan(
+	err := r.pool.QueryRow(ctx, query, contextID, email).Scan(
 		&c.ID,
-		&c.TenantID,
+		&c.ContextID,
 		&c.Email,
 		&c.FirstName,
 		&c.LastName,
@@ -297,7 +300,7 @@ func (r *repo) FindByEmail(tenantID, email string) (*contact.Contact, error) {
 		&c.UpdatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("contact not found: %w", err)
 		}
 		return nil, fmt.Errorf("find contact by email: %w", err)
@@ -383,7 +386,7 @@ func (r *repo) GetActivity(contactID string, offset, limit int) ([]contact.Activ
 	ctx := context.Background()
 
 	query := `
-		SELECT id, contact_id, tenant_id, type, data, source_id, created_at
+		SELECT id, contact_id, context_id, type, data, source_id, created_at
 		FROM contact_activities
 		WHERE contact_id = $1
 		ORDER BY created_at DESC
@@ -404,7 +407,7 @@ func (r *repo) GetActivity(contactID string, offset, limit int) ([]contact.Activ
 		err := rows.Scan(
 			&a.ID,
 			&a.ContactID,
-			&a.TenantID,
+			&a.ContextID,
 			(*string)(&a.Type),
 			&dataJSON,
 			&a.SourceID,
@@ -430,14 +433,14 @@ func (r *repo) GetActivity(contactID string, offset, limit int) ([]contact.Activ
 	return activities, nil
 }
 
-// CountByTenant returns the total number of contacts for a tenant.
-func (r *repo) CountByTenant(tenantID string) (int64, error) {
+// CountByContext returns the total number of contacts for a context.
+func (r *repo) CountByContext(contextID string) (int64, error) {
 	ctx := context.Background()
 
-	query := "SELECT COUNT(*) FROM contacts WHERE tenant_id = $1"
+	query := "SELECT COUNT(*) FROM contacts WHERE context_id = $1"
 	var count int64
 
-	err := r.pool.QueryRow(ctx, query, tenantID).Scan(&count)
+	err := r.pool.QueryRow(ctx, query, contextID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count contacts: %w", err)
 	}
@@ -448,7 +451,7 @@ func (r *repo) CountByTenant(tenantID string) (int64, error) {
 // loadTags loads tags for a contact by joining with contact_tag_memberships and contact_tags.
 func (r *repo) loadTags(ctx context.Context, c *contact.Contact) error {
 	query := `
-		SELECT t.id, t.tenant_id, t.name, t.color, t.created_at
+		SELECT t.id, t.context_id, t.name, t.color, t.created_at
 		FROM contact_tag_memberships tm
 		JOIN contact_tags t ON tm.tag_id = t.id
 		WHERE tm.contact_id = $1
@@ -464,7 +467,7 @@ func (r *repo) loadTags(ctx context.Context, c *contact.Contact) error {
 	c.Tags = make([]contact.Tag, 0)
 	for rows.Next() {
 		var tag contact.Tag
-		err := rows.Scan(&tag.ID, &tag.TenantID, &tag.Name, &tag.Color, &tag.CreatedAt)
+		err := rows.Scan(&tag.ID, &tag.ContextID, &tag.Name, &tag.Color, &tag.CreatedAt)
 		if err != nil {
 			return fmt.Errorf("scan tag: %w", err)
 		}
@@ -504,4 +507,83 @@ func isUniqueViolation(err error) bool {
 	}
 	// pgx v5 error code for unique violation
 	return strings.Contains(err.Error(), "23505")
+}
+
+// TagRepository returns a TagRepository implementation for tag operations.
+func (r *repo) TagRepository() uc.TagRepository {
+	return &tagRepo{pool: r.pool}
+}
+
+// tagRepo implements uc.TagRepository.
+type tagRepo struct {
+	pool *pgxpool.Pool
+}
+
+// ApplyTags ensures tags exist and assigns them to a contact.
+func (t *tagRepo) ApplyTags(contextID, contactID string, tagNames []string) error {
+	ctx := context.Background()
+
+	// Delete existing memberships
+	_, err := t.pool.Exec(ctx, "DELETE FROM contact_tag_memberships WHERE contact_id = $1", contactID)
+	if err != nil {
+		return fmt.Errorf("delete memberships: %w", err)
+	}
+
+	// Ensure tags exist and collect IDs
+	tagIDs := make([]string, 0, len(tagNames))
+	for _, name := range tagNames {
+		tagID, err := ensureTag(ctx, t.pool, contextID, name)
+		if err != nil {
+			return fmt.Errorf("ensure tag %q: %w", name, err)
+		}
+		tagIDs = append(tagIDs, tagID)
+	}
+
+	// Add memberships
+	if len(tagIDs) > 0 {
+		query := `
+			INSERT INTO contact_tag_memberships (contact_id, tag_id)
+			VALUES ($1, $2)
+			ON CONFLICT (contact_id, tag_id) DO NOTHING
+		`
+		for _, tagID := range tagIDs {
+			_, err := t.pool.Exec(ctx, query, contactID, tagID); if err != nil {
+				return fmt.Errorf("add membership: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ensureTag ensures a tag exists for the context, creating it if necessary.
+func ensureTag(ctx context.Context, pool *pgxpool.Pool, contextID, name string) (string, error) {
+	var tagID string
+	query := "SELECT id FROM contact_tags WHERE context_id = $1 AND name = $2"
+	err := pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
+	if err == nil {
+		return tagID, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("query tag: %w", err)
+	}
+
+	tagID = uuid.New().String()
+	color := "#6366f1"
+	_, err = pool.Exec(ctx,
+		"INSERT INTO contact_tags (id, context_id, name, color) VALUES ($1, $2, $3, $4)",
+		tagID, contextID, name, color,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			err = pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
+			if err != nil {
+				return "", fmt.Errorf("find tag after race: %w", err)
+			}
+			return tagID, nil
+		}
+		return "", fmt.Errorf("create tag: %w", err)
+	}
+
+	return tagID, nil
 }

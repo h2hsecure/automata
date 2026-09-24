@@ -12,7 +12,7 @@ import (
 
 type jobRow struct {
 	id           string
-	tenantID     string
+	contextID    string
 	toStr        string
 	subject      string
 	body         string
@@ -51,7 +51,7 @@ func (q *emailQueue) StopWorker(cancel context.CancelFunc) {
 
 func (q *emailQueue) processNextBatch(ctx context.Context, mailer Mailer) error {
 	query := `
-		SELECT id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, created_at
+		SELECT id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, created_at
 		FROM email_jobs
 		WHERE next_retry <= NOW() AND attempts < max_retries
 		ORDER BY created_at ASC
@@ -69,7 +69,7 @@ func (q *emailQueue) processNextBatch(ctx context.Context, mailer Mailer) error 
 	for rows.Next() {
 		j := jobRow{}
 		var toAddresses pgtype.Array[string]
-		err := rows.Scan(&j.id, &j.tenantID, &toAddresses, &j.subject, &j.body, &j.htmlBody, &j.attempts, &j.maxRetries, &j.createdAt)
+		err := rows.Scan(&j.id, &j.contextID, &toAddresses, &j.subject, &j.body, &j.htmlBody, &j.attempts, &j.maxRetries, &j.createdAt)
 		if err != nil {
 			return fmt.Errorf("scan job: %w", err)
 		}

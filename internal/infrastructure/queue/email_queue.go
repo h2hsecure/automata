@@ -13,7 +13,7 @@ import (
 // EmailJob represents a pending email to send.
 type EmailJob struct {
 	ID         string
-	TenantID   string
+	ContextID   string
 	To         []string
 	Subject    string
 	Body       string
@@ -63,12 +63,12 @@ func (q *emailQueue) Enqueue(job *EmailJob) error {
 	toStr := "{" + fmt.Sprint(job.To) + "}"
 
 	query := `
-		INSERT INTO email_jobs (id, tenant_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
+		INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 	`
 
 	_, err := q.pool.Exec(context.Background(), query,
-		job.ID, job.TenantID, toStr, job.Subject, job.Body, job.HTMLBody,
+		job.ID, job.ContextID, toStr, job.Subject, job.Body, job.HTMLBody,
 		job.Attempts, job.MaxRetries,
 	)
 	if err != nil {

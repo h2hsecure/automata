@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS email_jobs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id       UUID NOT NULL,
+    context_id       UUID NOT NULL,
     to_addresses    TEXT[] NOT NULL,
     subject         TEXT NOT NULL,
     body            TEXT NOT NULL,

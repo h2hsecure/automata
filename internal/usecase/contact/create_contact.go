@@ -22,9 +22,9 @@ type CreateInput struct {
 }
 
 // CreateContact creates a new contact or returns the existing one if a duplicate email is found.
-func CreateContact(repo Repository, tenantID string, input CreateInput) (*contact.Contact, error) {
-	if tenantID == "" {
-		return nil, fmt.Errorf("tenant_id is required")
+func CreateContact(repo Repository, contextID string, input CreateInput) (*contact.Contact, error) {
+	if contextID == "" {
+		return nil, fmt.Errorf("context_id is required")
 	}
 
 	// Validate email format if provided
@@ -36,7 +36,7 @@ func CreateContact(repo Repository, tenantID string, input CreateInput) (*contac
 
 	// Check for duplicate email
 	if input.Email != nil && *input.Email != "" {
-		existing, err := repo.FindByEmail(tenantID, *input.Email)
+		existing, err := repo.FindByEmail(contextID, *input.Email)
 		if err != nil {
 			// If not found, proceed with creation
 			if !strings.Contains(err.Error(), "contact not found") {
@@ -53,7 +53,7 @@ func CreateContact(repo Repository, tenantID string, input CreateInput) (*contac
 
 	contact := &contact.Contact{
 		ID:           id,
-		TenantID:     tenantID,
+		ContextID:     contextID,
 		Email:        input.Email,
 		FirstName:    input.FirstName,
 		LastName:     input.LastName,
@@ -74,7 +74,7 @@ func CreateContact(repo Repository, tenantID string, input CreateInput) (*contac
 
 	// Apply tags if provided
 	if len(input.Tags) > 0 {
-		if err := applyTags(repo, tenantID, id, input.Tags); err != nil {
+		if err := applyTags(repo, contextID, id, input.Tags); err != nil {
 			return nil, fmt.Errorf("apply tags: %w", err)
 		}
 	}
