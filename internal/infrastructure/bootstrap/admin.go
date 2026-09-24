@@ -1,12 +1,13 @@
 package bootstrap
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/context"
+	ctxdomain "github.com/hekemen/automata/internal/domain/context"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
@@ -15,7 +16,7 @@ import (
 // Run creates an admin user on first startup if no users exist.
 // It creates a default context if none exists, assigns admin to it with owner role,
 // and writes credentials to stdout. Returns nil if users already exist.
-func Run(pool *pgxpool.Pool, userRepo context.UserRepository, contextRepo context.Repository) error {
+func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository, contextRepo ctxdomain.Repository) error {
 	// Check if any users exist in the users table
 	exists, err := userRepo.ExistsAnyUser()
 	if err != nil {
@@ -27,7 +28,7 @@ func Run(pool *pgxpool.Pool, userRepo context.UserRepository, contextRepo contex
 
 	// Also check context_users for backward compat
 	var ctxUserCount int
-	if err := pool.QueryRow(nil, "SELECT COUNT(*) FROM context_users").Scan(&ctxUserCount); err == nil && ctxUserCount > 0 {
+	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM context_users").Scan(&ctxUserCount); err == nil && ctxUserCount > 0 {
 		return nil // context_users has data, migration handles it
 	}
 
@@ -51,13 +52,13 @@ func Run(pool *pgxpool.Pool, userRepo context.UserRepository, contextRepo contex
 
 	// Create default context if none exists
 	var contextsCount int
-	if err := pool.QueryRow(nil, "SELECT COUNT(*) FROM contexts").Scan(&contextsCount); err != nil {
+	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM contexts").Scan(&contextsCount); err != nil {
 		contextsCount = 0
 	}
 
 	var contextID string
 	if contextsCount == 0 {
-		ctx := &context.Context{
+		ctx := &ctxdomain.Context{
 			ID:       uuid.New().String(),
 			Slug:     "default",
 			Name:     "Default Context",
@@ -70,14 +71,14 @@ func Run(pool *pgxpool.Pool, userRepo context.UserRepository, contextRepo contex
 		contextID = ctx.ID
 	} else {
 		// Get first context
-		row := pool.QueryRow(nil, "SELECT id FROM contexts LIMIT 1")
+		row := pool.QueryRow(context.Background(), "SELECT id FROM contexts LIMIT 1")
 		if err := row.Scan(&contextID); err != nil {
 			return fmt.Errorf("get first context: %w", err)
 		}
 	}
 
 	// Create admin user
-	adminUser := &context.User{
+	adminUser := &ctxdomain.User{
 		ID:           uuid.New().String(),
 		Email:        adminEmail,
 		PasswordHash: string(hash),
@@ -88,7 +89,7 @@ func Run(pool *pgxpool.Pool, userRepo context.UserRepository, contextRepo contex
 	}
 
 	// Create membership
-	membership := &context.UserContext{
+	membership := &ctxdomain.UserContext{
 		UserID:    adminUser.ID,
 		ContextID: contextID,
 		Role:      "owner",
