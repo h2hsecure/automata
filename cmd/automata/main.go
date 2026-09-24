@@ -17,9 +17,11 @@ import (
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	banner_repo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
 	"github.com/hekemen/automata/internal/infrastructure/config"
+	"github.com/hekemen/automata/internal/infrastructure/bootstrap"
+	"github.com/hekemen/automata/internal/infrastructure/contact"
 	"github.com/hekemen/automata/internal/infrastructure/database"
 	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
-	tenant_repo "github.com/hekemen/automata/internal/infrastructure/tenant/repo"
+	context_repo "github.com/hekemen/automata/internal/infrastructure/context/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	"github.com/rs/zerolog/log"
 )
@@ -44,21 +46,42 @@ func main() {
 	defer database.Close(pool)
 
 	if err := database.RunMigrations(pool); err != nil {
-		log.Fatal().Err(err).Msg("failed to run migrations")
+		log.Fatal().Err(err).Msg("failed to run core migrations")
+	}
+
+	if err := tracking_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run tracking migrations")
+	}
+
+	if err := form_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run form migrations")
+	}
+
+	if err := contact.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run contact migrations")
+	}
+
+	if err := banner_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run banner migrations")
 	}
 
 	// Verify database connection
-	var tenantCount int
-	pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM tenants").Scan(&tenantCount)
-	log.Info().Int("tenants", tenantCount).Msg("database connected")
+	var contextCount int
+	pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM contexts").Scan(&contextCount)
+	log.Info().Int("contexts", contextCount).Msg("database connected")
 
 	// Initialize repositories
-	tenantRepo := tenant_repo.NewPostgresRepo(pool)
-	userRepo := tenant_repo.NewUserPostgresRepo(pool)
+	contextRepo := context_repo.NewPostgresRepo(pool)
+	userRepo := context_repo.NewUserPostgresRepo(pool)
 	apiKeyRepo := auth_repo.NewApiKeyPostgresRepo(pool)
 	formRepo := form_repo.New(pool)
 	bannerRepo := banner_repo.New(pool)
 	trackingRepo := tracking_repo.New(pool)
+
+	// Admin bootstrap: create admin user on first startup
+	if err := bootstrap.Run(pool, userRepo, contextRepo); err != nil {
+		log.Warn().Err(err).Msg("admin bootstrap failed (continuing anyway)")
+	}
 
 	// Initialize auth service
 	authService := auth.NewService(userRepo)
@@ -71,7 +94,7 @@ func main() {
 
 	// Admin server (port 8080)
 	adminEngine := gin.Default()
-	api.NewServer(adminEngine, pool, tenantRepo, userRepo, authService, apiKeyRepo, "/api")
+	api.NewServer(adminEngine, pool, contextRepo, userRepo, authService, apiKeyRepo, "/api")
 
 	webDir := os.Getenv("WEB_DIR")
 	if webDir == "" {
