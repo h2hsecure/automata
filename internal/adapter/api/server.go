@@ -40,7 +40,8 @@ func NewServer(
 	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo)
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/auth/logout", authHandler.Logout)
-	api.GET("/auth/me", authHandler.GetMe)
+
+	api.GET("/auth/me", middleware.AuthMiddleware(authService), authHandler.GetMe)
 
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(authService))
