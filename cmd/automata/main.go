@@ -65,6 +65,10 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to run banner migrations")
 	}
 
+	if err := database.RunUserContextMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run user-context migrations")
+	}
+
 	// Verify database connection
 	var contextCount int
 	pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM contexts").Scan(&contextCount)
