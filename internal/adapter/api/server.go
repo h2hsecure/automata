@@ -9,7 +9,7 @@ import (
 	"github.com/hekemen/automata/internal/adapter/api/middleware"
 	"github.com/hekemen/automata/internal/adapter/proxy"
 	"github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/domain/tenant"
+	"github.com/hekemen/automata/internal/domain/context"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	config_repo "github.com/hekemen/automata/internal/infrastructure/config/repo"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,8 +21,8 @@ import (
 func NewServer(
 	parent *gin.Engine,
 	pool *pgxpool.Pool,
-	tenantRepo tenant.Repository,
-	userRepo tenant.UserRepository,
+	contextRepo context.Repository,
+	userRepo context.UserRepository,
 	authService auth.AuthService,
 	apiKeyRepo auth_repo.ApiKeyRepository,
 	prefix string,
@@ -37,22 +37,41 @@ func NewServer(
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	authHandler := handler.NewAuthHandler(authService, userRepo, tenantRepo, apiKeyRepo)
+	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo)
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/auth/logout", authHandler.Logout)
+	api.GET("/auth/me", authHandler.GetMe)
 
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(authService))
 	{
-		tenantHandler := handler.NewTenantHandler(tenantRepo)
+		contextHandler := handler.NewContextHandler(contextRepo)
+		userHandler := handler.NewUserHandler(userRepo, contextRepo)
+		contextUserHandler := handler.NewContextUserHandler(userRepo, contextRepo)
 
-		tenantRoutes := admin.Group("/tenants")
+		contextRoutes := admin.Group("/contexts")
 		{
-			tenantRoutes.GET("", tenantHandler.List)
-			tenantRoutes.POST("", tenantHandler.Create)
-			tenantRoutes.GET("/:id", tenantHandler.Get)
-			tenantRoutes.PUT("/:id", tenantHandler.Update)
-			tenantRoutes.DELETE("/:id", tenantHandler.Delete)
+			contextRoutes.GET("", contextHandler.List)
+			contextRoutes.POST("", contextHandler.Create)
+			contextRoutes.GET("/:id", contextHandler.Get)
+			contextRoutes.PUT("/:id", contextHandler.Update)
+			contextRoutes.DELETE("/:id", contextHandler.Delete)
+		}
+
+		usersRoutes := admin.Group("/users")
+		{
+			usersRoutes.GET("", userHandler.List)
+			usersRoutes.POST("", userHandler.Create)
+			usersRoutes.GET("/:id", userHandler.Get)
+			usersRoutes.PUT("/:id", userHandler.Update)
+			usersRoutes.DELETE("/:id", userHandler.Delete)
+		}
+
+		contextUserRoutes := admin.Group("/contexts/:id/users")
+		{
+			contextUserRoutes.GET("", contextUserHandler.List)
+			contextUserRoutes.POST("", contextUserHandler.Create)
+			contextUserRoutes.DELETE("/:userId", contextUserHandler.Delete)
 		}
 
 		admin.POST("/api-keys", authHandler.CreateAPIKey)
@@ -60,15 +79,15 @@ func NewServer(
 		// Config routes
 		configRepo := config_repo.NewConfigRepo(pool)
 		configHandler := handler.NewConfigHandler(configRepo)
-		admin.GET("/configs/:tenantId", configHandler.GetConfig)
-		admin.PUT("/configs/:tenantId/cors", configHandler.UpdateCORS)
-		admin.PUT("/configs/:tenantId/domain", configHandler.UpdateDomain)
-		admin.PUT("/configs/:tenantId/display", configHandler.UpdateDisplay)
+		admin.GET("/configs/:contextId", configHandler.GetConfig)
+		admin.PUT("/configs/:contextId/cors", configHandler.UpdateCORS)
+		admin.PUT("/configs/:contextId/domain", configHandler.UpdateDomain)
+		admin.PUT("/configs/:contextId/display", configHandler.UpdateDisplay)
 	}
 
-	// Tenant-resolved routes (forms, snippets, static assets)
-	api.Use(TenantResolver(tenantRepo))
-	proxy.NewProxy(tenantRepo, api)
+	// Context-resolved routes (forms, snippets, static assets)
+	api.Use(ContextResolver(contextRepo))
+	proxy.NewProxy(contextRepo, api)
 
 	return parent
 }

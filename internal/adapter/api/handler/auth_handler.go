@@ -7,15 +7,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/domain/tenant"
+	"github.com/hekemen/automata/internal/domain/context"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	"github.com/rs/zerolog/log"
 )
 
 type AuthHandler struct {
 	authService auth.AuthService
-	userRepo    tenant.UserRepository
-	tenantRepo  tenant.Repository
+	userRepo    context.UserRepository
+	contextRepo context.Repository
 	apiKeyRepo  auth_repo.ApiKeyRepository
 }
 
@@ -29,8 +29,8 @@ type CreateAPIKeyRequest struct {
 	ExpiresIn *int   `json:"expires_in"`
 }
 
-func NewAuthHandler(authService auth.AuthService, userRepo tenant.UserRepository, tenantRepo tenant.Repository, apiKeyRepo auth_repo.ApiKeyRepository) *AuthHandler {
-	return &AuthHandler{authService: authService, userRepo: userRepo, tenantRepo: tenantRepo, apiKeyRepo: apiKeyRepo}
+func NewAuthHandler(authService auth.AuthService, userRepo context.UserRepository, contextRepo context.Repository, apiKeyRepo auth_repo.ApiKeyRepository) *AuthHandler {
+	return &AuthHandler{authService: authService, userRepo: userRepo, contextRepo: contextRepo, apiKeyRepo: apiKeyRepo}
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
@@ -49,14 +49,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Fill tenant details from tenantRepo
-	tenants := make([]gin.H, 0, len(tenantInfos))
+	// Fill context details from contextRepo
+	contexts := make([]gin.H, 0, len(tenantInfos))
 	for _, ti := range tenantInfos {
-		t, err := h.tenantRepo.GetByID(ti.ID)
+		t, err := h.contextRepo.GetByID(ti.ID)
 		if err != nil {
 			continue
 		}
-		tenants = append(tenants, gin.H{
+		contexts = append(contexts, gin.H{
 			"id":   t.ID,
 			"slug": t.Slug,
 			"name": t.Name,
@@ -67,7 +67,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"token":   token,
 		"user_id": userID,
 		"email":   req.Email,
-		"tenants": tenants,
+		"contexts": contexts,
 	})
 }
 
@@ -96,7 +96,7 @@ func (h *AuthHandler) CreateAPIKey(c *gin.Context) {
 		expiresAt = &exp
 	}
 
-	apiKey, err := h.authService.CreateAPIKey(userID, c.GetString("tenant_id"), req.Name, plaintextKey, expiresAt)
+	apiKey, err := h.authService.CreateAPIKey(userID, c.GetString("context_id"), req.Name, plaintextKey, expiresAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -113,5 +113,44 @@ func (h *AuthHandler) CreateAPIKey(c *gin.Context) {
 		"name":       apiKey.Name,
 		"key":        plaintextKey,
 		"expires_at": apiKey.ExpiresAt,
+	})
+}
+
+func (h *AuthHandler) GetMe(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	// Get user from platform users table
+	user, err := h.userRepo.GetByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Get context memberships
+	memberships, _ := h.userRepo.ListByUser(userID)
+
+	contexts := make([]gin.H, 0, len(memberships))
+	for _, mc := range memberships {
+		ctx, err := h.contextRepo.GetByID(mc.ContextID)
+		if err != nil {
+			continue
+		}
+		contexts = append(contexts, gin.H{
+			"id":   ctx.ID,
+			"slug": ctx.Slug,
+			"name": ctx.Name,
+			"role": mc.Role,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":       user.ID,
+		"email":    user.Email,
+		"is_admin": user.IsAdmin,
+		"contexts": contexts,
 	})
 }
