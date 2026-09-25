@@ -23,6 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
   const currentContextId = ref(localStorage.getItem('context_id') || '')
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const theme = ref(localStorage.getItem('theme') || 'light')
 
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.is_admin ?? false)
@@ -97,6 +98,11 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('context_id', contextId)
   }
 
+  function toggleTheme() {
+    theme.value = theme.value === 'dark' ? 'light' : 'dark'
+    localStorage.setItem('theme', theme.value)
+  }
+
   return {
     token,
     user,
@@ -104,6 +110,7 @@ export const useAuthStore = defineStore('auth', () => {
     currentContextId,
     loading,
     error,
+    theme,
     isAuthenticated,
     isAdmin,
     currentContext,

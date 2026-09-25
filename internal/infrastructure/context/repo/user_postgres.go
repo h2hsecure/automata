@@ -123,14 +123,13 @@ func (r *userPostgresRepo) GetByUsername(email string) (*domainctx.User, error) 
 	u := &domainctx.User{}
 
 	query := `
-		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, display_name, avatar_url, password_changed_at, created_at, updated_at
+		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, created_at, updated_at
 		FROM users WHERE email = $1
 	`
 
 	err := r.pool.QueryRow(context.Background(), query, email).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.SSOProvider, &u.SSOID,
-		&u.IsAdmin, &u.DisplayName, &u.AvatarURL, &u.PasswordChangedAt,
-		&u.CreatedAt, &u.UpdatedAt,
+		&u.IsAdmin, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get user by username: %w", err)

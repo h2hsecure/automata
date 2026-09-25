@@ -46,7 +46,11 @@ func NewServer(
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	cookieMgr := cookie.New(config.Get("auth.secret_key"))
+	cookieSecret := config.Get("auth.cookie_secret")
+	if cookieSecret == "" {
+		cookieSecret = "automata-cookie-secret-32bytes!!" // 32 bytes for AES-256
+	}
+	cookieMgr := cookie.New(cookieSecret)
 	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo, cookieMgr)
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/auth/logout", authHandler.Logout)

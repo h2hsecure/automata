@@ -1,1 +1,0 @@
-import{l as m,r as u}from"./index-BRS2yhxR.js";function g(n=1,l=20){const a=u(n),e=u(l),t=u(0),c=m(()=>Math.ceil(t.value/e.value));function s(o){const f=Math.max(1,Math.min(o,c.value));a.value=f}function r(o){t.value=o}function v(){a.value=n,e.value=l,t.value=0}return{page:a,limit:e,total:t,totalPages:c,goToPage:s,setTotal:r,reset:v}}export{g as u};

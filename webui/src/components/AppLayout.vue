@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { RouterView } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 
@@ -12,7 +13,7 @@ const sidebarOpen = ref(true)
     <div class="flex-1 flex flex-col overflow-hidden">
       <AppHeader @toggle-sidebar="sidebarOpen = !sidebarOpen" />
       <main class="flex-1 overflow-y-auto p-6">
-        <slot />
+        <RouterView />
       </main>
     </div>
   </div>

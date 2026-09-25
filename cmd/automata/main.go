@@ -116,6 +116,12 @@ func main() {
 
 	// Admin server (port 8080)
 	adminEngine := gin.Default()
+
+	// Health check at root level (before SPA fallback)
+	adminEngine.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	api.NewServer(adminEngine, pool, contextRepo, userRepo, authService, apiKeyRepo, "/api")
 
 	webDir := os.Getenv("WEB_DIR")

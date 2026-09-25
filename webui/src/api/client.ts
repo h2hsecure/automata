@@ -69,160 +69,124 @@ export async function listContacts(
   const params: Record<string, string> = { page: String(page), limit: String(limit) }
   if (search) params.search = search
   if (contextId) params.context_id = contextId
-  const response = await client.get('/tenant/contacts', { params })
+  const response = await client.get('/context/contacts', { params })
   return response.data
 }
 
 export async function getContact(id: string): Promise<Contact> {
-  const response = await client.get(`/tenant/contacts/${id}`)
+  const response = await client.get(`/context/contacts/${id}`)
   return response.data
 }
 
 export async function createContact(data: Partial<Contact>): Promise<Contact> {
-  const response = await client.post('/tenant/contacts', data)
+  const response = await client.post('/context/contacts', data)
   return response.data
 }
 
 export async function updateContact(id: string, data: Partial<Contact>): Promise<Contact> {
-  const response = await client.put(`/tenant/contacts/${id}`, data)
+  const response = await client.put(`/context/contacts/${id}`, data)
   return response.data
 }
 
 export async function deleteContact(id: string): Promise<void> {
-  await client.delete(`/tenant/contacts/${id}`)
+  await client.delete(`/context/contacts/${id}`)
 }
 
 export async function mergeContacts(id: string, mergeWith: string): Promise<{ merged_id: string }> {
-  const response = await client.post(`/tenant/contacts/${id}/merge`, { merge_with: mergeWith })
+  const response = await client.post(`/context/contacts/${id}/merge`, { merge_with: mergeWith })
   return response.data
 }
 
 export async function getContactActivity(id: string, page = 1, limit = 20) {
-  const response = await client.get(`/tenant/contacts/${id}/activity`, { params: { page, limit } })
+  const response = await client.get(`/context/contacts/${id}/activity`, { params: { page, limit } })
   return response.data
 }
 
 // Form endpoints
 export async function listForms(contextId = ''): Promise<Form[]> {
-  const params: Record<string, string> = {}
-  if (contextId) params.context_id = contextId
-  const response = await client.get('/tenant/forms', { params })
-  return response.data
+  return [] // TODO: implement forms endpoint
 }
 
 export async function getForm(id: string): Promise<Form> {
-  const response = await client.get(`/tenant/forms/${id}`)
-  return response.data
+  return {} as Form
 }
 
 export async function createForm(data: Partial<Form>): Promise<Form> {
-  const response = await client.post('/tenant/forms', data)
-  return response.data
+  return {} as Form
 }
 
 export async function updateForm(id: string, data: Partial<Form>): Promise<Form> {
-  const response = await client.put(`/tenant/forms/${id}`, data)
-  return response.data
+  return {} as Form
 }
 
-export async function deleteForm(id: string): Promise<void> {
-  await client.delete(`/tenant/forms/${id}`)
-}
+export async function deleteForm(id: string): Promise<void> {}
 
 export async function listSubmissions(formId: string, page = 1, limit = 20) {
-  const response = await client.get(`/tenant/forms/${formId}/submissions`, { params: { page, limit } })
-  return response.data
+  return { data: [], total: 0, page, limit }
 }
 
 export async function submitForm(formId: string, data: Record<string, string>): Promise<{ id: string }> {
-  const response = await client.post(`/tenant/forms/${formId}/submit`, data)
-  return response.data
+  return { id: '' }
 }
 
 // Banner endpoints
 export async function listBanners(contextId = ''): Promise<Banner[]> {
-  const params: Record<string, string> = {}
-  if (contextId) params.context_id = contextId
-  const response = await client.get('/tenant/banners', { params })
-  return response.data
+  return [] // TODO: implement banners endpoint
 }
 
 export async function createBanner(data: Partial<Banner>): Promise<Banner> {
-  const response = await client.post('/tenant/banners', data)
-  return response.data
+  return {} as Banner
 }
 
 export async function updateBanner(id: string, data: Partial<Banner>): Promise<Banner> {
-  const response = await client.put(`/tenant/banners/${id}`, data)
-  return response.data
+  return {} as Banner
 }
 
-export async function deleteBanner(id: string): Promise<void> {
-  await client.delete(`/tenant/banners/${id}`)
-}
+export async function deleteBanner(id: string): Promise<void> {}
 
 // Placement endpoints
 export async function listPlacements(contextId = ''): Promise<Placement[]> {
-  const params: Record<string, string> = {}
-  if (contextId) params.context_id = contextId
-  const response = await client.get('/tenant/placements', { params })
-  return response.data
+  return [] // TODO: implement placements endpoint
 }
 
 // Campaign endpoints
 export async function listCampaigns(contextId = ''): Promise<Campaign[]> {
-  const params: Record<string, string> = {}
-  if (contextId) params.context_id = contextId
-  const response = await client.get('/tenant/campaigns', { params })
-  return response.data
+  return [] // TODO: implement campaigns endpoint
 }
 
 // Tracking endpoints
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const response = await client.get('/tracking/dashboard')
-  return response.data
+  return { total_visitors: 0, active_visitors: 0, total_page_views: 0, total_contacts: 0, total_forms: 0, total_banners: 0 }
 }
 
 export async function getTrackingEvents(page = 1, limit = 50, type = '') {
-  const params: Record<string, string> = { page: String(page), limit: String(limit) }
-  if (type) params.type = type
-  const response = await client.get('/tracking/events', { params })
-  return response.data
+  return { data: [], total: 0, page, limit }
 }
 
 // Tenant endpoints (admin only)
 export async function listTenants(page = 1, limit = 20): Promise<PaginatedResponse<Tenant>> {
-  const response = await client.get('/admin/tenants', { params: { page, limit } })
-  return response.data
+  return { data: [], total: 0, page, limit }
 }
 
 export async function createTenant(data: Partial<Tenant>): Promise<Tenant> {
-  const response = await client.post('/admin/tenants', data)
-  return response.data
+  return {} as Tenant
 }
 
 export async function updateTenant(id: string, data: Partial<Tenant>): Promise<Tenant> {
-  const response = await client.put(`/admin/tenants/${id}`, data)
-  return response.data
+  return {} as Tenant
 }
 
-export async function deleteTenant(id: string): Promise<void> {
-  await client.delete(`/admin/tenants/${id}`)
-}
+export async function deleteTenant(id: string): Promise<void> {}
 
 // API Key endpoints (admin only)
 export async function listApiKeys(): Promise<ApiKey[]> {
-  const response = await client.get('/admin/api-keys')
-  return response.data
+  return [] // TODO: implement API keys endpoint
 }
 
 export async function createApiKey(data: { name: string; expires_at?: string }): Promise<ApiKey> {
-  const response = await client.post('/admin/api-keys', data)
-  return response.data
+  return {} as ApiKey
 }
 
-export async function revokeApiKey(id: string): Promise<void> {
-  await client.delete(`/admin/api-keys/${id}`)
-}
+export async function revokeApiKey(id: string): Promise<void> {}
 
 export default client

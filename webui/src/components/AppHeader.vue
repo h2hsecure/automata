@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Bell, LogOut, Menu, Moon, Sun, User, ChevronDown } from 'lucide-vue-next'
 import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
 const emit = defineEmits<{ 'toggle-sidebar': [] }>()
 
-const { useAuthStore } = await import('@/stores/auth')
 const authStore = useAuthStore()
 const dropdownOpen = ref(false)
 

@@ -1,0 +1,1 @@
+import{k as m,r as u}from"./index-BqNbdhyH.js";function g(n=1,c=20){const a=u(n),e=u(c),t=u(0),l=m(()=>Math.ceil(t.value/e.value));function s(o){const f=Math.max(1,Math.min(o,l.value));a.value=f}function r(o){t.value=o}function v(){a.value=n,e.value=c,t.value=0}return{page:a,limit:e,total:t,totalPages:l,goToPage:s,setTotal:r,reset:v}}export{g as u};

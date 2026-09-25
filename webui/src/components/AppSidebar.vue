@@ -13,6 +13,7 @@ import {
   X,
   Zap,
 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 interface NavItem {
   name: string
@@ -25,8 +26,8 @@ const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 
 const route = useRoute()
-const { useAuthStore } = await import('@/stores/auth')
 const authStore = useAuthStore()
+const isMobile = computed(() => typeof window !== 'undefined' && window.innerWidth < 1024)
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -58,7 +59,7 @@ const isActive = (path: string) => route.path === path
     :class="[
       'fixed top-0 left-0 z-50 flex h-full flex-col bg-card border-r transition-all duration-200',
       'w-64',
-      { 'translate-x-[-100%]': !props.open && window.innerWidth < 1024 },
+      { 'translate-x-[-100%]': !props.open && isMobile },
     ]"
     :style="{ width: props.open ? '16rem' : '4rem' }"
   >

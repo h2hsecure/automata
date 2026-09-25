@@ -25,6 +25,14 @@ import (
 
 func main() {
 	// Load configuration
+	configPath := config.Get("config.file")
+	if configPath == "" {
+		configPath = "config.yaml"
+	}
+	if err := config.Load(configPath); err != nil {
+		log.Warn().Err(err).Str("path", configPath).Msg("failed to load config, using defaults")
+	}
+
 	port := config.Get("bff.port")
 	if port == "" {
 		port = "8082"
@@ -35,7 +43,7 @@ func main() {
 	}
 	apiBackendURL := config.Get("bff.api_backend_url")
 	if apiBackendURL == "" {
-		apiBackendURL = "http://localhost:9081"
+		apiBackendURL = "http://localhost:8080"
 	}
 	webDir := config.Get("bff.web_dir")
 	if webDir == "" {
