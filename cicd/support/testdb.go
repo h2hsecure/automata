@@ -82,6 +82,15 @@ func (tdb *TestDB) Close() {
 
 // RunMigrations executes all embedded migrations against the test database.
 func (tdb *TestDB) RunMigrations(ctx context.Context) error {
+	// Get the project root directory (go up from cicd/ if needed)
+	wd, err := os.Getwd()
+	if err != nil {
+		wd = "."
+	}
+	if strings.HasSuffix(wd, "/cicd") || wd == "cicd" {
+		wd = filepath.Dir(wd)
+	}
+
 	migrationDirs := []string{
 		"internal/infrastructure/database",
 		"internal/infrastructure/contact",
@@ -91,22 +100,17 @@ func (tdb *TestDB) RunMigrations(ctx context.Context) error {
 		"internal/infrastructure/queue",
 	}
 
-	// Get the project root directory (go up from cicd/ if needed)
-	wd, err := os.Getwd()
-	if err != nil {
-		wd = "."
-	}
-	
-	// Check if we're in the cicd/ directory and go up if needed
-	if strings.HasSuffix(wd, "/cicd") || wd == "cicd" {
-		wd = filepath.Dir(wd)
-	}
-
+	// Run core migrations first
 	for _, dir := range migrationDirs {
 		migrationDir := fmt.Sprintf("%s/%s", wd, dir)
 		if err := runMigrationDir(ctx, tdb.Pool, migrationDir); err != nil {
 			return fmt.Errorf("run migrations from %s: %w", dir, err)
 		}
+	}
+
+	// Run user migrations (users, user_contexts) after core migrations
+	if err := runMigrationFile(ctx, tdb.Pool, fmt.Sprintf("%s/internal/infrastructure/database/migration_users.sql", wd)); err != nil {
+		return fmt.Errorf("run user migrations: %w", err)
 	}
 
 	return nil

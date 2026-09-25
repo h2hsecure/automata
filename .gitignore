@@ -1,3 +1,6 @@
 # Worktrees
 .worktrees/
 worktrees/
+
+# Dependencies
+webui/node_modules/

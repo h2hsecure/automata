@@ -53,3 +53,17 @@ CREATE TABLE IF NOT EXISTS contact_field_definitions (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_field_defs_context_key
     ON contact_field_definitions(context_id, key);
+
+-- Contact activities table
+CREATE TABLE IF NOT EXISTS contact_activities (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    contact_id      UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+    context_id      UUID NOT NULL,
+    type            VARCHAR(64) NOT NULL,
+    data            JSONB DEFAULT '{}',
+    source_id       VARCHAR(128),
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_activities_contact ON contact_activities(contact_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_context ON contact_activities(context_id, created_at DESC);
