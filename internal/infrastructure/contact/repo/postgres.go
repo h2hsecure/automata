@@ -9,24 +9,24 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/contact"
+	ct "github.com/hekemen/automata/internal/domain/contact"
 	uc "github.com/hekemen/automata/internal/usecase/contact"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// repo implements the contact.Repository interface using PostgreSQL.
+// repo implements the ct.Repository interface using PostgreSQL.
 type repo struct {
 	pool *pgxpool.Pool
 }
 
 // New creates a new PostgreSQL contact repository.
-func New(pool *pgxpool.Pool) contact.Repository {
+func New(pool *pgxpool.Pool) ct.Repository {
 	return &repo{pool: pool}
 }
 
 // Create inserts a new contact into the database.
-// Returns contact.ErrDuplicateEmail if a contact with the same email already exists for the context.
-func (r *repo) Create(c *contact.Contact) error {
+// Returns ct.ErrDuplicateEmail if a contact with the same email already exists for the context.
+func (r *repo) Create(c *ct.Contact) error {
 	ctx := context.Background()
 
 	query := `
@@ -53,7 +53,7 @@ func (r *repo) Create(c *contact.Contact) error {
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return contact.ErrDuplicateEmail
+			return ct.ErrDuplicateEmail
 		}
 		return fmt.Errorf("create contact: %w", err)
 	}
@@ -62,7 +62,7 @@ func (r *repo) Create(c *contact.Contact) error {
 }
 
 // GetByID retrieves a contact by its ID, including associated tags.
-func (r *repo) GetByID(id string) (*contact.Contact, error) {
+func (r *repo) GetByID(id string) (*ct.Contact, error) {
 	ctx := context.Background()
 
 	query := `
@@ -71,7 +71,7 @@ func (r *repo) GetByID(id string) (*contact.Contact, error) {
 		WHERE id = $1
 	`
 
-	c := &contact.Contact{}
+	c := &ct.Contact{}
 	var customFieldsJSON []byte
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
@@ -110,7 +110,7 @@ func (r *repo) GetByID(id string) (*contact.Contact, error) {
 
 // List retrieves contacts with optional filters, ordered by created_at DESC.
 // Note: context scoping is not available via this interface — callers must scope at the handler level.
-func (r *repo) List(offset, limit int, filters contact.FilterOptions) ([]*contact.Contact, error) {
+func (r *repo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact, error) {
 	ctx := context.Background()
 
 	whereClauses := []string{"1=1"}
@@ -178,9 +178,9 @@ func (r *repo) List(offset, limit int, filters contact.FilterOptions) ([]*contac
 	}
 	defer rows.Close()
 
-	contacts := make([]*contact.Contact, 0)
+	contacts := make([]*ct.Contact, 0)
 	for rows.Next() {
-		c := &contact.Contact{
+		c := &ct.Contact{
 			CustomFields: make(map[string]interface{}),
 		}
 		var customFieldsJSON []byte
@@ -223,8 +223,8 @@ func (r *repo) List(offset, limit int, filters contact.FilterOptions) ([]*contac
 	return contacts, nil
 }
 
-// Update modifies an existing contact.
-func (r *repo) Update(c *contact.Contact) error {
+// Update modifies an existing ct.
+func (r *repo) Update(c *ct.Contact) error {
 	ctx := context.Background()
 
 	customFieldsJSON, err := json.Marshal(c.CustomFields)
@@ -271,7 +271,7 @@ func (r *repo) Delete(id string) error {
 }
 
 // FindByEmail retrieves a contact by context and email.
-func (r *repo) FindByEmail(contextID, email string) (*contact.Contact, error) {
+func (r *repo) FindByEmail(contextID, email string) (*ct.Contact, error) {
 	ctx := context.Background()
 
 	query := `
@@ -280,7 +280,7 @@ func (r *repo) FindByEmail(contextID, email string) (*contact.Contact, error) {
 		WHERE context_id = $1 AND email = $2
 	`
 
-	c := &contact.Contact{
+	c := &ct.Contact{
 		CustomFields: make(map[string]interface{}),
 	}
 	var customFieldsJSON []byte
@@ -320,7 +320,7 @@ func (r *repo) FindByEmail(contextID, email string) (*contact.Contact, error) {
 }
 
 // Merge merges the contact identified by mergeIntoID into the contact identified by keepID.
-// It merges custom_fields (JSONB), tags, reassigns activities, and deletes the merged contact.
+// It merges custom_fields (JSONB), tags, reassigns activities, and deletes the merged ct.
 func (r *repo) Merge(keepID, mergeIntoID string) error {
 	ctx := context.Background()
 
@@ -382,26 +382,55 @@ func (r *repo) Merge(keepID, mergeIntoID string) error {
 }
 
 // GetActivity retrieves activities for a contact, ordered by created_at DESC.
-func (r *repo) GetActivity(contactID string, offset, limit int) ([]contact.Activity, error) {
+// When activityType is non-nil, filters by that type.
+// Returns activities and total count for pagination.
+func (r *repo) GetActivity(contactID, contextID string, offset, limit int, activityType *string) ([]ct.Activity, int64, error) {
 	ctx := context.Background()
 
-	query := `
+	// Build WHERE clauses
+	whereClauses := []string{"contact_id = $1", "context_id = $2"}
+	args := []interface{}{contactID, contextID}
+	argIndex := 3
+
+	if activityType != nil && *activityType != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("type = $%d", argIndex))
+		args = append(args, *activityType)
+		argIndex++
+	}
+
+	whereClause := strings.Join(whereClauses, " AND ")
+
+	// Count query
+	countQuery := fmt.Sprintf(
+		"SELECT COUNT(*) FROM contact_activities WHERE %s",
+		whereClause,
+	)
+	var total int64
+	err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count activities: %w", err)
+	}
+
+	// Paginated select
+	listQuery := fmt.Sprintf(`
 		SELECT id, contact_id, context_id, type, data, source_id, created_at
 		FROM contact_activities
-		WHERE contact_id = $1
+		WHERE %s
 		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3
-	`
+		LIMIT $%d OFFSET $%d
+	`, whereClause, argIndex, argIndex+1)
 
-	rows, err := r.pool.Query(ctx, query, contactID, limit, offset)
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, listQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("get activities: %w", err)
+		return nil, 0, fmt.Errorf("get activities: %w", err)
 	}
 	defer rows.Close()
 
-	activities := make([]contact.Activity, 0)
+	activities := make([]ct.Activity, 0)
 	for rows.Next() {
-		var a contact.Activity
+		var a ct.Activity
 		var dataJSON []byte
 
 		err := rows.Scan(
@@ -414,12 +443,12 @@ func (r *repo) GetActivity(contactID string, offset, limit int) ([]contact.Activ
 			&a.CreatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("scan activity: %w", err)
+			return nil, 0, fmt.Errorf("scan activity: %w", err)
 		}
 
 		if len(dataJSON) > 0 && string(dataJSON) != "null" {
 			if err := json.Unmarshal(dataJSON, &a.Data); err != nil {
-				return nil, fmt.Errorf("unmarshal activity data: %w", err)
+				return nil, 0, fmt.Errorf("unmarshal activity data: %w", err)
 			}
 		}
 
@@ -427,10 +456,54 @@ func (r *repo) GetActivity(contactID string, offset, limit int) ([]contact.Activ
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate activities: %w", err)
+		return nil, 0, fmt.Errorf("iterate activities: %w", err)
 	}
 
-	return activities, nil
+	return activities, total, nil
+}
+
+// GetActivityCount returns the total number of activities for a ct.
+func (r *repo) GetActivityCount(contactID string) (int64, error) {
+	ctx := context.Background()
+
+	query := "SELECT COUNT(*) FROM contact_activities WHERE contact_id = $1"
+	var count int64
+
+	err := r.pool.QueryRow(ctx, query, contactID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count activities: %w", err)
+	}
+
+	return count, nil
+}
+
+// CreateActivity inserts a new activity record.
+func (r *repo) CreateActivity(a *ct.Activity) error {
+	ctx := context.Background()
+
+	dataJSON, err := json.Marshal(a.Data)
+	if err != nil {
+		return fmt.Errorf("marshal activity data: %w", err)
+	}
+
+	query := `
+		INSERT INTO contact_activities (id, contact_id, context_id, type, data, source_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+	`
+
+	_, err = r.pool.Exec(ctx, query,
+		a.ID,
+		a.ContactID,
+		a.ContextID,
+		string(a.Type),
+		dataJSON,
+		a.SourceID,
+	)
+	if err != nil {
+		return fmt.Errorf("create activity: %w", err)
+	}
+
+	return nil
 }
 
 // CountByContext returns the total number of contacts for a context.
@@ -449,7 +522,7 @@ func (r *repo) CountByContext(contextID string) (int64, error) {
 }
 
 // loadTags loads tags for a contact by joining with contact_tag_memberships and contact_tags.
-func (r *repo) loadTags(ctx context.Context, c *contact.Contact) error {
+func (r *repo) loadTags(ctx context.Context, c *ct.Contact) error {
 	query := `
 		SELECT t.id, t.context_id, t.name, t.color, t.created_at
 		FROM contact_tag_memberships tm
@@ -464,9 +537,9 @@ func (r *repo) loadTags(ctx context.Context, c *contact.Contact) error {
 	}
 	defer rows.Close()
 
-	c.Tags = make([]contact.Tag, 0)
+	c.Tags = make([]ct.Tag, 0)
 	for rows.Next() {
-		var tag contact.Tag
+		var tag ct.Tag
 		err := rows.Scan(&tag.ID, &tag.ContextID, &tag.Name, &tag.Color, &tag.CreatedAt)
 		if err != nil {
 			return fmt.Errorf("scan tag: %w", err)
@@ -511,16 +584,17 @@ func isUniqueViolation(err error) bool {
 
 // TagRepository returns a TagRepository implementation for tag operations.
 func (r *repo) TagRepository() uc.TagRepository {
-	return &tagRepo{pool: r.pool}
+	return &repoTagRepo{pool: r.pool}
 }
 
-// tagRepo implements uc.TagRepository.
-type tagRepo struct {
+// repoTagRepo implements uc.TagRepository for the postgres repo.
+type repoTagRepo struct {
 	pool *pgxpool.Pool
 }
 
 // ApplyTags ensures tags exist and assigns them to a contact.
-func (t *tagRepo) ApplyTags(contextID, contactID string, tagNames []string) error {
+// Activity creation is handled by the usecase layer.
+func (t *repoTagRepo) ApplyTags(contextID, contactID string, tagNames []string, _ uc.ActivityCloser) error {
 	ctx := context.Background()
 
 	// Delete existing memberships

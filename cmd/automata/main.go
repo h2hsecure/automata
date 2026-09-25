@@ -20,8 +20,9 @@ import (
 	"github.com/hekemen/automata/internal/infrastructure/bootstrap"
 	"github.com/hekemen/automata/internal/infrastructure/contact"
 	"github.com/hekemen/automata/internal/infrastructure/database"
-	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	context_repo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
+	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	"github.com/rs/zerolog/log"
 )
@@ -65,6 +66,10 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to run banner migrations")
 	}
 
+	if err := email_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run email migrations")
+	}
+
 	if err := database.RunUserContextMigrations(pool); err != nil {
 		log.Fatal().Err(err).Msg("failed to run user-context migrations")
 	}
@@ -85,6 +90,14 @@ func main() {
 	// Admin bootstrap: create admin user on first startup
 	if err := bootstrap.Run(pool, userRepo, contextRepo); err != nil {
 		log.Warn().Err(err).Msg("admin bootstrap failed (continuing anyway)")
+	}
+
+	// Seed default email templates for all existing contexts
+	contexts, _ := contextRepo.List(0, 1000)
+	for _, ctx := range contexts {
+		if err := email_repo.SeedDefaultsForContext(pool, ctx.ID); err != nil {
+			log.Warn().Err(err).Str("context_id", ctx.ID).Msg("failed to seed email templates")
+		}
 	}
 
 	// Initialize auth service

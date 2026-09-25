@@ -10,10 +10,16 @@ import (
 	"github.com/hekemen/automata/internal/adapter/proxy"
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
+	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	"github.com/hekemen/automata/internal/infrastructure/config"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	config_repo "github.com/hekemen/automata/internal/infrastructure/config/repo"
-	"github.com/hekemen/automata/internal/infrastructure/tracking/repo"
+	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
+	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
+	"github.com/hekemen/automata/internal/infrastructure/queue"
+	webhook_svc "github.com/hekemen/automata/internal/infrastructure/webhook"
+	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
+	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -47,6 +53,9 @@ func NewServer(
 	api.POST("/auth/refresh", authHandler.HandleRefresh)
 
 	api.GET("/auth/me", middleware.AuthMiddleware(authService), authHandler.GetMe)
+	api.PUT("/auth/profile", middleware.AuthMiddleware(authService), authHandler.UpdateProfile)
+	api.POST("/auth/password", middleware.AuthMiddleware(authService), authHandler.ChangePassword)
+	api.POST("/auth/logout-all", middleware.AuthMiddleware(authService), authHandler.LogoutAll)
 
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(authService))
@@ -91,15 +100,56 @@ func NewServer(
 		admin.PUT("/configs/:contextId/display", configHandler.UpdateDisplay)
 
 		// Tracking visitor routes
-		trackingRepo := repo.New(pool)
+		trackingRepo := tracking_repo.New(pool)
 		trackingHandler := handler.NewTrackingHandler(trackingRepo)
 		admin.GET("/tracking/visitors", trackingHandler.ListVisitors)
 		admin.GET("/tracking/visitors/:id", trackingHandler.GetVisitorDetail)
 		admin.GET("/tracking/visitors/:id/events", trackingHandler.GetVisitorEvents)
 	}
 
+	// Email template routes (declared outside admin block for tenant route access)
+	emailRepo := email_repo.New(pool)
+	emailQueue := queue.NewEmailQueue(pool)
+	emailUsecase := emailusecase.NewEmailUsecase(emailRepo, emailQueue)
+	emailHandler := handler.NewEmailHandler(emailUsecase)
+
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("", emailHandler.List)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("", emailHandler.Create)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("/:id", emailHandler.Get)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).PUT("/:id", emailHandler.Update)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).DELETE("/:id", emailHandler.Delete)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("/:id/test", emailHandler.TestSend)
+
+	// Tracking visitor admin routes (already above)
+
+	// Webhook management routes
+	webhookSvc := webhook_svc.NewService(webhook_repo.New(pool), queue.NewWebhookQueue(pool))
+	webhookHandler := handler.NewWebhookHandler(webhookSvc)
+	admin.GET("/webhooks", webhookHandler.List)
+	admin.POST("/webhooks", webhookHandler.Create)
+	admin.GET("/webhooks/:id", webhookHandler.Get)
+	admin.PUT("/webhooks/:id", webhookHandler.Update)
+	admin.DELETE("/webhooks/:id", webhookHandler.Delete)
+	admin.POST("/webhooks/:id/test", webhookHandler.TestDeliver)
+
 	// Context-resolved routes (forms, snippets, static assets)
 	api.Use(ContextResolver(contextRepo))
+	tenantEmailGroup := api.Group("/tenant/:slug/email")
+	{
+		tenantEmailGroup.POST("/send", emailHandler.Send)
+	}
+
+	contactRepo := crepo.New(pool)
+	contactHandler := handler.NewContactHandler(contactRepo)
+	{
+		api.GET("/context/contacts", middleware.AuthMiddleware(authService), contactHandler.List)
+		api.GET("/context/contacts/:id", middleware.AuthMiddleware(authService), contactHandler.Get)
+		api.POST("/context/contacts", middleware.AuthMiddleware(authService), contactHandler.Create)
+		api.PUT("/context/contacts/:id", middleware.AuthMiddleware(authService), contactHandler.Update)
+		api.DELETE("/context/contacts/:id", middleware.AuthMiddleware(authService), contactHandler.Delete)
+		api.POST("/context/contacts/:id/merge", middleware.AuthMiddleware(authService), contactHandler.Merge)
+		api.GET("/context/contacts/:id/activity", middleware.AuthMiddleware(authService), contactHandler.GetActivity)
+	}
 	proxy.NewProxy(contextRepo, api)
 
 	return parent

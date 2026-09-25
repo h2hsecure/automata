@@ -2,7 +2,9 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -245,9 +247,147 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":       user.ID,
-		"email":    user.Email,
-		"is_admin": user.IsAdmin,
-		"contexts": contexts,
+		"id":           user.ID,
+		"email":        user.Email,
+		"display_name": user.DisplayName,
+		"avatar_url":   user.AvatarURL,
+		"is_admin":     user.IsAdmin,
+		"contexts":     contexts,
 	})
+}
+
+// UpdateProfileInput holds the input for updating a user's profile.
+type UpdateProfileInput struct {
+	DisplayName *string `json:"display_name"`
+	AvatarURL   *string `json:"avatar_url"`
+}
+
+// UpdateProfile updates the authenticated user's display name and/or avatar URL.
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	var input UpdateProfileInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate display_name length
+	if input.DisplayName != nil && len(*input.DisplayName) > 64 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "display_name must be 64 characters or less"})
+		return
+	}
+
+	// Validate avatar_url if provided
+	if input.AvatarURL != nil && *input.AvatarURL != "" {
+		if _, err := url.Parse(*input.AvatarURL); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "avatar_url must be a valid URL"})
+			return
+		}
+	}
+
+	// Update profile
+	if err := h.userRepo.UpdateProfile(userID, input.DisplayName, input.AvatarURL); err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("update profile failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	// Fetch and return updated profile
+	user, _ := h.userRepo.GetByID(userID)
+	memberships, _ := h.userRepo.ListByUser(userID)
+
+	contexts := make([]gin.H, 0, len(memberships))
+	for _, mc := range memberships {
+		ctx, err := h.contextRepo.GetByID(mc.ContextID)
+		if err != nil {
+			continue
+		}
+		contexts = append(contexts, gin.H{
+			"id":   ctx.ID,
+			"slug": ctx.Slug,
+			"name": ctx.Name,
+			"role": mc.Role,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user_id":      user.ID,
+		"email":        user.Email,
+		"display_name": user.DisplayName,
+		"avatar_url":   user.AvatarURL,
+		"is_admin":     user.IsAdmin,
+		"contexts":     contexts,
+	})
+}
+
+// ChangePasswordInput holds the input for changing a user's password.
+type ChangePasswordInput struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required"`
+}
+
+// ChangePassword updates the authenticated user's password.
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	var input ChangePasswordInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := h.userRepo.GetByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Check if SSO user
+	if user.SSOProvider != nil && *user.SSOProvider != "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "cannot change password for SSO accounts"})
+		return
+	}
+
+	if err := h.authService.ChangePassword(userID, input.CurrentPassword, input.NewPassword); err != nil {
+		if strings.Contains(err.Error(), "invalid current password") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
+			return
+		}
+		if strings.Contains(err.Error(), "requirements") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new password does not meet requirements"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	log.Info().Str("user_id", userID).Msg("password changed")
+	c.JSON(http.StatusOK, gin.H{"message": "password updated"})
+}
+
+// LogoutAll terminates all active sessions for the authenticated user.
+func (h *AuthHandler) LogoutAll(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	if err := h.authService.LogoutAllSessions(userID); err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("logout all failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	log.Info().Str("user_id", userID).Msg("all sessions terminated")
+	c.JSON(http.StatusOK, gin.H{"message": "all sessions terminated"})
 }

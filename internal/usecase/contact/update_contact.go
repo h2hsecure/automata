@@ -3,7 +3,9 @@ package contact
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/contact"
 )
 
@@ -57,6 +59,27 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 		}
 	}
 
+	// Compute changed fields before update
+	var changedFields []string
+	if input.Email != nil && (existing.Email == nil || *existing.Email != *input.Email) {
+		changedFields = append(changedFields, "email")
+	}
+	if input.FirstName != "" && existing.FirstName != input.FirstName {
+		changedFields = append(changedFields, "first_name")
+	}
+	if input.LastName != "" && existing.LastName != input.LastName {
+		changedFields = append(changedFields, "last_name")
+	}
+	if input.Phone != "" && existing.Phone != input.Phone {
+		changedFields = append(changedFields, "phone")
+	}
+	if input.Company != "" && existing.Company != input.Company {
+		changedFields = append(changedFields, "company")
+	}
+	if input.CustomFields != nil && !mapsEqual(existing.CustomFields, input.CustomFields) {
+		changedFields = append(changedFields, "custom_fields")
+	}
+
 	// Update contact fields
 	existing.Email = input.Email
 	existing.FirstName = input.FirstName
@@ -73,6 +96,31 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 		return nil, fmt.Errorf("update contact: %w", err)
 	}
 
+	// Create activity if fields changed
+	if len(changedFields) > 0 {
+		now := time.Now().Format(time.RFC3339)
+		prevValues := map[string]interface{}{
+			"email":         existing.Email,
+			"first_name":    input.FirstName,
+			"last_name":     input.LastName,
+			"phone":         input.Phone,
+			"company":       input.Company,
+		}
+		if err := repo.CreateActivity(&contact.Activity{
+			ID:        uuid.New().String(),
+			ContactID: id,
+			ContextID: contextID,
+			Type:      contact.ActivityContactUpdated,
+			Data: map[string]interface{}{
+				"changed_fields": changedFields,
+				"updated_at":     now,
+				"previous_values": prevValues,
+			},
+		}); err != nil {
+			_ = fmt.Errorf("create activity: %w", err)
+		}
+	}
+
 	// Update tags (delete old memberships, create new ones)
 	if len(input.Tags) > 0 {
 		if err := applyTags(repo, contextID, id, input.Tags); err != nil {
@@ -81,4 +129,17 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 	}
 
 	return existing, nil
+}
+
+// mapsEqual checks if two maps are equal (same keys and values).
+func mapsEqual(a, b map[string]interface{}) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, va := range a {
+		if vb, ok := b[k]; !ok || va != vb {
+			return false
+		}
+	}
+	return true
 }

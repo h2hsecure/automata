@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/contact"
 	uc "github.com/hekemen/automata/internal/usecase/contact"
 )
@@ -115,7 +116,8 @@ func (h *ContactHandler) List(c *gin.Context) {
 
 func (h *ContactHandler) Get(c *gin.Context) {
 	contextID := c.GetString("context_id")
-	if contextID == "" {
+	isAdmin := c.GetBool("is_admin")
+	if contextID == "" && !isAdmin {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
 		return
 	}
@@ -127,12 +129,19 @@ func (h *ContactHandler) Get(c *gin.Context) {
 		return
 	}
 
-	if contact.ContextID != contextID {
+	// Non-admin users must have context_id set and match the contact's context
+	if contextID != "" && contact.ContextID != contextID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contact not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, contact)
+	// Get activity count
+	activityCount, _ := h.repo.GetActivityCount(id)
+
+	c.JSON(http.StatusOK, gin.H{
+		"contact":       contact,
+		"activity_count": activityCount,
+	})
 }
 
 func (h *ContactHandler) Create(c *gin.Context) {
@@ -250,7 +259,22 @@ func (h *ContactHandler) Merge(c *gin.Context) {
 
 func (h *ContactHandler) GetActivity(c *gin.Context) {
 	contactID := c.Param("id")
+	contextID := c.GetString("context_id")
+	isAdmin := c.GetBool("is_admin")
 
+	// Validate contact ID is a valid UUID
+	if err := parseUUID(contactID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid contact ID"})
+		return
+	}
+
+	// Parse optional type filter
+	var activityType *string
+	if typeParam := c.Query("type"); typeParam != "" {
+		activityType = &typeParam
+	}
+
+	// Parse pagination params
 	offset := 0
 	if o := c.Query("offset"); o != "" {
 		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
@@ -258,25 +282,50 @@ func (h *ContactHandler) GetActivity(c *gin.Context) {
 		}
 	}
 
-	limit := 20
+	limit := 50
 	if l := c.Query("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v
-			if limit > 100 {
-				limit = 100
+			if limit > 200 {
+				limit = 200
 			}
 		}
 	}
 
-	activities, err := uc.GetActivity(h.repo, contactID, offset, limit)
+	// Verify contact exists and user has access
+	contact, err := h.repo.GetByID(contactID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "contact not found"})
+		return
+	}
+
+	// Non-admin users must have context_id set and match the contact's context
+	if contextID != "" && !isAdmin && contact.ContextID != contextID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	// Use empty contextID for non-admin users who are admins (admin bypasses context)
+	contextIDForQuery := contact.ContextID
+	if isAdmin {
+		// Admins can use the contact's actual context
+		contextIDForQuery = contact.ContextID
+	}
+
+	result, err := uc.GetActivity(h.repo, contactID, contextIDForQuery, offset, limit, activityType)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contact not found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"activities": activities,
-		"offset":     offset,
-		"limit":      limit,
+		"activities": result.Activities,
+		"total":      result.Total,
 	})
+}
+
+// parseUUID validates a UUID string.
+func parseUUID(s string) error {
+	_, err := uuid.Parse(s)
+	return err
 }

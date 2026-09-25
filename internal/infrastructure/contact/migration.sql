@@ -67,3 +67,16 @@ CREATE TABLE IF NOT EXISTS contact_activities (
 
 CREATE INDEX IF NOT EXISTS idx_activities_contact ON contact_activities(contact_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activities_context ON contact_activities(context_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_data ON contact_activities USING GIN (data);
+
+-- Contact cookie mappings for tracking resolution
+CREATE TABLE IF NOT EXISTS contact_cookie_mappings (
+    contact_id  UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+    context_id  UUID NOT NULL,
+    cookie      TEXT NOT NULL,
+    source      VARCHAR(32) NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (context_id, cookie)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cookie_contact ON contact_cookie_mappings(contact_id);

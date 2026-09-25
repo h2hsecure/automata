@@ -13,16 +13,19 @@ var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-
 // User represents a platform-level user account.
 // Context membership is tracked via UserContext records.
 type User struct {
-	ID           string
-	ContextID    string  // deprecated; kept for backward compat with context_users
-	Email        string
-	PasswordHash string  // empty for SSO users
-	SSOProvider  *string // nil for local auth
-	SSOID        *string // nil for local auth
-	IsAdmin      bool
-	IsOwner      bool   // deprecated; kept for backward compat
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              string
+	ContextID       string  // deprecated; kept for backward compat with context_users
+	Email           string
+	PasswordHash    string  // empty for SSO users
+	SSOProvider     *string // nil for local auth
+	SSOID           *string // nil for local auth
+	IsAdmin         bool
+	IsOwner         bool   // deprecated; kept for backward compat
+	DisplayName     *string // nil means unset
+	AvatarURL       *string // nil means no avatar
+	PasswordChangedAt time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // UserContext represents a user's membership in a context.

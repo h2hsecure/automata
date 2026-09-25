@@ -1,5 +1,7 @@
 package context
 
+import "time"
+
 // UserRepository defines the interface for user data persistence.
 type UserRepository interface {
 	Create(u *User) error
@@ -11,6 +13,12 @@ type UserRepository interface {
 	ListAll() ([]*User, error)                          // list all platform users
 	Update(u *User) error
 	Delete(id string) error
+
+	// Profile management
+	UpdateProfile(userID string, displayName, avatarURL *string) error
+	ChangePassword(userID string, passwordHash string) error
+	GetPasswordChangedAt(userID string) (time.Time, error)
+	UpdatePasswordChangedAt(userID string) error
 
 	// Context membership operations
 	GetByUserContext(userID, contextID string) (*UserContext, error)

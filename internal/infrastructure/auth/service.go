@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -301,4 +302,69 @@ func (s *service) RefreshToken(refreshToken string) (string, string, error) {
 	}
 
 	return accessTokenStr, newRefreshTokenStr, nil
+}
+
+// GetUserByID retrieves a user by their platform ID.
+func (s *service) GetUserByID(userID string) (*context.User, error) {
+	return s.userRepo.GetByID(userID)
+}
+
+// ChangePassword verifies the current password, validates the new one, and updates it.
+func (s *service) ChangePassword(userID, currentPassword, newPassword string) error {
+	// 1. Fetch user
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+
+	// 2. Verify current password
+	if err := s.ComparePassword(user.PasswordHash, currentPassword); err != nil {
+		return fmt.Errorf("invalid current password")
+	}
+
+	// 3. Validate new password strength
+	if err := ValidatePasswordStrength(newPassword); err != nil {
+		return fmt.Errorf("password does not meet requirements: %w", err)
+	}
+
+	// 4. Hash new password
+	newHash, err := s.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hash new password: %w", err)
+	}
+
+	// 5. Update DB
+	if err := s.userRepo.ChangePassword(userID, newHash); err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+
+	return nil
+}
+
+// LogoutAllSessions updates password_changed_at to invalidate all tokens.
+func (s *service) LogoutAllSessions(userID string) error {
+	if err := s.userRepo.UpdatePasswordChangedAt(userID); err != nil {
+		return fmt.Errorf("logout all sessions: %w", err)
+	}
+	return nil
+}
+
+// ValidatePasswordStrength checks that a password meets complexity requirements.
+func ValidatePasswordStrength(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+	hasUpper := regexp.MustCompile(`.*[A-Z].*`).MatchString(password)
+	hasDigit := regexp.MustCompile(`.*\d.*`).MatchString(password)
+	hasSpecial := regexp.MustCompile(`[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]`).MatchString(password)
+	if !hasUpper {
+		return fmt.Errorf("missing uppercase letter")
+	}
+	if !hasDigit {
+		return fmt.Errorf("missing digit")
+	}
+	if !hasSpecial {
+		return fmt.Errorf("missing special character")
+	}
+	return nil
 }

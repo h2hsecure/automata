@@ -11,6 +11,7 @@ import (
 )
 
 // AuthMiddleware validates JWT tokens and API keys.
+// It also performs session revocation checks by comparing JWT iat against password_changed_at.
 func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
@@ -28,14 +29,16 @@ func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
+		secretKey := config.Get("auth.secret_key")
+		if secretKey == "" {
+			secretKey = "automata-dev-secret-key-change-in-production"
+		}
+
 		userID, err := authService.VerifyTokenUserOnly(token)
 		if err == nil {
 			c.Set("user_id", userID)
-			// Parse token to get is_admin claim
-			secretKey := config.Get("auth.secret_key")
-			if secretKey == "" {
-				secretKey = "automata-dev-secret-key-change-in-production"
-			}
+
+			// Parse token to get is_admin and iat claims
 			parsedToken, parseErr := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 				return []byte(secretKey), nil
 			})
@@ -44,8 +47,20 @@ func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 					if isAdmin, ok := claims["is_admin"].(bool); ok {
 						c.Set("is_admin", isAdmin)
 					}
+
+					// Session revocation check: compare JWT iat with password_changed_at
+					if user, userErr := authService.GetUserByID(userID); userErr == nil {
+						if iat, ok := claims["iat"].(float64); ok {
+							if int64(iat) < user.PasswordChangedAt.Unix() {
+								c.JSON(http.StatusUnauthorized, gin.H{"error": "session revoked"})
+								c.Abort()
+								return
+							}
+						}
+					}
 				}
 			}
+
 			c.Next()
 			return
 		}

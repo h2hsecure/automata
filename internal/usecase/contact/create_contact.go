@@ -3,9 +3,10 @@ package contact
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/contact"
+	ct "github.com/hekemen/automata/internal/domain/contact"
 )
 
 // CreateInput holds the input parameters for creating a contact.
@@ -22,7 +23,7 @@ type CreateInput struct {
 }
 
 // CreateContact creates a new contact or returns the existing one if a duplicate email is found.
-func CreateContact(repo Repository, contextID string, input CreateInput) (*contact.Contact, error) {
+func CreateContact(repo Repository, contextID string, input CreateInput) (*ct.Contact, error) {
 	if contextID == "" {
 		return nil, fmt.Errorf("context_id is required")
 	}
@@ -51,9 +52,9 @@ func CreateContact(repo Repository, contextID string, input CreateInput) (*conta
 	// Generate UUID for new contact
 	id := uuid.New().String()
 
-	contact := &contact.Contact{
+	c := &ct.Contact{
 		ID:           id,
-		ContextID:     contextID,
+		ContextID:    contextID,
 		Email:        input.Email,
 		FirstName:    input.FirstName,
 		LastName:     input.LastName,
@@ -64,12 +65,28 @@ func CreateContact(repo Repository, contextID string, input CreateInput) (*conta
 		SourceID:     input.SourceID,
 	}
 
-	if err := contact.Validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("validate contact: %w", err)
 	}
 
-	if err := repo.Create(contact); err != nil {
+	if err := repo.Create(c); err != nil {
 		return nil, fmt.Errorf("create contact: %w", err)
+	}
+
+	// Create activity for contact creation
+	now := time.Now().Format(time.RFC3339)
+	if err := repo.CreateActivity(&ct.Activity{
+		ID:        uuid.New().String(),
+		ContactID: id,
+		ContextID: contextID,
+		Type:      ct.ActivityContactCreated,
+		Data: map[string]interface{}{
+			"source":    input.Source,
+			"created_at": now,
+		},
+	}); err != nil {
+		// Non-fatal: log but don't fail the operation
+		_ = fmt.Errorf("create activity: %w", err)
 	}
 
 	// Apply tags if provided
@@ -79,7 +96,7 @@ func CreateContact(repo Repository, contextID string, input CreateInput) (*conta
 		}
 	}
 
-	return contact, nil
+	return c, nil
 }
 
 // isValidEmail checks basic email format validity.

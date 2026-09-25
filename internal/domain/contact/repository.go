@@ -18,6 +18,8 @@ type Repository interface {
 	Delete(id string) error
 	FindByEmail(contextID, email string) (*Contact, error)
 	Merge(keepID, mergeIntoID string) error
-	GetActivity(contactID string, offset, limit int) ([]Activity, error)
+	CreateActivity(a *Activity) error
+	GetActivity(contactID, contextID string, offset, limit int, activityType *string) ([]Activity, int64, error)
+	GetActivityCount(contactID string) (int64, error)
 	CountByContext(contextID string) (int64, error)
 }

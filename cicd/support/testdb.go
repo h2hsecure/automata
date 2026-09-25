@@ -98,6 +98,7 @@ func (tdb *TestDB) RunMigrations(ctx context.Context) error {
 		"internal/infrastructure/banner/repo",
 		"internal/infrastructure/tracking/repo",
 		"internal/infrastructure/queue",
+		"internal/infrastructure/email/repo",
 	}
 
 	// Run core migrations first

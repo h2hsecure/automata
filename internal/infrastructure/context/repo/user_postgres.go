@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	domainctx "github.com/hekemen/automata/internal/domain/context"
@@ -28,16 +29,18 @@ func (r *userPostgresRepo) Create(u *domainctx.User) error {
 
 	// Insert into users table (platform-level)
 	query := `
-		INSERT INTO users (id, email, password_hash, sso_provider, sso_id, is_admin, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-		RETURNING id, email, password_hash, sso_provider, sso_id, is_admin, created_at, updated_at
+		INSERT INTO users (id, email, password_hash, sso_provider, sso_id, is_admin, display_name, avatar_url, password_changed_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW())
+		RETURNING id, email, password_hash, sso_provider, sso_id, is_admin, display_name, avatar_url, password_changed_at, created_at, updated_at
 	`
 
 	err := r.pool.QueryRow(context.Background(), query,
 		u.ID, u.Email, u.PasswordHash, nil, nil, u.IsAdmin,
+		u.DisplayName, u.AvatarURL,
 	).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.SSOProvider, &u.SSOID,
-		&u.IsAdmin, &u.CreatedAt, &u.UpdatedAt,
+		&u.IsAdmin, &u.DisplayName, &u.AvatarURL, &u.PasswordChangedAt,
+		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("create user: %w", err)
@@ -49,13 +52,14 @@ func (r *userPostgresRepo) GetByID(id string) (*domainctx.User, error) {
 	u := &domainctx.User{}
 
 	query := `
-		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, created_at, updated_at
+		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, display_name, avatar_url, password_changed_at, created_at, updated_at
 		FROM users WHERE id = $1
 	`
 
 	err := r.pool.QueryRow(context.Background(), query, id).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.SSOProvider, &u.SSOID,
-		&u.IsAdmin, &u.CreatedAt, &u.UpdatedAt,
+		&u.IsAdmin, &u.DisplayName, &u.AvatarURL, &u.PasswordChangedAt,
+		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get user by ID: %w", err)
@@ -119,13 +123,14 @@ func (r *userPostgresRepo) GetByUsername(email string) (*domainctx.User, error) 
 	u := &domainctx.User{}
 
 	query := `
-		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, created_at, updated_at
+		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, display_name, avatar_url, password_changed_at, created_at, updated_at
 		FROM users WHERE email = $1
 	`
 
 	err := r.pool.QueryRow(context.Background(), query, email).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.SSOProvider, &u.SSOID,
-		&u.IsAdmin, &u.CreatedAt, &u.UpdatedAt,
+		&u.IsAdmin, &u.DisplayName, &u.AvatarURL, &u.PasswordChangedAt,
+		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get user by username: %w", err)
@@ -146,7 +151,7 @@ func (r *userPostgresRepo) ExistsAnyUser() (bool, error) {
 
 func (r *userPostgresRepo) ListAll() ([]*domainctx.User, error) {
 	rows, err := r.pool.Query(context.Background(), `
-		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, created_at, updated_at
+		SELECT id, email, password_hash, sso_provider, sso_id, is_admin, display_name, avatar_url, password_changed_at, created_at, updated_at
 		FROM users
 	`)
 	if err != nil {
@@ -158,7 +163,8 @@ func (r *userPostgresRepo) ListAll() ([]*domainctx.User, error) {
 	for rows.Next() {
 		u := &domainctx.User{}
 		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.SSOProvider,
-			&u.SSOID, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			&u.SSOID, &u.IsAdmin, &u.DisplayName, &u.AvatarURL, &u.PasswordChangedAt,
+			&u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		result = append(result, u)
@@ -168,12 +174,12 @@ func (r *userPostgresRepo) ListAll() ([]*domainctx.User, error) {
 
 func (r *userPostgresRepo) Update(u *domainctx.User) error {
 	query := `
-		UPDATE users SET email = $1, password_hash = $2, is_admin = $3, updated_at = NOW()
-		WHERE id = $4
+		UPDATE users SET email = $1, password_hash = $2, is_admin = $3, display_name = $4, avatar_url = $5, updated_at = NOW()
+		WHERE id = $6
 	`
 
 	result, err := r.pool.Exec(context.Background(), query,
-		u.Email, u.PasswordHash, u.IsAdmin, u.ID,
+		u.Email, u.PasswordHash, u.IsAdmin, u.DisplayName, u.AvatarURL, u.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)
@@ -298,4 +304,59 @@ func (r *userPostgresRepo) ListMembers(contextID string) ([]domainctx.UserContex
 		result = append(result, uc)
 	}
 	return result, nil
+}
+
+// UpdateProfile updates user display name and/or avatar URL.
+func (r *userPostgresRepo) UpdateProfile(userID string, displayName, avatarURL *string) error {
+	ctx := context.Background()
+	query := `
+		UPDATE users SET display_name = COALESCE($2, display_name),
+			avatar_url = COALESCE($3, avatar_url), updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, userID, displayName, avatarURL)
+	if err != nil {
+		return fmt.Errorf("update profile: %w", err)
+	}
+	return nil
+}
+
+// ChangePassword updates the user's password hash and sets password_changed_at.
+func (r *userPostgresRepo) ChangePassword(userID string, passwordHash string) error {
+	ctx := context.Background()
+	query := `
+		UPDATE users SET password_hash = $2, password_changed_at = NOW(), updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, userID, passwordHash)
+	if err != nil {
+		return fmt.Errorf("change password: %w", err)
+	}
+	return nil
+}
+
+// GetPasswordChangedAt returns the password_changed_at timestamp.
+func (r *userPostgresRepo) GetPasswordChangedAt(userID string) (time.Time, error) {
+	ctx := context.Background()
+	var pwt time.Time
+	query := "SELECT password_changed_at FROM users WHERE id = $1"
+	err := r.pool.QueryRow(ctx, query, userID).Scan(&pwt)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("get password changed at: %w", err)
+	}
+	return pwt, nil
+}
+
+// UpdatePasswordChangedAt sets password_changed_at to NOW().
+func (r *userPostgresRepo) UpdatePasswordChangedAt(userID string) error {
+	ctx := context.Background()
+	query := `
+		UPDATE users SET password_changed_at = NOW(), updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("update password changed at: %w", err)
+	}
+	return nil
 }

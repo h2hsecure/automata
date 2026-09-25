@@ -36,4 +36,7 @@ type AuthService interface {
 	HashPassword(password string) (string, error)
 	ComparePassword(hash, password string) error
 	GetCurrentUser(contextID string) (*context.User, error)
+	GetUserByID(userID string) (*context.User, error)
+	ChangePassword(userID, currentPassword, newPassword string) error
+	LogoutAllSessions(userID string) error
 }

@@ -305,25 +305,33 @@ func (s *Server) registerContactTools() {
 			limit = int(limitArg)
 		}
 
-		activities, err := contactuc.GetActivity(s.contactRepo, contactID, offset, limit)
+		var activityType *string
+		if at, ok := args["activity_type"].(string); ok && at != "" {
+			activityType = &at
+		}
+
+		result, err := contactuc.GetActivity(s.contactRepo, contactID, contextID, offset, limit, activityType)
 		if err != nil {
 			return nil, fmt.Errorf("get activity: %w", err)
 		}
 
-		activityMaps := make([]map[string]interface{}, 0, len(activities))
-		for _, a := range activities {
+		total := result.Total
+		activityMaps := make([]map[string]interface{}, 0, len(result.Activities))
+		for _, a := range result.Activities {
 			activityMaps = append(activityMaps, map[string]interface{}{
-				"id":         a.ID,
-				"contact_id": a.ContactID,
-				"context_id":  a.ContextID,
-				"type":       string(a.Type),
-				"data":       a.Data,
-				"source_id":  a.SourceID,
-				"created_at": a.CreatedAt.Format("2006-01-02T15:04:05Z"),
+				"id":          a.ID,
+				"type":        string(a.Type),
+				"title":       a.Title,
+				"description": a.Description,
+				"data":        a.Data,
+				"created_at":  a.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			})
 		}
 
-		return activityMaps, nil
+		return map[string]interface{}{
+			"activities": activityMaps,
+			"total":      total,
+		}, nil
 	})
 }
 

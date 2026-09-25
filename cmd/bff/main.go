@@ -13,8 +13,9 @@ import (
 	"github.com/hekemen/automata/internal/infrastructure/config"
 	"github.com/hekemen/automata/internal/infrastructure/contact"
 	"github.com/hekemen/automata/internal/infrastructure/database"
-	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	ctx_repo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
+	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	webui_handler "github.com/hekemen/automata/internal/adapter/webui/handler"
 	webui_cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
@@ -75,6 +76,7 @@ func main() {
 	form_repo.RunMigrations(dbPool)
 	banner_repo.RunMigrations(dbPool)
 	tracking_repo.RunMigrations(dbPool)
+	email_repo.RunMigrations(dbPool)
 
 	// Initialize repositories
 	userRepo := ctx_repo.NewUserPostgresRepo(dbPool)
