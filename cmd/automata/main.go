@@ -23,6 +23,7 @@ import (
 	context_repo "github.com/hekemen/automata/internal/infrastructure/context/repo"
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
 	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
+	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	"github.com/rs/zerolog/log"
 )
@@ -68,6 +69,10 @@ func main() {
 
 	if err := email_repo.RunMigrations(pool); err != nil {
 		log.Fatal().Err(err).Msg("failed to run email migrations")
+	}
+
+	if err := webhook_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run webhook migrations")
 	}
 
 	if err := database.RunUserContextMigrations(pool); err != nil {
