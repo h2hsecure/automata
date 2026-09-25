@@ -28,6 +28,7 @@ type ContextInfo struct {
 // AuthService defines the interface for authentication operations.
 type AuthService interface {
 	Login(email, password string) (token string, userID string, contexts []ContextInfo, err error)
+	RefreshToken(refreshToken string) (accessToken string, newRefreshToken string, err error)
 	VerifyToken(token string) (userID string, contextID string, err error)
 	VerifyTokenUserOnly(token string) (userID string, err error)
 	CreateAPIKey(userID, contextID, name string, plaintextKey string, expiresAt *time.Time) (*APIKey, error)

@@ -1,6 +1,9 @@
 package tracking
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type DateRange struct {
 	Start time.Time
@@ -28,4 +31,13 @@ type Repository interface {
 	GetBrowserBreakdown(contextID string, dateRange DateRange) (map[string]int, error)
 	GetActiveVisitors(contextID string, minutes int) (int64, error)
 	PurgeOldEvents(contextID string, retentionDays int) (int64, error)
+
+	// ListVisitors returns a paginated list of visitors for a context.
+	ListVisitors(ctx context.Context, contextID string, opts ListVisitorsOpts) ([]*Visitor, int64, error)
+
+	// GetVisitorByID returns a single visitor by their ID (not cookie value).
+	GetVisitorByID(ctx context.Context, contextID, visitorID string) (*Visitor, error)
+
+	// GetVisitorEvents returns a paginated list of events for a specific visitor.
+	GetVisitorEvents(ctx context.Context, contextID, visitorID string, opts GetVisitorEventsOpts) ([]*Event, int64, error)
 }

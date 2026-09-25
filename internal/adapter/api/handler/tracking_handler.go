@@ -107,3 +107,114 @@ func (h *TrackingHandler) GetEvents(c *gin.Context) {
 		"total":  total,
 	})
 }
+
+// ListVisitors handles GET /api/admin/tracking/visitors — returns paginated visitor list.
+func (h *TrackingHandler) ListVisitors(c *gin.Context) {
+	context := c.GetString("context")
+	if context == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
+		return
+	}
+
+	var opts tracking.ListVisitorsOpts
+
+	if o := c.Query("offset"); o != "" {
+		if p, err := strconv.Atoi(o); err == nil {
+			opts.Offset = p
+		}
+	}
+	if l := c.Query("limit"); l != "" {
+		if p, err := strconv.Atoi(l); err == nil {
+			opts.Limit = p
+		}
+	}
+	if s := c.Query("sort"); s != "" {
+		opts.Sort = s
+	}
+
+	visitors, total, err := trackingUsecase.ListVisitors(h.repo, context, opts)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"visitors": visitors,
+		"total":    total,
+	})
+}
+
+// GetVisitorDetail handles GET /api/admin/tracking/visitors/:id — returns visitor profile with recent events.
+func (h *TrackingHandler) GetVisitorDetail(c *gin.Context) {
+	context := c.GetString("context")
+	if context == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
+		return
+	}
+
+	visitorID := c.Param("id")
+	if visitorID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "visitor ID required"})
+		return
+	}
+
+	limit := 20
+	if l := c.Query("limit"); l != "" {
+		if p, err := strconv.Atoi(l); err == nil && p > 0 {
+			limit = p
+		}
+	}
+
+	detail, err := trackingUsecase.GetVisitorDetail(h.repo, context, visitorID, limit)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "visitor not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"visitor":        detail.Visitor,
+		"recent_events":  detail.RecentEvents,
+	})
+}
+
+// GetVisitorEvents handles GET /api/admin/tracking/visitors/:id/events — returns paginated visitor event history.
+func (h *TrackingHandler) GetVisitorEvents(c *gin.Context) {
+	context := c.GetString("context")
+	if context == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
+		return
+	}
+
+	visitorID := c.Param("id")
+	if visitorID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "visitor ID required"})
+		return
+	}
+
+	var opts tracking.GetVisitorEventsOpts
+
+	if t := c.Query("type"); t != "" {
+		opts.Type = tracking.EventType(t)
+	}
+	if o := c.Query("offset"); o != "" {
+		if p, err := strconv.Atoi(o); err == nil {
+			opts.Offset = p
+		}
+	}
+	if l := c.Query("limit"); l != "" {
+		if p, err := strconv.Atoi(l); err == nil {
+			opts.Limit = p
+		}
+	}
+
+	events, total, err := trackingUsecase.GetVisitorEvents(h.repo, context, visitorID, opts)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"events": events,
+		"total":  total,
+	})
+}

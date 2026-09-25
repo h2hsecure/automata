@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -209,4 +210,95 @@ func (s *service) ValidateAPIKey(key string) (*domainauth.APIKey, error) {
 func (s *service) GetCurrentUser(contextID string) (*context.User, error) {
 	// This is a stub - actual implementation will query the database
 	return nil, fmt.Errorf("get current user requires database repository")
+}
+
+// RefreshToken validates a refresh token JWT and returns a new access token pair.
+// The refresh token must have "type": "refresh" claim and not be expired.
+// Rotation: always issues new tokens (old refresh token is invalidated).
+func (s *service) RefreshToken(refreshToken string) (string, string, error) {
+	secretKey := config.Get("auth.secret_key")
+	if secretKey == "" {
+		secretKey = "automata-dev-secret-key-change-in-production"
+	}
+
+	// Parse and validate the refresh token
+	refreshToken = strings.TrimPrefix(refreshToken, "Bearer ")
+	token, err := jwt.Parse(refreshToken, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return []byte(secretKey), nil
+	})
+
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return "", "", ErrRefreshTokenExpired
+		}
+		return "", "", ErrRefreshTokenInvalid
+	}
+
+	if !token.Valid {
+		return "", "", ErrRefreshTokenInvalid
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", "", ErrRefreshTokenInvalid
+	}
+
+	// Verify type claim is "refresh"
+	if typ, ok := claims["type"].(string); !ok || typ != "refresh" {
+		return "", "", ErrRefreshTokenInvalid
+	}
+
+	// Check expiry
+	if claims["exp"] == nil {
+		return "", "", ErrRefreshTokenExpired
+	}
+	exp, ok := claims["exp"].(float64)
+	if !ok {
+		return "", "", ErrRefreshTokenInvalid
+	}
+	if time.Now().Unix() > int64(exp) {
+		return "", "", ErrRefreshTokenExpired
+	}
+
+	// Extract user claims
+	userID, ok := claims["user_id"].(string)
+	if !ok || userID == "" {
+		return "", "", ErrRefreshTokenInvalid
+	}
+
+	userEmail, _ := claims["user_email"].(string)
+	isAdmin, _ := claims["is_admin"].(bool)
+
+	// Issue a new access token (24h expiry) with same claims
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id":    userID,
+		"user_email": userEmail,
+		"is_admin":   isAdmin,
+		"exp":        time.Now().Add(24 * time.Hour).Unix(),
+	})
+
+	accessTokenStr, err := accessToken.SignedString([]byte(secretKey))
+	if err != nil {
+		log.Error().Err(err).Msg("access token generation failed")
+		return "", "", fmt.Errorf("generate access token: %w", err)
+	}
+
+	// Issue a new refresh token (7-day expiry, fresh jti)
+	newRefreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id":    userID,
+		"type":       "refresh",
+		"exp":        time.Now().Add(7 * 24 * time.Hour).Unix(),
+		"iat":        time.Now().Unix(),
+	})
+
+	newRefreshTokenStr, err := newRefreshToken.SignedString([]byte(secretKey))
+	if err != nil {
+		log.Error().Err(err).Msg("refresh token generation failed")
+		return "", "", fmt.Errorf("generate refresh token: %w", err)
+	}
+
+	return accessTokenStr, newRefreshTokenStr, nil
 }

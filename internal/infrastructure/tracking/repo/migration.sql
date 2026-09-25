@@ -33,3 +33,11 @@ CREATE INDEX IF NOT EXISTS idx_tracking_events_context_created ON tracking_event
 CREATE INDEX IF NOT EXISTS idx_tracking_events_visitor ON tracking_events(context_id, visitor_id);
 CREATE INDEX IF NOT EXISTS idx_tracking_events_type ON tracking_events(context_id, type);
 CREATE INDEX IF NOT EXISTS idx_tracking_events_url ON tracking_events(context_id, url) WHERE type = 'pageview';
+
+-- Indexes for visitor listing sort operations
+CREATE INDEX IF NOT EXISTS idx_tracking_visitors_context_first_seen
+    ON tracking_visitors(context_id, first_seen DESC);
+CREATE INDEX IF NOT EXISTS idx_tracking_visitors_context_last_seen
+    ON tracking_visitors(context_id, last_seen DESC);
+CREATE INDEX IF NOT EXISTS idx_tracking_visitors_context_page_views
+    ON tracking_visitors(context_id, page_views DESC);

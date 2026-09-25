@@ -10,8 +10,11 @@ import (
 	"github.com/hekemen/automata/internal/adapter/proxy"
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
+	"github.com/hekemen/automata/internal/infrastructure/config"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	config_repo "github.com/hekemen/automata/internal/infrastructure/config/repo"
+	"github.com/hekemen/automata/internal/infrastructure/tracking/repo"
+	cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -37,9 +40,11 @@ func NewServer(
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo)
+	cookieMgr := cookie.New(config.Get("auth.secret_key"))
+	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo, cookieMgr)
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/auth/logout", authHandler.Logout)
+	api.POST("/auth/refresh", authHandler.HandleRefresh)
 
 	api.GET("/auth/me", middleware.AuthMiddleware(authService), authHandler.GetMe)
 
@@ -84,6 +89,13 @@ func NewServer(
 		admin.PUT("/configs/:contextId/cors", configHandler.UpdateCORS)
 		admin.PUT("/configs/:contextId/domain", configHandler.UpdateDomain)
 		admin.PUT("/configs/:contextId/display", configHandler.UpdateDisplay)
+
+		// Tracking visitor routes
+		trackingRepo := repo.New(pool)
+		trackingHandler := handler.NewTrackingHandler(trackingRepo)
+		admin.GET("/tracking/visitors", trackingHandler.ListVisitors)
+		admin.GET("/tracking/visitors/:id", trackingHandler.GetVisitorDetail)
+		admin.GET("/tracking/visitors/:id/events", trackingHandler.GetVisitorEvents)
 	}
 
 	// Context-resolved routes (forms, snippets, static assets)
