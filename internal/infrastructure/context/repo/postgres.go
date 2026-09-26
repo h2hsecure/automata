@@ -178,3 +178,37 @@ func (r *postgresRepo) Delete(id string) error {
 
 	return nil
 }
+
+func (r *postgresRepo) GetByUserEmail(email string) ([]*domainctx.Context, error) {
+	query := `
+		SELECT DISTINCT c.id, c.slug, c.name, c.domain, c.is_active, c.settings, c.created_at, c.updated_at
+		FROM contexts c
+		JOIN user_contexts uc ON uc.context_id = c.id
+		JOIN users u ON u.id = uc.user_id
+		WHERE u.email = $1
+		ORDER BY c.created_at
+	`
+	rows, err := r.pool.Query(context.Background(), query, email)
+	if err != nil {
+		return nil, fmt.Errorf("get contexts by user email: %w", err)
+	}
+	defer rows.Close()
+
+	var contexts []*domainctx.Context
+	for rows.Next() {
+		c := &domainctx.Context{}
+		var settingsBytes []byte
+		err := rows.Scan(
+			&c.ID, &c.Slug, &c.Name, &c.Domain, &c.IsActive,
+			&settingsBytes, &c.CreatedAt, &c.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan context: %w", err)
+		}
+		if len(settingsBytes) > 0 {
+			_ = json.Unmarshal(settingsBytes, &c.Settings)
+		}
+		contexts = append(contexts, c)
+	}
+	return contexts, nil
+}

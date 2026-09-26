@@ -22,8 +22,8 @@ func NewTrackingHandler(repo tracking.Repository) *TrackingHandler {
 
 // GetDashboard handles GET /api/tracking/dashboard — returns dashboard metrics.
 func (h *TrackingHandler) GetDashboard(c *gin.Context) {
-	context := c.GetString("context")
-	if context == "" {
+	ctxID := c.GetString("context_id")
+	if ctxID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
 	}
@@ -48,7 +48,7 @@ func (h *TrackingHandler) GetDashboard(c *gin.Context) {
 		TopN:      10,
 	}
 
-	metrics, err := trackingUsecase.GetDashboard(h.repo, context, opts)
+	metrics, err := trackingUsecase.GetDashboard(h.repo, ctxID, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -67,8 +67,8 @@ func (h *TrackingHandler) GetDashboard(c *gin.Context) {
 
 // GetEvents handles GET /api/tracking/events — returns paginated events.
 func (h *TrackingHandler) GetEvents(c *gin.Context) {
-	context := c.GetString("context")
-	if context == "" {
+	ctxID := c.GetString("context_id")
+	if ctxID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
 	}
@@ -96,7 +96,7 @@ func (h *TrackingHandler) GetEvents(c *gin.Context) {
 		}
 	}
 
-	events, total, err := trackingUsecase.GetEvents(h.repo, context, opts)
+	events, total, err := trackingUsecase.GetEvents(h.repo, ctxID, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -110,8 +110,8 @@ func (h *TrackingHandler) GetEvents(c *gin.Context) {
 
 // ListVisitors handles GET /api/admin/tracking/visitors — returns paginated visitor list.
 func (h *TrackingHandler) ListVisitors(c *gin.Context) {
-	context := c.GetString("context")
-	if context == "" {
+	ctxID := c.GetString("context_id")
+	if ctxID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
 	}
@@ -132,7 +132,7 @@ func (h *TrackingHandler) ListVisitors(c *gin.Context) {
 		opts.Sort = s
 	}
 
-	visitors, total, err := trackingUsecase.ListVisitors(h.repo, context, opts)
+	visitors, total, err := trackingUsecase.ListVisitors(h.repo, ctxID, opts)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -146,8 +146,8 @@ func (h *TrackingHandler) ListVisitors(c *gin.Context) {
 
 // GetVisitorDetail handles GET /api/admin/tracking/visitors/:id — returns visitor profile with recent events.
 func (h *TrackingHandler) GetVisitorDetail(c *gin.Context) {
-	context := c.GetString("context")
-	if context == "" {
+	ctxID := c.GetString("context_id")
+	if ctxID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
 	}
@@ -165,7 +165,7 @@ func (h *TrackingHandler) GetVisitorDetail(c *gin.Context) {
 		}
 	}
 
-	detail, err := trackingUsecase.GetVisitorDetail(h.repo, context, visitorID, limit)
+	detail, err := trackingUsecase.GetVisitorDetail(h.repo, ctxID, visitorID, limit)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "visitor not found"})
 		return
@@ -179,8 +179,8 @@ func (h *TrackingHandler) GetVisitorDetail(c *gin.Context) {
 
 // GetVisitorEvents handles GET /api/admin/tracking/visitors/:id/events — returns paginated visitor event history.
 func (h *TrackingHandler) GetVisitorEvents(c *gin.Context) {
-	context := c.GetString("context")
-	if context == "" {
+	ctxID := c.GetString("context_id")
+	if ctxID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
 	}
@@ -207,7 +207,7 @@ func (h *TrackingHandler) GetVisitorEvents(c *gin.Context) {
 		}
 	}
 
-	events, total, err := trackingUsecase.GetVisitorEvents(h.repo, context, visitorID, opts)
+	events, total, err := trackingUsecase.GetVisitorEvents(h.repo, ctxID, visitorID, opts)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

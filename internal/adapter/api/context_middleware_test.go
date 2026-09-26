@@ -73,6 +73,10 @@ func (m *mockContextRepo) Delete(id string) error {
 	return errors.New("context not found")
 }
 
+func (m *mockContextRepo) GetByUserEmail(email string) ([]*context.Context, error) {
+	return nil, nil
+}
+
 var _ context.Repository = (*mockContextRepo)(nil)
 
 func TestContextMiddleware(t *testing.T) {

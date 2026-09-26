@@ -8,4 +8,5 @@ type Repository interface {
 	List(offset, limit int) ([]*Context, error)
 	Update(c *Context) error
 	Delete(id string) error
+	GetByUserEmail(email string) ([]*Context, error)
 }

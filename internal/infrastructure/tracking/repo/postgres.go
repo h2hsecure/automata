@@ -322,7 +322,7 @@ func (r *repo) GetActiveVisitors(contextID string, minutes int) (int64, error) {
 		WHERE context_id = $1 AND created_at > NOW() - ($2 || ' minutes')::interval
 	`
 	var count int64
-	err := r.pool.QueryRow(ctx, query, contextID, minutes).Scan(&count)
+	err := r.pool.QueryRow(ctx, query, contextID, fmt.Sprintf("%d", minutes)).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get active visitors: %w", err)
 	}

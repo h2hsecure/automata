@@ -130,6 +130,10 @@ func (m *mockTenantRepo) Delete(id string) error {
 	return nil
 }
 
+func (m *mockTenantRepo) GetByUserEmail(email string) ([]*context.Context, error) {
+	return nil, nil
+}
+
 func TestProxy(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Proxy Adapter Suite")

@@ -10,6 +10,9 @@ import (
 	"github.com/hekemen/automata/internal/adapter/proxy"
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
+	formRepo "github.com/hekemen/automata/internal/infrastructure/form/repo"
+	bannerRepo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
+	trackingRepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	"github.com/hekemen/automata/internal/infrastructure/config"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
@@ -19,7 +22,6 @@ import (
 	"github.com/hekemen/automata/internal/infrastructure/queue"
 	webhook_svc "github.com/hekemen/automata/internal/infrastructure/webhook"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
-	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -104,7 +106,7 @@ func NewServer(
 		admin.PUT("/configs/:contextId/display", configHandler.UpdateDisplay)
 
 		// Tracking visitor routes
-		trackingRepo := tracking_repo.New(pool)
+		trackingRepo := trackingRepo.New(pool)
 		trackingHandler := handler.NewTrackingHandler(trackingRepo)
 		admin.GET("/tracking/visitors", trackingHandler.ListVisitors)
 		admin.GET("/tracking/visitors/:id", trackingHandler.GetVisitorDetail)
@@ -154,6 +156,57 @@ func NewServer(
 		api.POST("/context/contacts/:id/merge", middleware.AuthMiddleware(authService), contactHandler.Merge)
 		api.GET("/context/contacts/:id/activity", middleware.AuthMiddleware(authService), contactHandler.GetActivity)
 	}
+
+	// Form routes (context-resolved)
+	formRepo := formRepo.New(pool)
+	formHandler := handler.NewFormHandler(formRepo)
+	{
+		api.GET("/context/forms", middleware.AuthMiddleware(authService), formHandler.List)
+		api.GET("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Get)
+		api.POST("/context/forms", middleware.AuthMiddleware(authService), formHandler.Create)
+		api.PUT("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Update)
+		api.DELETE("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Delete)
+		api.POST("/context/forms/:id/submit", formHandler.SubmitForm)
+		api.GET("/context/forms/:id/submissions", middleware.AuthMiddleware(authService), formHandler.ListSubmissions)
+		api.GET("/context/forms/:id/submissions/:sid", middleware.AuthMiddleware(authService), formHandler.GetSubmission)
+	}
+
+	// Banner routes (context-resolved)
+	bannerRepo := bannerRepo.New(pool)
+	bannerHandler := handler.NewBannerHandler(bannerRepo)
+	placementHandler := handler.NewPlacementHandler(bannerRepo)
+	campaignHandler := handler.NewCampaignHandler(bannerRepo)
+	{
+		api.GET("/context/banners", middleware.AuthMiddleware(authService), bannerHandler.ListBanners)
+		api.GET("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.GetBanner)
+		api.POST("/context/banners", middleware.AuthMiddleware(authService), bannerHandler.CreateBanner)
+		api.PUT("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.UpdateBanner)
+		api.DELETE("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.DeleteBanner)
+		api.GET("/context/placements", middleware.AuthMiddleware(authService), placementHandler.ListPlacements)
+		api.POST("/context/placements", middleware.AuthMiddleware(authService), placementHandler.CreatePlacement)
+		api.GET("/context/placements/:id", middleware.AuthMiddleware(authService), placementHandler.GetPlacement)
+		api.PUT("/context/placements/:id", middleware.AuthMiddleware(authService), placementHandler.UpdatePlacement)
+		api.DELETE("/context/placements/:id", middleware.AuthMiddleware(authService), placementHandler.DeletePlacement)
+		api.GET("/context/campaigns", middleware.AuthMiddleware(authService), campaignHandler.ListCampaigns)
+		api.POST("/context/campaigns", middleware.AuthMiddleware(authService), campaignHandler.CreateCampaign)
+		api.GET("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.GetCampaign)
+		api.PUT("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.UpdateCampaign)
+		api.DELETE("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.DeleteCampaign)
+	}
+
+	// Tracking dashboard routes (context-resolved)
+	trackingHandler := handler.NewTrackingHandler(trackingRepo.New(pool))
+	{
+		api.GET("/context/tracking/dashboard", middleware.AuthMiddleware(authService), trackingHandler.GetDashboard)
+		api.GET("/context/tracking/events", middleware.AuthMiddleware(authService), trackingHandler.GetEvents)
+	}
+
+	// API keys list/revoke (admin routes)
+	{
+		api.GET("/admin/api-keys", middleware.AuthMiddleware(authService), authHandler.ListAPIKeys)
+		api.DELETE("/admin/api-keys/:id", middleware.AuthMiddleware(authService), authHandler.RevokeAPIKey)
+	}
+
 	proxy.NewProxy(contextRepo, api)
 
 	return parent

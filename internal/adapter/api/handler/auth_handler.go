@@ -391,3 +391,108 @@ func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	log.Info().Str("user_id", userID).Msg("all sessions terminated")
 	c.JSON(http.StatusOK, gin.H{"message": "all sessions terminated"})
 }
+
+// ListAPIKeys returns all API keys for the current context.
+func (h *AuthHandler) ListAPIKeys(c *gin.Context) {
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		// Try to resolve from user's first context
+		userID := c.GetString("user_id")
+		if userID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+		user, err := h.userRepo.GetByID(userID)
+		if err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("get user failed")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
+		}
+		if user == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+		// Get user's first context
+		contexts, err := h.contextRepo.GetByUserEmail(user.Email)
+		if err != nil || len(contexts) == 0 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "no context available"})
+			return
+		}
+		contextID = contexts[0].ID
+	}
+
+	keys, err := h.apiKeyRepo.ListByContext(contextID)
+	if err != nil {
+		log.Error().Err(err).Str("context_id", contextID).Msg("list api keys failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	result := make([]gin.H, 0, len(keys))
+	for _, k := range keys {
+		result = append(result, gin.H{
+			"id":         k.ID,
+			"name":       k.Name,
+			"key":        k.KeyHash[:8] + "...",
+			"expires_at": k.ExpiresAt,
+			"created_at": k.CreatedAt,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"keys": result})
+}
+
+// RevokeAPIKey revokes an API key.
+func (h *AuthHandler) RevokeAPIKey(c *gin.Context) {
+	keyID := c.Param("id")
+	if keyID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing key id"})
+		return
+	}
+
+	// Resolve context
+	contextID := c.GetHeader("X-Context-ID")
+	if contextID == "" {
+		userID := c.GetString("user_id")
+		if userID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+		user, err := h.userRepo.GetByID(userID)
+		if err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("get user failed")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
+		}
+		if user == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+		contexts, err := h.contextRepo.GetByUserEmail(user.Email)
+		if err != nil || len(contexts) == 0 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "no context available"})
+			return
+		}
+		contextID = contexts[0].ID
+	}
+
+	// Verify key belongs to this context
+	key, err := h.apiKeyRepo.GetByPrefix(keyID, contextID)
+	if err != nil {
+		log.Error().Err(err).Str("key_id", keyID).Msg("api key not found")
+		c.JSON(http.StatusNotFound, gin.H{"error": "api key not found"})
+		return
+	}
+	if key.ID != keyID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "api key not found"})
+		return
+	}
+
+	if err := h.apiKeyRepo.Delete(keyID); err != nil {
+		log.Error().Err(err).Str("key_id", keyID).Msg("revoke api key failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	log.Info().Str("key_id", keyID).Msg("api key revoked")
+	c.JSON(http.StatusOK, gin.H{"message": "api key revoked"})
+}
