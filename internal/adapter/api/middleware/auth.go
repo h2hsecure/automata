@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/infrastructure/config"
+	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 )
 
 // AuthMiddleware validates JWT tokens and API keys.
@@ -29,10 +29,7 @@ func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		secretKey := config.Get("auth.secret_key")
-		if secretKey == "" {
-			secretKey = "automata-dev-secret-key-change-in-production"
-		}
+		secretKey := infraauth.GetJWTSecret()
 
 		userID, err := authService.VerifyTokenUserOnly(token)
 		if err == nil {

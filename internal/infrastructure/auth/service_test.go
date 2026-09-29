@@ -6,21 +6,23 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/hekemen/automata/internal/infrastructure/config"
 )
 
+const testJWTSecret = "test-secret-key-for-jwt-signing-32bytes"
+const testCookieSecret = "test-cookie-secret-for-testing-32bytes!!"
+
 func TestMain(m *testing.M) {
-	// Set up a known secret key for testing
-	config.Set("auth.secret_key", "test-secret-key-for-jwt-signing-32bytes")
+	// Initialize secrets for all auth tests
+	InitForTesting(testJWTSecret, testCookieSecret)
 	m.Run()
-	config.Reset()
+	Reset()
 }
 
 func TestRefreshToken_HappyPath(t *testing.T) {
 	s := &service{}
 
 	// Create a valid refresh token
-	secretKey := config.Get("auth.secret_key")
+	secretKey := testJWTSecret
 	refreshClaims := jwt.MapClaims{
 		"user_id":    "test-user-123",
 		"user_email": "test@example.com",
@@ -81,7 +83,7 @@ func TestRefreshToken_Expired(t *testing.T) {
 	s := &service{}
 
 	// Create an expired refresh token
-	secretKey := config.Get("auth.secret_key")
+	secretKey := testJWTSecret
 	refreshClaims := jwt.MapClaims{
 		"user_id":    "test-user-123",
 		"type":       "refresh",
@@ -104,7 +106,7 @@ func TestRefreshToken_InvalidType(t *testing.T) {
 	s := &service{}
 
 	// Create an access token (type=access, not type=refresh)
-	secretKey := config.Get("auth.secret_key")
+	secretKey := testJWTSecret
 	accessClaims := jwt.MapClaims{
 		"user_id":    "test-user-123",
 		"type":       "access",
@@ -150,7 +152,7 @@ func TestRefreshToken_BearerPrefix(t *testing.T) {
 	s := &service{}
 
 	// Create a valid refresh token
-	secretKey := config.Get("auth.secret_key")
+	secretKey := testJWTSecret
 	refreshClaims := jwt.MapClaims{
 		"user_id":    "test-user-123",
 		"type":       "refresh",
@@ -177,7 +179,7 @@ func TestRefreshToken_BearerPrefix(t *testing.T) {
 func TestRefreshToken_MissingUserID(t *testing.T) {
 	s := &service{}
 
-	secretKey := config.Get("auth.secret_key")
+	secretKey := testJWTSecret
 	refreshClaims := jwt.MapClaims{
 		"type":  "refresh",
 		"exp":   time.Now().Add(7 * 24 * time.Hour).Unix(),
@@ -197,7 +199,7 @@ func TestRefreshToken_MissingUserID(t *testing.T) {
 
 func TestRefreshToken_TrimsBearerPrefix(t *testing.T) {
 	s := &service{}
-	secretKey := config.Get("auth.secret_key")
+	secretKey := testJWTSecret
 
 	refreshClaims := jwt.MapClaims{
 		"user_id":    "test-user",

@@ -10,7 +10,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	domainauth "github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
-	"github.com/hekemen/automata/internal/infrastructure/config"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -40,10 +39,7 @@ func (s *service) ComparePassword(hash, password string) error {
 
 // Login authenticates a user by email and password, returns a JWT token and context list.
 func (s *service) Login(email, password string) (string, string, []domainauth.ContextInfo, error) {
-	secretKey := config.Get("auth.secret_key")
-	if secretKey == "" {
-		secretKey = "automata-dev-secret-key-change-in-production"
-	}
+	secretKey := GetJWTSecret()
 
 	if s.userRepo == nil {
 		return "", "", nil, fmt.Errorf("user repository not initialized")
@@ -117,10 +113,7 @@ func (s *service) Login(email, password string) (string, string, []domainauth.Co
 
 // VerifyToken verifies a JWT token and returns the user ID and context ID.
 func (s *service) VerifyToken(tokenStr string) (string, string, error) {
-	secretKey := config.Get("auth.secret_key")
-	if secretKey == "" {
-		secretKey = "automata-dev-secret-key-change-in-production"
-	}
+	secretKey := GetJWTSecret()
 
 	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
@@ -155,10 +148,7 @@ func (s *service) VerifyToken(tokenStr string) (string, string, error) {
 // VerifyTokenUserOnly verifies a JWT token and returns only the user ID.
 // It does not require a context claim, making it suitable for the new global login flow.
 func (s *service) VerifyTokenUserOnly(tokenStr string) (string, error) {
-	secretKey := config.Get("auth.secret_key")
-	if secretKey == "" {
-		secretKey = "automata-dev-secret-key-change-in-production"
-	}
+	secretKey := GetJWTSecret()
 
 	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
@@ -217,10 +207,7 @@ func (s *service) GetCurrentUser(contextID string) (*context.User, error) {
 // The refresh token must have "type": "refresh" claim and not be expired.
 // Rotation: always issues new tokens (old refresh token is invalidated).
 func (s *service) RefreshToken(refreshToken string) (string, string, error) {
-	secretKey := config.Get("auth.secret_key")
-	if secretKey == "" {
-		secretKey = "automata-dev-secret-key-change-in-production"
-	}
+	secretKey := GetJWTSecret()
 
 	// Parse and validate the refresh token
 	refreshToken = strings.TrimPrefix(refreshToken, "Bearer ")

@@ -10,11 +10,11 @@ import (
 	"github.com/hekemen/automata/internal/adapter/proxy"
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
+	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 	formRepo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	bannerRepo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
 	trackingRepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	emailusecase "github.com/hekemen/automata/internal/usecase/email"
-	"github.com/hekemen/automata/internal/infrastructure/config"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	config_repo "github.com/hekemen/automata/internal/infrastructure/config/repo"
 	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
@@ -48,11 +48,7 @@ func NewServer(
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	cookieSecret := config.Get("auth.cookie_secret")
-	if cookieSecret == "" {
-		cookieSecret = "automata-cookie-secret-32bytes!!" // 32 bytes for AES-256
-	}
-	cookieMgr := cookie.New(cookieSecret)
+	cookieMgr := cookie.New(infraauth.GetCookieSecret())
 	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo, cookieMgr)
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/auth/logout", authHandler.Logout)

@@ -13,7 +13,7 @@ import (
 	"github.com/hekemen/automata/internal/adapter/api"
 	"github.com/hekemen/automata/internal/adapter/api/handler"
 	"github.com/hekemen/automata/internal/adapter/tracking"
-	auth "github.com/hekemen/automata/internal/infrastructure/auth"
+	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	banner_repo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
 	"github.com/hekemen/automata/internal/infrastructure/config"
@@ -37,6 +37,9 @@ func main() {
 	if err := config.Load(configPath); err != nil {
 		log.Warn().Err(err).Str("path", configPath).Msg("failed to load config, using defaults")
 	}
+
+	// Initialize and validate secret keys (panics if missing)
+	infraauth.Init()
 
 	log.Info().Str("db_host", config.Get("database.host")).Msg("loaded config")
 
@@ -106,7 +109,7 @@ func main() {
 	}
 
 	// Initialize auth service
-	authService := auth.NewService(userRepo)
+	authService := infraauth.NewService(userRepo)
 
 	// Create handlers for tracking server
 	formHandler := handler.NewFormHandler(formRepo)

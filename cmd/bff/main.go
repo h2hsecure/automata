@@ -33,14 +33,14 @@ func main() {
 		log.Warn().Err(err).Str("path", configPath).Msg("failed to load config, using defaults")
 	}
 
+	// Initialize and validate secret keys (panics if missing)
+	auth.Init()
+
 	port := config.Get("bff.port")
 	if port == "" {
 		port = "8082"
 	}
-	cookieSecret := config.Get("bff.cookie_secret")
-	if cookieSecret == "" {
-		cookieSecret = "change-me-in-production"
-	}
+	cookieSecret := auth.GetCookieSecret()
 	apiBackendURL := config.Get("bff.api_backend_url")
 	if apiBackendURL == "" {
 		apiBackendURL = "http://localhost:8080"

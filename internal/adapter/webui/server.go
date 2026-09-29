@@ -1,9 +1,8 @@
 package webui
 
 import (
-	"os"
-
 	"github.com/gin-gonic/gin"
+	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 )
 
 // RegisterRoutes registers BFF routes on the given Gin engine.
@@ -11,10 +10,7 @@ import (
 // as a standalone component (not recommended — use cmd/bff/main.go for the
 // integrated dual-server setup).
 func RegisterRoutes(engine *gin.Engine) {
-	cookieSecret := os.Getenv("AUTOMATA_COOKIE_SECRET")
-	if cookieSecret == "" {
-		cookieSecret = "change-me-in-production"
-	}
+	_ = infraauth.GetCookieSecret() // ensures secrets are initialized
 
 	engine.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})

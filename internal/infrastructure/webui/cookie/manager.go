@@ -27,9 +27,14 @@ type Manager struct {
 }
 
 // New creates a new cookie Manager with the given encryption secret.
+// The secret must be at least 16 characters long; an empty or too-short secret will panic.
+// Callers should use auth.GetCookieSecret() to obtain the configured secret.
 func New(secret string) *Manager {
 	if secret == "" {
-		secret = "change-me-in-production"
+		panic("cookie: secret must not be empty — configure auth.cookie_secret in config.yaml or set AUTOMATA_COOKIE_SECRET")
+	}
+	if len(secret) < 16 {
+		panic(fmt.Sprintf("cookie: secret must be at least 16 characters long (got %d)", len(secret)))
 	}
 	return &Manager{secret: secret}
 }

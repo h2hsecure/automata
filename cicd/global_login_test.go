@@ -28,6 +28,8 @@ var _ = Describe("Global Login Integration Tests", func() {
 		engine = gin.New()
 		engine.Use(gin.Recovery())
 
+		infraauth.InitForTesting("test-secret-key-for-jwt-signing-32bytes", "test-cookie-secret-for-testing-32bytes!!")
+
 		userRepo := ctxrepo.NewUserPostgresRepo(pool)
 		authSvc = infraauth.NewService(userRepo)
 		handler := &TestAuthHandler{service: authSvc}

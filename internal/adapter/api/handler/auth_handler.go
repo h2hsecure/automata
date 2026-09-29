@@ -13,7 +13,6 @@ import (
 	"github.com/hekemen/automata/internal/domain/context"
 	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
-	"github.com/hekemen/automata/internal/infrastructure/config"
 	cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
 	"github.com/rs/zerolog/log"
 )
@@ -57,10 +56,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Generate refresh token
-	secretKey := "automata-dev-secret-key-change-in-production"
-	if sk := config.Get("auth.secret_key"); sk != "" {
-		secretKey = sk
-	}
+	secretKey := infraauth.GetJWTSecret()
 	refreshClaims := jwt.MapClaims{
 		"user_id": userID,
 		"type":    "refresh",
@@ -394,7 +390,7 @@ func (h *AuthHandler) LogoutAll(c *gin.Context) {
 
 // ListAPIKeys returns all API keys for the current context.
 func (h *AuthHandler) ListAPIKeys(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		// Try to resolve from user's first context
 		userID := c.GetString("user_id")
@@ -450,7 +446,7 @@ func (h *AuthHandler) RevokeAPIKey(c *gin.Context) {
 	}
 
 	// Resolve context
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		userID := c.GetString("user_id")
 		if userID == "" {
