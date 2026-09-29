@@ -1,0 +1,23 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "automata.fullname" . }}
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  rules:
+    - host: {{ .Values.ingress.hostname | quote }}
+      http:
+        paths:
+          # Frontend + API proxy via BFF
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "automata.fullname" . }}-bff
+                port:
+                  number: 8082
+{{- end -}}

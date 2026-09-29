@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "automata.fullname" . }}-automata
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+    app.kubernetes.io/component: automata
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+    - port: 8081
+      targetPort: 8081
+      name: tracking
+  selector:
+    {{- include "automata.automataSelectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "automata.fullname" . }}-bff
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bff
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8082
+      targetPort: 8082
+      name: http
+  selector:
+    {{- include "automata.bffSelectorLabels" . | nindent 4 }}

@@ -1,0 +1,39 @@
+{{- $fullname := include "automata.fullname" . -}}
+{{- $dbHost := ternary (printf "%s-postgresql" .Release.Name) (.Values.database.host | default "automata-postgresql") .Values.postgresql.enabled -}}
+{{- $dbName := ternary (.Values.postgresql.auth.database | default "automata") (.Values.database.name | default "automata") .Values.postgresql.enabled -}}
+{{- $dbUser := ternary (.Values.postgresql.auth.username | default "automata") (.Values.database.user | default "automata") .Values.postgresql.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-config
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: "8080"
+      tracking_port: "8081"
+
+    database:
+      host: {{ $dbHost }}
+      port: {{ .Values.database.port | default "5432" }}
+      name: {{ $dbName }}
+      user: {{ $dbUser }}
+      password: ""
+      max_connections: "4"
+
+    auth:
+      secret_key: {{ .Values.secretKey | quote }}
+      cookie_secret: {{ .Values.cookieSecret | quote }}
+      admin_email: {{ .Values.adminEmail | quote }}
+
+    bff:
+      port: "8082"
+      api_backend_url: "http://{{ $fullname }}-automata:8080"
+      cookie_secret: {{ .Values.cookieSecret | quote }}
+      web_dir: "web"
+
+    context:
+      resolution: path
+      default_path: /

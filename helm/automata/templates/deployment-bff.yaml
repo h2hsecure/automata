@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "automata.fullname" . }}-bff
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bff
+spec:
+  replicas: {{ .Values.bff.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "automata.bffSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "automata.bffSelectorLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: bff
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["./bff"]
+          ports:
+            - containerPort: 8082
+              name: http
+          volumeMounts:
+            - name: config
+              mountPath: /root/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          env:
+            - name: AUTOMATA_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "automata.fullname" . }}-postgres-auth
+                  key: postgres-password
+            - name: AUTOMATA_ADMIN_PASSWORD
+              value: {{ .Values.adminPassword | quote }}
+            - name: AUTOMATA_ADMIN_EMAIL
+              value: {{ .Values.adminEmail | quote }}
+          resources:
+            {{- toYaml .Values.bff.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "automata.fullname" . }}-config

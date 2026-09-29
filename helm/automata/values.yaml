@@ -1,0 +1,65 @@
+# Default values for automata.
+# This is a YAML-formatted file.
+
+image:
+  repository: ghcr.io/hekemen/automata
+  tag: "latest"
+  pullPolicy: Always
+  pullSecrets:
+    - ghcr-registry
+
+automata:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+bff:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingress:
+  enabled: true
+  hostname: automata.home.arpa
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+secretKey: "change-this-in-production"
+cookieSecret: "change-this-in-production"
+adminEmail: "admin@automata.local"
+adminPassword: "REDACTED"
+
+database:
+  # PostgreSQL connection settings (overridden by sub-chart if enabled)
+  host: ""
+  port: "5432"
+  name: automata
+  user: automata
+
+postgresql:
+  enabled: true
+  auth:
+    database: automata
+    username: automata
+    password: "REDACTED"
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 500m

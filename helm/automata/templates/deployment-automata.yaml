@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "automata.fullname" . }}-automata
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+    app.kubernetes.io/component: automata
+spec:
+  replicas: {{ .Values.automata.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "automata.automataSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "automata.automataSelectorLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: automata
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["./automata"]
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8081
+              name: tracking
+          volumeMounts:
+            - name: config
+              mountPath: /root/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          env:
+            - name: AUTOMATA_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "automata.fullname" . }}-postgres-auth
+                  key: postgres-password
+            - name: AUTOMATA_ADMIN_PASSWORD
+              value: {{ .Values.adminPassword | quote }}
+            - name: AUTOMATA_ADMIN_EMAIL
+              value: {{ .Values.adminEmail | quote }}
+          resources:
+            {{- toYaml .Values.automata.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "automata.fullname" . }}-config
