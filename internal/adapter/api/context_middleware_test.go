@@ -77,6 +77,22 @@ func (m *mockContextRepo) GetByUserEmail(email string) ([]*context.Context, erro
 	return nil, nil
 }
 
+func (m *mockContextRepo) GetDefaultContext() (*context.Context, error) {
+	// Return the first active context (sorted by ID for determinism)
+	var first *context.Context
+	for _, t := range m.contexts {
+		if t.IsActive {
+			if first == nil || t.ID < first.ID {
+				first = t
+			}
+		}
+	}
+	if first == nil {
+		return nil, errors.New("no active context found")
+	}
+	return first, nil
+}
+
 var _ context.Repository = (*mockContextRepo)(nil)
 
 func TestContextMiddleware(t *testing.T) {

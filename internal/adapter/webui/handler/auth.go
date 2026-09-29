@@ -26,11 +26,9 @@ func NewAuthHandler(authService domainauth.AuthService, userRepo domainwebui.Use
 	}
 }
 
-// HandleLogin renders the login page.
+// HandleLogin renders the login page (redirects to SPA).
 func (h *AuthHandler) HandleLogin(c *gin.Context) {
-	c.HTML(http.StatusOK, "login.tmpl", gin.H{
-		"error": c.Query("error"),
-	})
+	c.Redirect(http.StatusFound, "/")
 }
 
 // HandleLoginPost processes the login form submission.
@@ -41,7 +39,7 @@ func (h *AuthHandler) HandleLoginPost(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.Redirect(http.StatusFound, "/login?error=invalid_request")
+		c.Redirect(http.StatusFound, "/?error=invalid_request")
 		return
 	}
 
@@ -49,7 +47,7 @@ func (h *AuthHandler) HandleLoginPost(c *gin.Context) {
 	userID, email, contexts, err := h.authService.Login(req.Email, req.Password)
 	if err != nil {
 		log.Warn().Err(err).Str("email", req.Email).Msg("login failed")
-		c.Redirect(http.StatusFound, "/login?error=invalid_credentials")
+		c.Redirect(http.StatusFound, "/?error=invalid_credentials")
 		return
 	}
 
@@ -102,7 +100,7 @@ func (h *AuthHandler) HandleLogout(c *gin.Context) {
 		HttpOnly: true,
 		MaxAge:   -1,
 	})
-	c.Redirect(http.StatusFound, "/login")
+	c.Redirect(http.StatusFound, "/")
 }
 
 // GetSessionData extracts session data from the cookie.

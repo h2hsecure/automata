@@ -24,9 +24,9 @@ func (h *FrontendHandler) HandleIndex(c *gin.Context) {
 	http.ServeFile(c.Writer, c.Request, filepath.Join(h.webDir, "index.html"))
 }
 
-// HandleLogin serves the login page.
+// HandleLogin serves the login page (redirects to SPA).
 func (FrontendHandler) HandleLogin(c *gin.Context) {
-	c.HTML(http.StatusOK, "login.tmpl", gin.H{})
+	c.Redirect(http.StatusFound, "/")
 }
 
 // HandleSPA serves index.html for all non-API routes (Vue Router history mode).

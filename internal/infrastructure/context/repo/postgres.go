@@ -212,3 +212,26 @@ func (r *postgresRepo) GetByUserEmail(email string) ([]*domainctx.Context, error
 	}
 	return contexts, nil
 }
+
+func (r *postgresRepo) GetDefaultContext() (*domainctx.Context, error) {
+	t := &domainctx.Context{}
+	var settingsBytes []byte
+
+	query := `
+		SELECT id, slug, name, domain, is_active, settings, created_at, updated_at
+		FROM contexts WHERE is_active = true ORDER BY created_at ASC LIMIT 1
+	`
+
+	err := r.pool.QueryRow(context.Background(), query).Scan(
+		&t.ID, &t.Slug, &t.Name, &t.Domain, &t.IsActive,
+		&settingsBytes, &t.CreatedAt, &t.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get default context: %w", err)
+	}
+
+	if len(settingsBytes) > 0 {
+		_ = json.Unmarshal(settingsBytes, &t.Settings)
+	}
+	return t, nil
+}

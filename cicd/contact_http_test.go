@@ -264,11 +264,14 @@ var _ = Describe("HTTP Integration Tests - Contact CRUD", func() {
 			var response map[string]interface{}
 			err = json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response["ID"]).To(Equal(contactID))
+			contactResp, ok := response["contact"].(map[string]interface{})
+			Expect(ok).To(BeTrue())
+			Expect(contactResp["ID"]).To(Equal(contactID))
 		})
 
 		It("should return 404 for non-existent contact", func() {
-			req := httptest.NewRequest("GET", "/api/contacts/nonexistent", nil)
+			fakeContactID := support.NewTestUUID()
+			req := httptest.NewRequest("GET", "/api/contacts/"+fakeContactID, nil)
 			req.Header.Set("X-Context-ID", support.NewTestContextID())
 			engine.ServeHTTP(w, req)
 
@@ -459,7 +462,8 @@ var _ = Describe("HTTP Integration Tests - Contact CRUD", func() {
 		})
 
 		It("should return 404 for non-existent contact", func() {
-			req := httptest.NewRequest("GET", "/api/contacts/nonexistent/activity", nil)
+			fakeContactID := support.NewTestUUID()
+			req := httptest.NewRequest("GET", "/api/contacts/"+fakeContactID+"/activity", nil)
 			req.Header.Set("X-Context-ID", support.NewTestContextID())
 			engine.ServeHTTP(w, req)
 

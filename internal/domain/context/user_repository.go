@@ -1,6 +1,9 @@
 package context
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // UserRepository defines the interface for user data persistence.
 type UserRepository interface {
@@ -21,7 +24,7 @@ type UserRepository interface {
 	UpdatePasswordChangedAt(userID string) error
 
 	// Context membership operations
-	GetByUserContext(userID, contextID string) (*UserContext, error)
+	GetByUserIDContext(ctx context.Context, userID, contextID string) (*UserContext, error)
 	ListByUser(userID string) ([]UserContext, error)
 	CreateMembership(uc *UserContext) error
 	UpdateMembership(uc *UserContext) error

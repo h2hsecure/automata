@@ -21,7 +21,7 @@ func NewBannerHandler(repo bdomain.Repository) *BannerHandler {
 
 // CreateBanner handles POST /api/banners — creates a new banner.
 func (h *BannerHandler) CreateBanner(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -44,7 +44,7 @@ func (h *BannerHandler) CreateBanner(c *gin.Context) {
 
 // UpdateBanner handles PUT /api/banners/:id — updates an existing banner.
 func (h *BannerHandler) UpdateBanner(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -94,7 +94,7 @@ func (h *BannerHandler) GetBanner(c *gin.Context) {
 
 // ListBanners handles GET /api/banners — lists banners with optional filters.
 func (h *BannerHandler) ListBanners(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -145,7 +145,7 @@ func NewPlacementHandler(repo bdomain.Repository) *PlacementHandler {
 
 // CreatePlacement handles POST /api/placements — creates a new placement.
 func (h *PlacementHandler) CreatePlacement(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -168,7 +168,7 @@ func (h *PlacementHandler) CreatePlacement(c *gin.Context) {
 
 // UpdatePlacement handles PUT /api/placements/:id — updates an existing placement.
 func (h *PlacementHandler) UpdatePlacement(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -218,7 +218,7 @@ func (h *PlacementHandler) GetPlacement(c *gin.Context) {
 
 // ListPlacements handles GET /api/placements — lists placements with optional filters.
 func (h *PlacementHandler) ListPlacements(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -252,7 +252,7 @@ func NewCampaignHandler(repo bdomain.Repository) *CampaignHandler {
 
 // CreateCampaign handles POST /api/campaigns — creates a new campaign.
 func (h *CampaignHandler) CreateCampaign(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -275,7 +275,7 @@ func (h *CampaignHandler) CreateCampaign(c *gin.Context) {
 
 // UpdateCampaign handles PUT /api/campaigns/:id — updates an existing campaign.
 func (h *CampaignHandler) UpdateCampaign(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return
@@ -325,7 +325,7 @@ func (h *CampaignHandler) GetCampaign(c *gin.Context) {
 
 // ListCampaigns handles GET /api/campaigns — lists campaigns with optional filters.
 func (h *CampaignHandler) ListCampaigns(c *gin.Context) {
-	contextID := c.GetHeader("X-Context-ID")
+	contextID := c.GetString("context_id")
 	if contextID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
 		return

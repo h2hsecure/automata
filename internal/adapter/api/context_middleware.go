@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/domain/context"
+	"github.com/rs/zerolog/log"
 )
 
 // ContextKeyType is the type for context keys used in the Gin context.
@@ -43,6 +44,22 @@ func ContextResolver(contextRepo context.Repository) gin.HandlerFunc {
 			}
 			c.Set(string(ContextKey), *t)
 			c.Set("context_id", contextID)
+			c.Header("X-Context-ID", contextID)
+			c.Next()
+			return
+		}
+
+		// Try context_id query parameter (used by SPA)
+		if contextID := c.Query("context_id"); contextID != "" {
+			t, err := contextRepo.GetByID(contextID)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "context not found"})
+				c.Abort()
+				return
+			}
+			c.Set(string(ContextKey), *t)
+			c.Set("context_id", contextID)
+			c.Header("X-Context-ID", contextID)
 			c.Next()
 			return
 		}
@@ -57,6 +74,7 @@ func ContextResolver(contextRepo context.Repository) gin.HandlerFunc {
 		if t != nil {
 			c.Set(string(ContextKey), *t)
 			c.Set("context_id", t.ID)
+			c.Header("X-Context-ID", t.ID)
 			c.Next()
 			return
 		}
@@ -71,12 +89,25 @@ func ContextResolver(contextRepo context.Repository) gin.HandlerFunc {
 		if t != nil {
 			c.Set(string(ContextKey), *t)
 			c.Set("context_id", t.ID)
+			c.Header("X-Context-ID", t.ID)
 			c.Next()
 			return
 		}
 
-		c.JSON(http.StatusBadRequest, gin.H{"error": "context not found"})
-		c.Abort()
+		// Last resort: default to the first active context (for single-context deployments)
+		// where the SPA doesn't pass context_id in API calls
+		t, err = contextRepo.GetDefaultContext()
+		if err != nil {
+			log.Warn().Err(err).Msg("GetDefaultContext failed")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "context not found (debug: " + err.Error() + ")"})
+			c.Abort()
+			return
+		}
+		c.Set(string(ContextKey), *t)
+		c.Set("context_id", t.ID)
+		c.Header("X-Context-ID", t.ID)
+		c.Next()
+		return
 	}
 }
 

@@ -205,9 +205,9 @@ func (r *userPostgresRepo) Delete(id string) error {
 	return nil
 }
 
-func (r *userPostgresRepo) GetByUserContext(userID, contextID string) (*domainctx.UserContext, error) {
+func (r *userPostgresRepo) GetByUserIDContext(ctx context.Context, userID, contextID string) (*domainctx.UserContext, error) {
 	uc := &domainctx.UserContext{}
-	err := r.pool.QueryRow(context.Background(), `
+	err := r.pool.QueryRow(ctx, `
 		SELECT id, user_id, context_id, role, created_at, updated_at
 		FROM user_contexts WHERE user_id = $1 AND context_id = $2
 	`, userID, contextID).Scan(

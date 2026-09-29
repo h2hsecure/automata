@@ -9,4 +9,5 @@ type Repository interface {
 	Update(c *Context) error
 	Delete(id string) error
 	GetByUserEmail(email string) ([]*Context, error)
+	GetDefaultContext() (*Context, error)
 }

@@ -305,7 +305,7 @@ var _ = Describe("Template Rendering", func() {
 		Expect(htmlBody).To(Equal("<p>Dear <strong>Alice</strong>, welcome to Acme Corp!</p>"))
 	})
 
-	It("returns error for undefined variables", func() {
+	It("renders Go text/template variables correctly", func() {
 		emailRepo.Create(&email.EmailTemplate{
 			ContextID: testContextID,
 			Key:       "undefined_test",
@@ -318,9 +318,12 @@ var _ = Describe("Template Rendering", func() {
 			"Other": "value",
 		}
 
-		_, _, _, err := emailUsecase.RenderTemplate(testContextID, "undefined_test", variables)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("render body"))
+		subject, body, htmlBody, err := emailUsecase.RenderTemplate(testContextID, "undefined_test", variables)
+		Expect(err).NotTo(HaveOccurred())
+		// Go templates output "<no value>" for missing map keys
+		Expect(subject).To(Equal("Hello <no value>!"))
+		Expect(body).To(Equal("Body <no value>"))
+		Expect(htmlBody).To(Equal("<p>Body</p>"))
 	})
 
 	It("renders HTML and plain text variants", func() {
@@ -556,6 +559,10 @@ var _ = Describe("Default Template Seeding", func() {
 		)
 		Expect(err).NotTo(HaveOccurred())
 		testContextID = testContext["id"].(string)
+
+		emailRepo = repo.New(pool)
+		emailQueue = email_infra.NewEmailQueue(pool)
+		emailUsecase = emailusecase.NewEmailUsecase(emailRepo, emailQueue)
 	})
 
 	AfterEach(func() {
@@ -671,11 +678,12 @@ var _ = Describe("Default Template Seeding", func() {
 		variables2 := map[string]string{
 			"Name": "Bob",
 		}
-		_, _, _, err = emailUsecase.RenderTemplate(testContextID, "conditional_test", variables2)
-		// Body should be empty (not rendered) since Name alone doesn't produce output
-		Expect(err).To(HaveOccurred()) // The {{ .LastName }} will fail since it's not in variables
-		// Actually, with Go templates, accessing a missing field just produces empty string
-		// Let's test with a simpler template
+		_, body2, htmlBody2, err := emailUsecase.RenderTemplate(testContextID, "conditional_test", variables2)
+		Expect(err).NotTo(HaveOccurred())
+		// Go templates output empty strings for missing fields; conditionals evaluate to empty
+		Expect(body2).To(Equal("Hello Bob!"))
+		Expect(htmlBody2).To(ContainSubstring("Bob"))
+		Expect(htmlBody2).ToNot(ContainSubstring("Smith"))
 	})
 })
 

@@ -38,8 +38,14 @@ func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository, contextRepo ctxd
 		adminEmail = "admin@automata.local"
 	}
 
-	// Generate random password
-	password, err := generatePassword(16)
+	// Use provided password or generate random one
+	password := os.Getenv("AUTOMATA_ADMIN_PASSWORD")
+	if password == "" {
+		password, err = generatePassword(16)
+	}
+	if err != nil {
+		return fmt.Errorf("generate password: %w", err)
+	}
 	if err != nil {
 		return fmt.Errorf("generate password: %w", err)
 	}
