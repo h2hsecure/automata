@@ -6,7 +6,7 @@ image:
   tag: "latest"
   pullPolicy: Always
   pullSecrets:
-    - ghcr-registry
+    - name: ghcr-registry
 
 automata:
   replicaCount: 1
