@@ -336,4 +336,10 @@ Failure modes this spec implies but the tests do not cover:
 
 ## Execution Status
 
-(To be filled in at completion.)
+**Executed 2026-10-14 (inline).** All steps complete and verified:
+
+- Task 1 (GetPending retry pickup + regression spec): done — commit `7e27932`. 10/10 focused webhook specs pass. Note: the first commit attempt (`bc95286`) accidentally swept pre-existing uncommitted user work (tenantID→contextID renames in `cicd/webhook_queue_test.go`) into the commit; reset and re-committed as `7e27932` with only the task's changes; the user's changes were restored to the working tree as uncommitted.
+- Task 2 (worker integration specs + poll-interval seam): done — commit `152866f`. 13/13 focused webhook specs pass (10 queue + 3 worker). Spec deviation: header assertions use canonical MIME casing (`X-Tenant-Id`/`X-Form-Id`) because Go's `http.Header` canonicalizes names (RFC 7230: header names are case-insensitive); production behavior unchanged, test-side fix only.
+- Task 3 (wiring + roadmap + docs): done — commit `db92305`. `go build ./...` clean; vet clean on touched packages.
+- Full suite (Task 3 Step 6): 315 specs / 292 pass / 23 fail — all 23 failures are the pre-existing baseline set (banner_campaign_http ×9, form_http ×9, tracking_http ×4, tracking_server ×1); all 4 new webhook specs pass.
+- Known limitations (documented, not fixed, per spec §6.5): `GetPending` has no row claim/lock, so 2+ API replicas could double-deliver (same class as the email worker); worker goroutine lifecycle on shutdown verified by code review only.
