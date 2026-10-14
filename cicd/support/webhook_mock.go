@@ -20,15 +20,17 @@ type WebhookRequest struct {
 
 // MockWebhookServer is an embedded test server for capturing webhook deliveries.
 type MockWebhookServer struct {
-	server    *httptest.Server
-	requests  []WebhookRequest
-	mu        sync.RWMutex
+	server     *httptest.Server
+	requests   []WebhookRequest
+	statusCode int
+	mu         sync.RWMutex
 }
 
 // NewMockWebhookServer creates a new mock webhook server.
 func NewMockWebhookServer() *MockWebhookServer {
 	mws := &MockWebhookServer{
-		requests: make([]WebhookRequest, 0),
+		requests:   make([]WebhookRequest, 0),
+		statusCode: http.StatusOK,
 	}
 
 	mws.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +49,10 @@ func NewMockWebhookServer() *MockWebhookServer {
 			}
 		}
 
+		mws.mu.RLock()
+		statusCode := mws.statusCode
+		mws.mu.RUnlock()
+
 		// Store request
 		req := WebhookRequest{
 			URL:        r.URL.String(),
@@ -54,14 +60,14 @@ func NewMockWebhookServer() *MockWebhookServer {
 			Headers:    headers,
 			Payload:    payload,
 			ReceivedAt: time.Now(),
-			StatusCode: http.StatusOK,
+			StatusCode: statusCode,
 		}
 
 		mws.mu.Lock()
 		mws.requests = append(mws.requests, req)
 		mws.mu.Unlock()
 
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(statusCode)
 		w.Write([]byte(`{"status":"received"}`))
 	}))
 
@@ -81,6 +87,14 @@ func (mws *MockWebhookServer) Requests() []WebhookRequest {
 	reqs := make([]WebhookRequest, len(mws.requests))
 	copy(reqs, mws.requests)
 	return reqs
+}
+
+// SetResponseStatusCode sets the status code the mock returns for captured
+// requests. The default is 200.
+func (mws *MockWebhookServer) SetResponseStatusCode(code int) {
+	mws.mu.Lock()
+	defer mws.mu.Unlock()
+	mws.statusCode = code
 }
 
 // Clear removes all captured requests.

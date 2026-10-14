@@ -25,14 +25,20 @@ type WebhookWorker struct {
 	batchSize  int
 }
 
-// NewWebhookWorker creates a new webhook worker.
-func NewWebhookWorker(queue WebhookQueue) *WebhookWorker {
+// NewWebhookWorkerWithInterval creates a worker with a custom poll interval.
+// It is a test seam; production uses NewWebhookWorker.
+func NewWebhookWorkerWithInterval(queue WebhookQueue, pollInterval time.Duration) *WebhookWorker {
 	return &WebhookWorker{
 		queue:        queue,
 		client:       &http.Client{Timeout: 30 * time.Second},
-		pollInterval: 10 * time.Second,
+		pollInterval: pollInterval,
 		batchSize:    10,
 	}
+}
+
+// NewWebhookWorker creates a new webhook worker.
+func NewWebhookWorker(queue WebhookQueue) *WebhookWorker {
+	return NewWebhookWorkerWithInterval(queue, 10*time.Second)
 }
 
 // Start begins the worker loop. It runs until ctx is cancelled.
