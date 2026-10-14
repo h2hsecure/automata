@@ -28,6 +28,9 @@ type WebhookWorker struct {
 // NewWebhookWorkerWithInterval creates a worker with a custom poll interval.
 // It is a test seam; production uses NewWebhookWorker.
 func NewWebhookWorkerWithInterval(queue WebhookQueue, pollInterval time.Duration) *WebhookWorker {
+	if pollInterval <= 0 {
+		pollInterval = 10 * time.Second
+	}
 	return &WebhookWorker{
 		queue:        queue,
 		client:       &http.Client{Timeout: 30 * time.Second},

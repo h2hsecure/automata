@@ -10,7 +10,7 @@ Wire the existing webhook delivery worker into the main API process, fix the bro
 
 - Go 1.26.5, module `github.com/hekemen/automata`. No new dependencies.
 - House test style: cicd = Ginkgo/Gomega, package `cicd_test`, run via `go test ./cicd/ -count=1 -args -ginkgo.focus="..."`.
-- cicd baseline: 311 specs / 288 pass / 23 pre-existing failures (banner_campaign_http ×9, form_http ×9, tracking_http ×4, tracking_server ×1). New specs must pass; the baseline must not change.
+- cicd baseline: 311 specs / 288 pass / 23 pre-existing failures (working tree; committed tree 306 / 283 / 23). Failure breakdown: banner_campaign_http ×10, form_http ×8, tracking_http ×4, tracking_server ×1. New specs must pass; the baseline must not change.
 - TDD gate per task: failing test first, then the minimal change, then commit.
 - Do not touch the user's uncommitted files: `webui/`, `web/`, the 7 cicd test files + `cicd/creation_endpoints_test.go`, `AGENTS.md`, the `automata` binary, `helm/automata/values.yaml`, `.playwright-mcp/`.
 - Commit per task on branch `phase2-auth-changes`.
@@ -151,8 +151,8 @@ var _ = Describe("Webhook Delivery Worker", func() {
 		req, ok := whServer.LastRequest()
 		Expect(ok).To(BeTrue())
 		Expect(req.Headers["X-Webhook-Source"]).To(Equal("automata"))
-		Expect(req.Headers["X-Tenant-ID"]).To(Equal(contextID))
-		Expect(req.Headers["X-Form-ID"]).To(Equal(formID))
+		Expect(req.Headers["X-Tenant-Id"]).To(Equal(contextID)) // canonical MIME form (RFC 7230)
+		Expect(req.Headers["X-Form-Id"]).To(Equal(formID))
 		Expect(req.Payload["contact_email"]).To(Equal("worker-test@example.com"))
 	})
 
@@ -341,5 +341,5 @@ Failure modes this spec implies but the tests do not cover:
 - Task 1 (GetPending retry pickup + regression spec): done — commit `7e27932`. 10/10 focused webhook specs pass. Note: the first commit attempt (`bc95286`) accidentally swept pre-existing uncommitted user work (tenantID→contextID renames in `cicd/webhook_queue_test.go`) into the commit; reset and re-committed as `7e27932` with only the task's changes; the user's changes were restored to the working tree as uncommitted.
 - Task 2 (worker integration specs + poll-interval seam): done — commit `152866f`. 13/13 focused webhook specs pass (10 queue + 3 worker). Spec deviation: header assertions use canonical MIME casing (`X-Tenant-Id`/`X-Form-Id`) because Go's `http.Header` canonicalizes names (RFC 7230: header names are case-insensitive); production behavior unchanged, test-side fix only.
 - Task 3 (wiring + roadmap + docs): done — commit `db92305`. `go build ./...` clean; vet clean on touched packages.
-- Full suite (Task 3 Step 6): 315 specs / 292 pass / 23 fail — all 23 failures are the pre-existing baseline set (banner_campaign_http ×9, form_http ×9, tracking_http ×4, tracking_server ×1); all 4 new webhook specs pass.
-- Known limitations (documented, not fixed, per spec §6.5): `GetPending` has no row claim/lock, so 2+ API replicas could double-deliver (same class as the email worker); worker goroutine lifecycle on shutdown verified by code review only.
+- Full suite (Task 3 Step 6): working tree 315 specs / 292 pass / 23 fail (includes the user's untracked `cicd/creation_endpoints_test.go`, 5 specs; committed tree is 310 / 287 / 23). All 23 failures are the pre-existing baseline set (banner_campaign_http ×10, form_http ×8, tracking_http ×4, tracking_server ×1); all 4 new webhook specs pass.
+- Known limitations (documented, not fixed, per spec §6.5): `GetPending` has no row claim/lock, so 2+ API replicas could double-deliver (the email worker is better protected here — it claims rows with `FOR UPDATE SKIP LOCKED`; the webhook queue has no claim at all); worker goroutine lifecycle on shutdown verified by code review only.

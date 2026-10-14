@@ -126,7 +126,7 @@ The worker's 10s poll interval would make every cicd spec wait 10–20s and sit 
 
 ### 6.5 No row claim/lock — documented limitation
 
-`GetPending` does not claim or lock rows, so two or more API replicas could double-deliver. This is the same class of limitation as the email worker's `FOR UPDATE SKIP LOCKED` note and is accepted for single-process deployments. It is documented in the plan's Review Focus, not fixed here.
+`GetPending` does not claim or lock rows, so two or more API replicas could double-deliver. (The email worker is better protected here: it claims rows with `FOR UPDATE SKIP LOCKED`; the webhook queue has no claim at all.) The limitation is accepted for single-process deployments. It is documented in the plan's Review Focus, not fixed here.
 
 ## 7. Implementation Notes
 
