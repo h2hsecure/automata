@@ -101,15 +101,25 @@ func (s *stdClient) Data(data []byte) error {
 
 func (s *stdClient) Close() error { return s.c.Close() }
 
-type netDialer struct{ cfg Config }
+type netDialer struct {
+	cfg     Config
+	timeout time.Duration
+}
 
-func DefaultDialer(cfg Config) Dialer { return &netDialer{cfg: cfg} }
+func DefaultDialer(cfg Config) Dialer {
+	return &netDialer{cfg: cfg, timeout: 30 * time.Second}
+}
 
 func (d *netDialer) Dial() (Client, error) {
 	addr := net.JoinHostPort(d.cfg.Host, strconv.Itoa(d.cfg.Port))
 	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
 		return nil, err
+	}
+	// Bound the greeting/AUTH/STARTTLS handshake: a stalled relay must not
+	// block the worker indefinitely.
+	if d.timeout > 0 {
+		conn.SetDeadline(time.Now().Add(d.timeout))
 	}
 	client, err := stdsmtp.NewClient(conn, d.cfg.Host)
 	if err != nil {
@@ -132,20 +142,24 @@ func (d *netDialer) Dial() (Client, error) {
 	return &stdClient{c: client}, nil
 }
 
+// buildMessage renders an RFC-5322 message with CRLF line endings (RFC 5321
+// requires CRLF in the DATA payload). When htmlBody is non-empty the message
+// is multipart/alternative with plain and html parts.
 func buildMessage(from string, to []string, subject, body, htmlBody string) []byte {
 	subject = strings.NewReplacer("\n", " ", "\r", " ").Replace(subject)
 	toHeader := strings.Join(to, ", ")
+	date := time.Now().UTC().Format(time.RFC1123)
 	if htmlBody == "" {
 		return []byte(fmt.Sprintf(
-			"From: %s\nTo: %s\nSubject: %s\nMIME-Version: 1.0\nContent-Type: text/plain; charset=\"utf-8\"\n\n%s\n",
-			from, toHeader, subject, body))
+			"From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=\"utf-8\"\r\n\r\n%s\r\n",
+			from, toHeader, subject, date, body))
 	}
 	boundary := "automata-delivery-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	var b strings.Builder
-	fmt.Fprintf(&b, "From: %s\nTo: %s\nSubject: %s\nMIME-Version: 1.0\nContent-Type: multipart/alternative; boundary=%s\n\n",
-		from, toHeader, subject, boundary)
-	fmt.Fprintf(&b, "--%s\nContent-Type: text/plain; charset=\"utf-8\"\n\n%s\n", boundary, body)
-	fmt.Fprintf(&b, "--%s\nContent-Type: text/html; charset=\"utf-8\"\n\n%s\n", boundary, htmlBody)
-	fmt.Fprintf(&b, "--%s--\n", boundary)
+	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n\r\n",
+		from, toHeader, subject, date, boundary)
+	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/plain; charset=\"utf-8\"\r\n\r\n%s\r\n", boundary, body)
+	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/html; charset=\"utf-8\"\r\n\r\n%s\r\n", boundary, htmlBody)
+	fmt.Fprintf(&b, "--%s--\r\n", boundary)
 	return []byte(b.String())
 }

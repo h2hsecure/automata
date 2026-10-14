@@ -204,6 +204,9 @@ func main() {
 	if !mailer.IsConfigured() {
 		log.Warn().Msg("smtp not configured: email jobs will be discarded after max retries")
 	}
+	if smtpCfg.Username != "" && !smtpCfg.StartTLS {
+		log.Warn().Msg("smtp: username set with starttls disabled; credentials will be sent in cleartext")
+	}
 	emailQueue := queue.NewEmailQueue(pool)
 	emailQueue.StartWorker(ctx, mailer)
 

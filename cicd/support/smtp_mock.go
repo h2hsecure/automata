@@ -172,7 +172,8 @@ func (c *SMTPClient) Data(body []byte) error {
 
 	for _, line := range lines {
 		if inHeaders {
-			if line == "" {
+			// "" (LF messages) or "\r" (CRLF messages) marks the header/body separator.
+			if line == "" || line == "\r" {
 				inHeaders = false
 				continue
 			}
