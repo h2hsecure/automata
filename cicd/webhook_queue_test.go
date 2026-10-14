@@ -266,5 +266,20 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deliveries).To(HaveLen(0))
 		})
+
+		It("should return retrying webhooks whose next_retry has passed", func() {
+			contextID := support.NewTestContextID()
+			formID := support.NewTestUUID()
+			_, err := pool.Exec(ctx, `
+				INSERT INTO webhook_deliveries (id, context_id, form_id, url, payload, status, attempts, max_retries, next_retry, created_at, updated_at)
+				VALUES ($1, $2, $3, $4, $5, 'retrying', 1, 3, NOW() - INTERVAL '1 second', NOW(), NOW())`,
+				support.NewTestUUID(), contextID, formID, webhookServer.URL(), []byte(`{"test":"data"}`))
+			Expect(err).NotTo(HaveOccurred())
+
+			deliveries, err := queue.NewWebhookQueue(pool).GetPending(10)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deliveries).To(HaveLen(1))
+			Expect(deliveries[0].Status).To(Equal("retrying"))
+		})
 	})
 })

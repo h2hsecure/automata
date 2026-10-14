@@ -77,7 +77,7 @@ func (q *webhookQueue) GetPending(limit int) ([]*WebhookDelivery, error) {
 	query := `
 		SELECT id, context_id, form_id, url, payload, status, attempts, max_retries, next_retry, error_msg, created_at, updated_at
 		FROM webhook_deliveries
-		WHERE status = 'pending' AND next_retry <= NOW()
+		WHERE status IN ('pending', 'retrying') AND next_retry <= NOW()
 		ORDER BY created_at ASC
 		LIMIT $1
 	`
