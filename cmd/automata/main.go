@@ -210,6 +210,10 @@ func main() {
 	emailQueue := queue.NewEmailQueue(pool)
 	emailQueue.StartWorker(ctx, mailer)
 
+	// Webhook delivery worker (API enqueues deliveries; worker POSTs them)
+	webhookQueue := queue.NewWebhookQueue(pool)
+	go queue.NewWebhookWorker(webhookQueue).Start(ctx)
+
 	// Graceful shutdown on SIGINT/SIGTERM
 	go func() {
 		sigChan := make(chan os.Signal, 1)

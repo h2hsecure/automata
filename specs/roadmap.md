@@ -32,7 +32,7 @@ Banner CRUD, placement rules, A/B testing, impression and click tracking. **Done
 Email queue, template management, and notification integration with forms and webhooks. **Done** (2026-09-25). SMTP delivery: **Done** (2026-10-14, [plan](../docs/superpowers/plans/2026-10-14-email-delivery.md)).
 
 ### 7. Webhook Management
-Per-context webhook CRUD, queue, delivery, and retry. **Done** (2026-09-25).
+Per-context webhook CRUD, queue, delivery, and retry. **Done** (2026-09-25; delivery worker wired into the main API process and retry pickup fixed 2026-10-14, [plan](../docs/superpowers/plans/2026-10-14-webhook-delivery-wiring.md)).
 
 ### 8. Settings & Profile
 Per-context settings (CORS, domain, display), user profile management, and password change. **Done** (2026-09-25).
