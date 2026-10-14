@@ -20,23 +20,35 @@ func NewBannerUsecase(repo bdomain.Repository) *BannerUsecase {
 // CreateBanner creates a new banner.
 func (u *BannerUsecase) CreateBanner(contextID string, req *bdomain.CreateBannerRequest) (*bdomain.Banner, error) {
 	b := &bdomain.Banner{
-		ContextID:   contextID,
+		ContextID:  contextID,
 		Name:       req.Name,
 		Type:       req.Type,
 		Content:    req.Content,
 		LinkURL:    req.LinkURL,
-		ImageURL:   &req.ImageURL,
-		AltText:    &req.AltText,
-		CampaignID: &req.CampaignID,
 		Placements: req.Placements,
 		Priority:   req.Priority,
-		StartDate:  &req.StartDate,
-		EndDate:    &req.EndDate,
 		IsActive:   true,
 		ABTest:     req.ABTest,
 		ABVariants: req.ABVariants,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
+	}
+	// Only set nullable fields when provided, so they persist as NULL
+	// instead of zero values (e.g. "" is not a valid UUID for campaign_id).
+	if req.ImageURL != "" {
+		b.ImageURL = &req.ImageURL
+	}
+	if req.AltText != "" {
+		b.AltText = &req.AltText
+	}
+	if req.CampaignID != "" {
+		b.CampaignID = &req.CampaignID
+	}
+	if !req.StartDate.IsZero() {
+		b.StartDate = &req.StartDate
+	}
+	if !req.EndDate.IsZero() {
+		b.EndDate = &req.EndDate
 	}
 
 	if err := u.repo.CreateBanner(b); err != nil {

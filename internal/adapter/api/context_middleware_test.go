@@ -202,44 +202,69 @@ var _ = Describe("ContextResolver middleware", func() {
 			Expect(captured.Context.Slug).To(Equal("myapp"))
 		})
 
-		It("skips www subdomain", func() {
+		// Unresolvable subdomains (no explicit context slug in the path)
+		// fall back to the default context instead of aborting.
+		It("falls back to the default context for www subdomain", func() {
 			req := requestWithHost("GET", "/test", "www.example.com")
-			w, _ := runWithCapture(middleware, mockRepo, req)
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			w, captured := runWithCapture(middleware, mockRepo, req)
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(captured.Found).To(BeTrue())
+			Expect(captured.Context.Slug).To(Equal("context1"))
 		})
 
-		It("skips api subdomain", func() {
+		It("falls back to the default context for api subdomain", func() {
 			req := requestWithHost("GET", "/test", "api.example.com")
-			w, _ := runWithCapture(middleware, mockRepo, req)
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			w, captured := runWithCapture(middleware, mockRepo, req)
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(captured.Found).To(BeTrue())
+			Expect(captured.Context.Slug).To(Equal("context1"))
 		})
 
-		It("skips mail subdomain", func() {
+		It("falls back to the default context for mail subdomain", func() {
 			req := requestWithHost("GET", "/test", "mail.example.com")
-			w, _ := runWithCapture(middleware, mockRepo, req)
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			w, captured := runWithCapture(middleware, mockRepo, req)
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(captured.Found).To(BeTrue())
+			Expect(captured.Context.Slug).To(Equal("context1"))
 		})
 
-		It("returns error for non-existent subdomain", func() {
+		It("falls back to the default context for non-existent subdomain", func() {
 			req := requestWithHost("GET", "/test", "unknown.example.com")
-			w, _ := runWithCapture(middleware, mockRepo, req)
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			w, captured := runWithCapture(middleware, mockRepo, req)
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(captured.Found).To(BeTrue())
+			Expect(captured.Context.Slug).To(Equal("context1"))
 		})
 
-		It("returns error for no subdomain (single part host)", func() {
+		It("falls back to the default context for no subdomain (single part host)", func() {
 			req := requestWithHost("GET", "/test", "localhost")
-			w, _ := runWithCapture(middleware, mockRepo, req)
+			w, captured := runWithCapture(middleware, mockRepo, req)
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(captured.Found).To(BeTrue())
+			Expect(captured.Context.Slug).To(Equal("context1"))
+		})
+	})
+
+	Describe("default context fallback", func() {
+		It("resolves SPA API paths (e.g. /api/context/contacts) to the default context", func() {
+			// The SPA calls /api/context/... without a context header, query
+			// param, or matching subdomain. This must resolve to the default
+			// context rather than aborting with "no context found".
+			req := requestWithHost("GET", "/api/context/contacts", "automata.example.com")
+			w, captured := runWithCapture(middleware, mockRepo, req)
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(captured.Found).To(BeTrue())
+			Expect(captured.Context.Slug).To(Equal("context1"))
+		})
+
+		It("returns 400 when no default context exists", func() {
+			emptyRepo := newMockContextRepo()
+			mw := ContextResolver(emptyRepo)
+			req := requestWithHost("GET", "/api/context/contacts", "automata.example.com")
+			w, _ := runWithCapture(mw, emptyRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			Expect(string(body)).To(ContainSubstring("context not found"))
 		})
 	})
 

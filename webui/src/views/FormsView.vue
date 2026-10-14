@@ -10,7 +10,7 @@ import Input from '@/components/Input.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { listForms, deleteForm, createForm, updateForm } from '@/api/client'
-import type { Form } from '@/types/api'
+import type { Form, FormInput } from '@/types/api'
 
 const { confirmStore, show, confirm } = useConfirm()
 const forms = ref<Form[]>([])
@@ -55,10 +55,16 @@ function openCreate() {
 
 function openEdit(f: Form) {
   isEdit.value = true
-  editingId.value = f.id
-  formName.value = f.name
-  formSlug.value = f.slug
-  formFields.value = [...f.fields]
+  editingId.value = f.ID
+  formName.value = f.Name
+  formSlug.value = f.Slug
+  // Map backend FormField (slug) to the local field model (name).
+  formFields.value = (f.Fields ?? []).map(fl => ({
+    name: fl.slug,
+    type: fl.type,
+    required: fl.required,
+    label: fl.label,
+  }))
   formError.value = ''
   modalOpen.value = true
 }
@@ -82,10 +88,18 @@ async function handleSave() {
   }
   loading.value = true
   try {
-    const data = {
+    const data: FormInput = {
       name: formName.value,
       slug: formSlug.value || formName.value.toLowerCase().replace(/\s+/g, '-'),
-      fields: formFields.value,
+      // Map the local field model (name) to the backend FormField (slug).
+      fields: formFields.value.map((f, i) => ({
+        slug: f.name,
+        type: f.type,
+        label: f.label,
+        required: f.required,
+        validation: null,
+        order: i,
+      })),
     }
     if (isEdit.value) {
       await updateForm(editingId.value, data)
@@ -104,12 +118,12 @@ async function handleSave() {
 async function handleDelete(f: Form) {
   const confirmed = await show({
     title: 'Delete Form',
-    description: `Are you sure you want to delete "${f.name}"? This action cannot be undone.`,
+    description: `Are you sure you want to delete "${f.Name}"? This action cannot be undone.`,
     variant: 'destructive',
   })
   if (confirmed) {
     try {
-      await deleteForm(f.id)
+      await deleteForm(f.ID)
       loadForms()
     } catch {
       // handled
@@ -141,16 +155,16 @@ onMounted(loadForms)
         empty-text="No forms found."
       >
         <template #name="{ row }: { row: Form }">
-          <span class="font-medium">{{ row.name }}</span>
+          <span class="font-medium">{{ row.Name }}</span>
         </template>
         <template #slug="{ row }: { row: Form }">
-          <code class="text-sm bg-muted px-1.5 py-0.5 rounded">{{ row.slug }}</code>
+          <code class="text-sm bg-muted px-1.5 py-0.5 rounded">{{ row.Slug }}</code>
         </template>
         <template #fields_count="{ row }: { row: Form }">
-          {{ row.fields?.length || 0 }}
+          {{ row.Fields?.length || 0 }}
         </template>
         <template #created_at="{ row }: { row: Form }">
-          {{ new Date(row.created_at).toLocaleDateString() }}
+          {{ new Date(row.CreatedAt).toLocaleDateString() }}
         </template>
         <template #actions="{ row }: { row: Form }">
           <div class="flex gap-1">

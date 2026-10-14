@@ -29,7 +29,7 @@ const form = ref({
   first_name: '',
   last_name: '',
   phone: '',
-  tags: [] as Array<{ id: string; name: string; color: string }>,
+  tags: [] as string[],
   custom_fields: {} as Record<string, string>,
 })
 const formError = ref('')
@@ -77,14 +77,14 @@ function openCreate() {
 
 function openEdit(contact: Contact) {
   isEdit.value = true
-  editingId.value = contact.id
+  editingId.value = contact.ID
   form.value = {
-    email: contact.email,
-    first_name: contact.first_name,
-    last_name: contact.last_name,
-    phone: contact.phone || '',
-    tags: contact.tags || [],
-    custom_fields: { ...contact.custom_fields },
+    email: contact.Email ?? '',
+    first_name: contact.FirstName,
+    last_name: contact.LastName,
+    phone: contact.Phone || '',
+    tags: [],
+    custom_fields: { ...contact.CustomFields },
   }
   formError.value = ''
   modalOpen.value = true
@@ -114,12 +114,12 @@ async function handleSave() {
 async function handleDelete(contact: Contact) {
   const confirmed = await show({
     title: 'Delete Contact',
-    description: `Are you sure you want to delete ${contact.first_name} ${contact.last_name}? This action cannot be undone.`,
+    description: `Are you sure you want to delete ${contact.FirstName} ${contact.LastName}? This action cannot be undone.`,
     variant: 'destructive',
   })
   if (confirmed) {
     try {
-      await deleteContact(contact.id)
+      await deleteContact(contact.ID)
       loadContacts()
     } catch {
       // handled
@@ -165,32 +165,32 @@ onMounted(loadContacts)
         <template #name="{ row }: { row: Contact }">
           <div class="flex items-center gap-2">
             <div class="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
-              {{ row.first_name?.[0] || row.email?.[0] || '?' }}
+              {{ row.FirstName?.[0] || row.Email?.[0] || '?' }}
             </div>
             <div>
-              <p class="font-medium">{{ row.first_name }} {{ row.last_name }}</p>
+              <p class="font-medium">{{ row.FirstName }} {{ row.LastName }}</p>
             </div>
           </div>
         </template>
         <template #email="{ row }: { row: Contact }">
-          <span class="text-sm">{{ row.email }}</span>
+          <span class="text-sm">{{ row.Email }}</span>
         </template>
         <template #phone="{ row }: { row: Contact }">
-          {{ row.phone || '-' }}
+          {{ row.Phone || '-' }}
         </template>
         <template #tags="{ row }: { row: Contact }">
           <div class="flex gap-1 flex-wrap">
             <Badge
-              v-for="tag in row.tags"
-              :key="tag.id"
+              v-for="tag in row.Tags"
+              :key="tag.ID"
               :variant="'default'"
             >
-              {{ tag.name }}
+              {{ tag.Name }}
             </Badge>
           </div>
         </template>
         <template #created_at="{ row }: { row: Contact }">
-          {{ new Date(row.created_at).toLocaleDateString() }}
+          {{ new Date(row.CreatedAt).toLocaleDateString() }}
         </template>
         <template #actions="{ row }: { row: Contact }">
           <div class="flex gap-1">

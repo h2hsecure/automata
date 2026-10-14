@@ -1,8 +1,11 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import type {
   Contact,
+  ContactInput,
   Form,
+  FormInput,
   Banner,
+  BannerInput,
   Tenant,
   ApiKey,
   PaginatedResponse,
@@ -70,7 +73,13 @@ export async function listContacts(
   if (search) params.search = search
   if (contextId) params.context_id = contextId
   const response = await client.get('/context/contacts', { params })
-  return response.data
+  const d = response.data
+  return {
+    data: d.contacts ?? [],
+    total: d.total ?? 0,
+    page: d.page ?? page,
+    limit: d.limit ?? limit,
+  }
 }
 
 export async function getContact(id: string): Promise<Contact> {
@@ -78,12 +87,12 @@ export async function getContact(id: string): Promise<Contact> {
   return response.data
 }
 
-export async function createContact(data: Partial<Contact>): Promise<Contact> {
+export async function createContact(data: ContactInput): Promise<Contact> {
   const response = await client.post('/context/contacts', data)
   return response.data
 }
 
-export async function updateContact(id: string, data: Partial<Contact>): Promise<Contact> {
+export async function updateContact(id: string, data: ContactInput): Promise<Contact> {
   const response = await client.put(`/context/contacts/${id}`, data)
   return response.data
 }
@@ -104,22 +113,30 @@ export async function getContactActivity(id: string, page = 1, limit = 20) {
 
 // Form endpoints
 export async function listForms(contextId = ''): Promise<Form[]> {
-  return [] // TODO: implement forms endpoint
+  const params: Record<string, string> = {}
+  if (contextId) params.context_id = contextId
+  const response = await client.get('/context/forms', { params })
+  return response.data.forms ?? []
 }
 
 export async function getForm(id: string): Promise<Form> {
-  return {} as Form
+  const response = await client.get(`/context/forms/${id}`)
+  return response.data
 }
 
-export async function createForm(data: Partial<Form>): Promise<Form> {
-  return {} as Form
+export async function createForm(data: FormInput): Promise<Form> {
+  const response = await client.post('/context/forms', data)
+  return response.data
 }
 
-export async function updateForm(id: string, data: Partial<Form>): Promise<Form> {
-  return {} as Form
+export async function updateForm(id: string, data: FormInput): Promise<Form> {
+  const response = await client.put(`/context/forms/${id}`, data)
+  return response.data
 }
 
-export async function deleteForm(id: string): Promise<void> {}
+export async function deleteForm(id: string): Promise<void> {
+  await client.delete(`/context/forms/${id}`)
+}
 
 export async function listSubmissions(formId: string, page = 1, limit = 20) {
   return { data: [], total: 0, page, limit }
@@ -131,18 +148,25 @@ export async function submitForm(formId: string, data: Record<string, string>): 
 
 // Banner endpoints
 export async function listBanners(contextId = ''): Promise<Banner[]> {
-  return [] // TODO: implement banners endpoint
+  const params: Record<string, string> = {}
+  if (contextId) params.context_id = contextId
+  const response = await client.get('/context/banners', { params })
+  return response.data.banners ?? []
 }
 
-export async function createBanner(data: Partial<Banner>): Promise<Banner> {
-  return {} as Banner
+export async function createBanner(data: BannerInput): Promise<Banner> {
+  const response = await client.post('/context/banners', data)
+  return response.data
 }
 
-export async function updateBanner(id: string, data: Partial<Banner>): Promise<Banner> {
-  return {} as Banner
+export async function updateBanner(id: string, data: BannerInput): Promise<Banner> {
+  const response = await client.put(`/context/banners/${id}`, data)
+  return response.data
 }
 
-export async function deleteBanner(id: string): Promise<void> {}
+export async function deleteBanner(id: string): Promise<void> {
+  await client.delete(`/context/banners/${id}`)
+}
 
 // Placement endpoints
 export async function listPlacements(contextId = ''): Promise<Placement[]> {

@@ -11,7 +11,7 @@ import Textarea from '@/components/Textarea.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { listBanners, createBanner, updateBanner, deleteBanner } from '@/api/client'
-import type { Banner } from '@/types/api'
+import type { Banner, BannerInput } from '@/types/api'
 
 const { confirmStore, show, confirm } = useConfirm()
 const banners = ref<Banner[]>([])
@@ -60,13 +60,13 @@ function openCreate() {
 
 function openEdit(b: Banner) {
   isEdit.value = true
-  editingId.value = b.id
-  bannerName.value = b.name
-  bannerPlacement.value = b.placement
-  bannerContentType.value = b.content_type
-  bannerContent.value = b.content
-  bannerLinkUrl.value = b.link_url
-  bannerStatus.value = b.status
+  editingId.value = b.ID
+  bannerName.value = b.Name
+  bannerPlacement.value = b.Placements?.[0] ?? ''
+  bannerContentType.value = b.Type
+  bannerContent.value = b.Content
+  bannerLinkUrl.value = b.LinkURL
+  bannerStatus.value = b.IsActive ? 'active' : 'inactive'
   formError.value = ''
   modalOpen.value = true
 }
@@ -78,13 +78,15 @@ async function handleSave() {
   }
   loading.value = true
   try {
-    const data = {
+    const data: BannerInput = {
       name: bannerName.value,
-      placement: bannerPlacement.value,
-      content_type: bannerContentType.value,
+      type: bannerContentType.value,
       content: bannerContent.value,
       link_url: bannerLinkUrl.value,
-      status: bannerStatus.value,
+      placements: bannerPlacement.value ? [bannerPlacement.value] : [],
+    }
+    if (isEdit.value) {
+      data.is_active = bannerStatus.value === 'active'
     }
     if (isEdit.value) {
       await updateBanner(editingId.value, data)
@@ -103,12 +105,12 @@ async function handleSave() {
 async function handleDelete(b: Banner) {
   const confirmed = await show({
     title: 'Delete Banner',
-    description: `Are you sure you want to delete "${b.name}"?`,
+    description: `Are you sure you want to delete "${b.Name}"?`,
     variant: 'destructive',
   })
   if (confirmed) {
     try {
-      await deleteBanner(b.id)
+      await deleteBanner(b.ID)
       loadBanners()
     } catch {
       // handled
@@ -140,21 +142,21 @@ onMounted(loadBanners)
         empty-text="No banners found."
       >
         <template #name="{ row }: { row: Banner }">
-          <span class="font-medium">{{ row.name }}</span>
+          <span class="font-medium">{{ row.Name }}</span>
         </template>
         <template #type="{ row }: { row: Banner }">
-          <Badge variant="info">{{ row.content_type }}</Badge>
+          <Badge variant="info">{{ row.Type }}</Badge>
         </template>
         <template #placement="{ row }: { row: Banner }">
-          {{ row.placement || '-' }}
+          {{ row.Placements?.[0] || '-' }}
         </template>
         <template #status="{ row }: { row: Banner }">
-          <Badge :variant="row.status === 'active' ? 'success' : 'default'">
-            {{ row.status }}
+          <Badge :variant="row.IsActive ? 'success' : 'default'">
+            {{ row.IsActive ? 'active' : 'inactive' }}
           </Badge>
         </template>
         <template #created_at="{ row }: { row: Banner }">
-          {{ new Date(row.created_at).toLocaleDateString() }}
+          {{ new Date(row.CreatedAt).toLocaleDateString() }}
         </template>
         <template #actions="{ row }: { row: Banner }">
           <div class="flex gap-1">

@@ -79,19 +79,26 @@ func ContextResolver(contextRepo context.Repository) gin.HandlerFunc {
 			return
 		}
 
-		// Fall back to path-based resolution
-		t, err = resolveByPath(c, contextRepo)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			c.Abort()
-			return
-		}
-		if t != nil {
-			c.Set(string(ContextKey), *t)
-			c.Set("context_id", t.ID)
-			c.Header("X-Context-ID", t.ID)
-			c.Next()
-			return
+		// Fall back to path-based resolution, but only for explicit
+		// /context/<slug> or /t/<slug> paths. An explicit slug that cannot be
+		// resolved is an error (the caller asked for a specific context), so
+		// it must not silently fall back to the default context. Requests
+		// without a context slug (e.g. SPA calls to /api/context/...) skip
+		// this branch and use the default-context fallback below.
+		if strings.HasPrefix(c.Request.URL.Path, "/context/") || strings.HasPrefix(c.Request.URL.Path, "/t/") {
+			t, err = resolveByPath(c, contextRepo)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				c.Abort()
+				return
+			}
+			if t != nil {
+				c.Set(string(ContextKey), *t)
+				c.Set("context_id", t.ID)
+				c.Header("X-Context-ID", t.ID)
+				c.Next()
+				return
+			}
 		}
 
 		// Last resort: default to the first active context (for single-context deployments)
