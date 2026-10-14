@@ -81,6 +81,10 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to run webhook migrations")
 	}
 
+	if err := queue.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run queue migrations")
+	}
+
 	if err := database.RunUserContextMigrations(pool); err != nil {
 		log.Fatal().Err(err).Msg("failed to run user-context migrations")
 	}

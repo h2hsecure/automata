@@ -343,3 +343,9 @@ Failure modes this spec implies but the tests do not cover:
 - Task 3 (wiring + roadmap + docs): done — commit `db92305`. `go build ./...` clean; vet clean on touched packages.
 - Full suite (Task 3 Step 6): working tree 315 specs / 292 pass / 23 fail (includes the user's untracked `cicd/creation_endpoints_test.go`, 5 specs; committed tree is 310 / 287 / 23). All 23 failures are the pre-existing baseline set (banner_campaign_http ×10, form_http ×8, tracking_http ×4, tracking_server ×1); all 4 new webhook specs pass.
 - Known limitations (documented, not fixed, per spec §6.5): `GetPending` has no row claim/lock, so 2+ API replicas could double-deliver (the email worker is better protected here — it claims rows with `FOR UPDATE SKIP LOCKED`; the webhook queue has no claim at all); worker goroutine lifecycle on shutdown verified by code review only.
+
+### Deploy follow-up (2026-10-14)
+
+Deploying the image to the cluster exposed a production migration gap: `cmd/automata/main.go` ran migrations for the database, tracking, form, contact, banner, email-repo, and webhook-repo packages but never the queue package, so `email_jobs` and `webhook_deliveries` were never created in production and both workers spammed `42P01` errors every 10s. The cicd suite never caught it because `cicd/support/testdb.go` runs migrations by directory scan (which includes `internal/infrastructure/queue`), i.e. a different sequence than production startup.
+
+Fix (TDD): new regression spec `cicd/production_migrations_test.go` (fresh TestDB + the exact production startup sequence → asserts both delivery tables exist; RED before fix, GREEN after), plus `internal/infrastructure/queue/migration.go` (`RunMigrations` embedding `migration.sql` + `webhook_migration.sql`, mirroring `email/repo/migration.go`) wired into `main.go` after the webhook-repo migration. Image rebuilt from the fix commit and redeployed; production DB verified to contain both tables and worker logs clean.
