@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useConfirm } from '@/composables/useConfirm'
 
-const { show, confirm, cancel } = useConfirm()
+const { confirmStore, confirm, cancel } = useConfirm()
 const emit = defineEmits<{ confirm: [] }>()
 
 async function handleConfirm() {
@@ -13,25 +13,25 @@ async function handleConfirm() {
 <template>
   <Teleport to="body">
     <div
-      v-if="show"
+      v-if="confirmStore.show"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
     >
       <div class="w-full max-w-md rounded-lg border bg-card p-6 shadow-lg">
         <h3 class="text-lg font-semibold mb-2">
-          {{ show.options?.title }}
+          {{ confirmStore.options?.title }}
         </h3>
         <p class="text-sm text-muted-foreground mb-6">
-          {{ show.options?.description }}
+          {{ confirmStore.options?.description }}
         </p>
         <div class="flex justify-end gap-2">
           <Button variant="outline" @click="cancel">
-            {{ show.options?.cancelText || 'Cancel' }}
+            {{ confirmStore.options?.cancelText || 'Cancel' }}
           </Button>
           <Button
-            :variant="show.options?.variant || 'default'"
+            :variant="confirmStore.options?.variant || 'default'"
             @click="handleConfirm"
           >
-            {{ show.options?.confirmText || 'Confirm' }}
+            {{ confirmStore.options?.confirmText || 'Confirm' }}
           </Button>
         </div>
       </div>
