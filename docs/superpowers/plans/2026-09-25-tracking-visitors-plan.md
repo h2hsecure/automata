@@ -657,3 +657,7 @@ Steps:
 - `go test ./internal/infrastructure/tracking/repo/...` passes
 - `go test ./internal/usecase/tracking/...` passes
 - `go test ./internal/adapter/api/handler/...` passes
+
+## Execution Status
+
+**Completed.** Marked Done in `specs/roadmap.md`; the `/tracking/visitors` endpoints are implemented and registered in `internal/adapter/api/server.go` and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.

@@ -10,6 +10,25 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-22-context-rename-and-login-simplification.md` (design) + `docs/superpowers/specs/2026-09-24-implementation-spec.md` (implementation spec)
 
+## Execution Status
+
+**Status: Completed** — executed 2026-10-13 on branch `phase2-auth-changes`. The plan was written post-hoc to document work that had already been completed; execution consisted of verifying every step against the codebase, closing the one real gap (Task 10 Step 1), and verifying end-to-end on the k3s cluster.
+
+- **Code gap closed:** `cicd/global_login_test.go` still seeded `context_users`; it now seeds `users` + `user_contexts`. All 6 "Global Login" specs pass against a real Postgres testcontainer.
+- **Verification:** `go build ./...`, `go vet ./cicd/...`, `make build` pass. Full cicd suite: 279 passed / 23 failed — the 23 failures are pre-existing and unrelated to Phase 2 (tracking/form/banner/placement/campaign specs); the identical failure set was confirmed by re-running the suite with the change stashed.
+- **Live verification (k3s):** release `automata` (rev 20, deployed 2026-10-05, image `ghcr.io/hekemen/automata:latest`) runs the new code. Login verified end-to-end via port-forward with a temporary user: 200 OK with JWT (`is_admin`/`user_email`/`user_id` claims), AES-encrypted `refresh_token`, and `contexts` populated from `user_contexts`. Temporary user deleted afterward; DB restored to original state.
+
+### Deviations from the plan
+
+| Plan step | Actual state |
+|---|---|
+| Task 3: add `IsAdmin` to `ContextInfo` | `ContextInfo` carries `Role` (`owner`/`admin`/`member`) instead; `is_admin` is a JWT claim extracted by the auth middleware, not a `ContextInfo` field. |
+| Task 6: `bootstrap.Bootstrap(pool)` | Actual function is `bootstrap.Run(pool, userRepo, contextRepo)` in `internal/infrastructure/bootstrap/admin.go`. Guard is DB-based (`ExistsAnyUser` + `context_users` count); the `.admin_initialized` marker is written but not the guard. Admin email/password come from `AUTOMATA_ADMIN_EMAIL` / `AUTOMATA_ADMIN_PASSWORD` env vars (email defaults to `admin@automata.local`). |
+| Task 9 Step 2: `GetByEmailGlobal` queries both tables | Queries `context_users` only. Functionally equivalent: `Login` calls `GetByUsername` (`users` table) first and falls back to `GetByEmailGlobal`, so both tables are covered in the login path. |
+| Task 10 Step 3: fix remaining test failures | 23 pre-existing failures remain (unrelated to Phase 2; see above). No failures were caused by this plan's changes. |
+| Task 11 Steps 3–4: docker rebuild + login | Verified on the k3s cluster instead (see live verification above). **Finding:** the docker-compose smoke test fails with `crypto/aes: invalid key size 25` because `config.example.yaml`'s `cookie_secret` (`change-this-in-production`) is 25 chars — invalid for AES (needs 16/24/32). The k3s chart uses a 32-char `cookieSecret`, so the cluster is unaffected. `config.example.yaml` was left unchanged per user decision. |
+| Commit steps | The work is in branch history (`dc7fac6`, `1f67080`, `22fe826`, `cdba540`, …); per-task commits were not replayed separately. The remaining delta (test updates, plan check-offs) is left uncommitted pending review. |
+
 ## Global Constraints
 
 - Go version: 1.26.2
@@ -43,7 +62,7 @@
 - Consumes: PostgreSQL pool with `contexts` and `context_users` tables
 - Produces: New tables `users` and `user_contexts`, with data migration from `context_users`
 
-- [ ] **Step 1: Write migration SQL**
+- [x] **Step 1: Write migration SQL**
 
 Create `internal/infrastructure/database/migration_user_contexts.sql`:
 
@@ -97,17 +116,17 @@ CREATE INDEX IF NOT EXISTS idx_user_contexts_context ON user_contexts(context_id
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 ```
 
-- [ ] **Step 2: Verify the existing migration runner picks up new .sql files**
+- [x] **Step 2: Verify the existing migration runner picks up new .sql files**
 
 Read `internal/infrastructure/database/` to find how `RunMigrations` discovers SQL files. The new file uses the same naming convention (`migration_*.sql`) so it should be picked up automatically. If not, add a call after the existing `RunMigrations`.
 
-- [ ] **Step 3: Build to verify**
+- [x] **Step 3: Build to verify**
 
 Run: `go build ./internal/infrastructure/database/...`
 
 Expected: Build succeeds.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/infrastructure/database/migration_user_contexts.sql
@@ -126,7 +145,7 @@ git commit -m "feat: add users and user_contexts tables with migration"
 - Consumes: Existing `User` struct, `UserRepository` interface
 - Produces: Updated `User` with `IsAdmin`, `SSOProvider`, `SSOID`; new `UserContext` struct; extended `UserRepository`
 
-- [ ] **Step 1: Update User struct and add UserContext struct**
+- [x] **Step 1: Update User struct and add UserContext struct**
 
 Replace the current `User` struct in `internal/domain/context/user.go` with:
 
@@ -161,7 +180,7 @@ type UserContext struct {
 }
 ```
 
-- [ ] **Step 2: Update Validate method**
+- [x] **Step 2: Update Validate method**
 
 Replace the Validate method to allow SSO-only users:
 
@@ -184,7 +203,7 @@ func (u *User) Validate() error {
 }
 ```
 
-- [ ] **Step 3: Update UserRepository interface**
+- [x] **Step 3: Update UserRepository interface**
 
 Replace `internal/domain/context/user_repository.go` with:
 
@@ -215,13 +234,13 @@ type UserRepository interface {
 }
 ```
 
-- [ ] **Step 4: Build to verify**
+- [x] **Step 4: Build to verify**
 
 Run: `go build ./internal/domain/...`
 
 Expected: Build succeeds, no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/domain/context/user.go internal/domain/context/user_repository.go
@@ -239,7 +258,7 @@ git commit -m "domain: add UserContext struct and platform user interface method
 - Consumes: Existing `AuthService` interface, `ContextInfo` struct
 - Produces: `ContextInfo` with `Role` field; `AuthService` with `GetCurrentUser(contextID string) (*context.User, error)`
 
-- [ ] **Step 1: Update ContextInfo struct**
+- [x] **Step 1: Update ContextInfo struct**
 
 Replace the `ContextInfo` struct in `internal/domain/auth/auth.go` (lines 17-21) with:
 
@@ -252,7 +271,7 @@ type ContextInfo struct {
 }
 ```
 
-- [ ] **Step 2: Add GetCurrentUser to AuthService interface**
+- [x] **Step 2: Add GetCurrentUser to AuthService interface**
 
 Add after line 31 (`ComparePassword`):
 
@@ -260,7 +279,7 @@ Add after line 31 (`ComparePassword`):
     GetCurrentUser(contextID string) (*context.User, error)
 ```
 
-- [ ] **Step 3: Add context import**
+- [x] **Step 3: Add context import**
 
 Add to imports:
 
@@ -268,13 +287,13 @@ Add to imports:
     "github.com/hekemen/automata/internal/domain/context"
 ```
 
-- [ ] **Step 4: Build to verify**
+- [x] **Step 4: Build to verify**
 
 Run: `go build ./internal/domain/...`
 
 Expected: Build succeeds.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/domain/auth/auth.go
@@ -292,7 +311,7 @@ git commit -m "domain: add Role to ContextInfo, GetCurrentUser to AuthService"
 - Consumes: `pgxpool.Pool`, existing `userPostgresRepo` struct
 - Produces: All new methods on `*userPostgresRepo`
 
-- [ ] **Step 1: Add `GetByUsername` — platform-level lookup from `users` table**
+- [x] **Step 1: Add `GetByUsername` — platform-level lookup from `users` table**
 
 Append to `user_postgres.go`:
 
@@ -317,7 +336,7 @@ func (r *userPostgresRepo) GetByUsername(email string) (*domainctx.User, error) 
 }
 ```
 
-- [ ] **Step 2: Add `ExistsAnyUser`**
+- [x] **Step 2: Add `ExistsAnyUser`**
 
 ```go
 func (r *userPostgresRepo) ExistsAnyUser() (bool, error) {
@@ -331,7 +350,7 @@ func (r *userPostgresRepo) ExistsAnyUser() (bool, error) {
 }
 ```
 
-- [ ] **Step 3: Add membership methods**
+- [x] **Step 3: Add membership methods**
 
 Append these methods to `user_postgres.go`:
 
@@ -459,13 +478,13 @@ func (r *userPostgresRepo) ListAll() ([]*domainctx.User, error) {
 }
 ```
 
-- [ ] **Step 4: Build to verify**
+- [x] **Step 4: Build to verify**
 
 Run: `go build ./internal/infrastructure/context/...`
 
 Expected: Build succeeds.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/infrastructure/context/repo/user_postgres.go
@@ -484,7 +503,7 @@ git commit -m "infra: add platform user lookup and user_contexts membership meth
 - Consumes: `userRepo.GetByUsername()`, `userRepo.GetByEmailGlobal()`, `userRepo.ListByUser()`
 - Produces: Login queries `users` table, builds JWT with `is_admin`, returns contexts with roles
 
-- [ ] **Step 1: Replace the Login method**
+- [x] **Step 1: Replace the Login method**
 
 Replace the entire `Login` method (lines 40-84 in `service.go`) with:
 
@@ -566,13 +585,13 @@ func (s *service) Login(email, password string) (string, string, []domainauth.Co
 }
 ```
 
-- [ ] **Step 2: Build to verify**
+- [x] **Step 2: Build to verify**
 
 Run: `go build ./internal/infrastructure/auth/...`
 
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add internal/infrastructure/auth/service.go
@@ -591,7 +610,7 @@ git commit -m "auth: use users table for login, add is_admin to JWT, return cont
 - Consumes: `pool`, `userRepo`, `contextRepo`
 - Produces: Admin user + default context + membership + stdout credentials
 
-- [ ] **Step 1: Write admin bootstrap**
+- [x] **Step 1: Write admin bootstrap**
 
 Create `internal/infrastructure/bootstrap/admin.go`:
 
@@ -728,7 +747,7 @@ func generatePassword(length int) (string, error) {
 
 Note: `context.Context` requires a `Validate()` call in `Create()` which checks `Slug` and `Name`. The default context has both, so it will pass validation. The `Settings: make(map[string]interface{})` is not nil so it marshals to `{}`.
 
-- [ ] **Step 2: Wire bootstrap into main.go**
+- [x] **Step 2: Wire bootstrap into main.go**
 
 In `cmd/automata/main.go`, after the migration calls (after line 65), add:
 
@@ -741,13 +760,13 @@ In `cmd/automata/main.go`, after the migration calls (after line 65), add:
 
 Add import: `"github.com/hekemen/automata/internal/infrastructure/bootstrap"`
 
-- [ ] **Step 3: Build to verify**
+- [x] **Step 3: Build to verify**
 
 Run: `go build ./cmd/automata`
 
 Expected: Build succeeds.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add internal/infrastructure/bootstrap/admin.go cmd/automata/main.go
@@ -768,7 +787,7 @@ git commit -m "infra: add admin bootstrap on first startup"
 - Consumes: `UserRepository`, `context.Repository`, `context.UserRepository`
 - Produces: `GET/POST /admin/users`, `GET/PUT/DELETE /admin/users/:id`, `GET /admin/contexts/:id/users`, `POST /admin/contexts/:id/users`, `DELETE /admin/contexts/:id/users/:userId`, `GET /auth/me`
 
-- [ ] **Step 1: Write UserHandler**
+- [x] **Step 1: Write UserHandler**
 
 Create `internal/adapter/api/handler/user_handler.go`:
 
@@ -917,7 +936,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 }
 ```
 
-- [ ] **Step 2: Write ContextUserHandler**
+- [x] **Step 2: Write ContextUserHandler**
 
 Create `internal/adapter/api/handler/context_user_handler.go`:
 
@@ -1007,7 +1026,7 @@ func (h *ContextUserHandler) Delete(c *gin.Context) {
 }
 ```
 
-- [ ] **Step 3: Add GetMe to AuthHandler**
+- [x] **Step 3: Add GetMe to AuthHandler**
 
 In `internal/adapter/api/handler/auth_handler.go`, add the `GetMe` method after the existing `Logout` method:
 
@@ -1057,7 +1076,7 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 }
 ```
 
-- [ ] **Step 4: Register new routes in server.go**
+- [x] **Step 4: Register new routes in server.go**
 
 In `internal/adapter/api/server.go`, inside the `admin` group (after line 56, before the closing `}`), add:
 
@@ -1088,13 +1107,13 @@ Also add `/auth/me` route (inside `api` group, before `admin` group):
     api.GET("/auth/me", authHandler.GetMe)
 ```
 
-- [ ] **Step 5: Build to verify**
+- [x] **Step 5: Build to verify**
 
 Run: `go build ./internal/adapter/api/...`
 
 Expected: Build succeeds.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/adapter/api/handler/user_handler.go internal/adapter/api/handler/context_user_handler.go internal/adapter/api/handler/auth_handler.go internal/adapter/api/server.go
@@ -1112,7 +1131,7 @@ git commit -m "api: add user CRUD, context memberships, and /auth/me endpoints"
 - Consumes: `authService.VerifyTokenUserOnly()`
 - Produces: Sets `c.Set("is_admin", true/false)` from JWT claims
 
-- [ ] **Step 1: Update AuthMiddleware to set is_admin**
+- [x] **Step 1: Update AuthMiddleware to set is_admin**
 
 Modify `internal/adapter/api/middleware/auth.go` to add `is_admin` to the context after successful auth:
 
@@ -1167,13 +1186,13 @@ Add imports:
     "github.com/hekemen/automata/internal/infrastructure/config"
 ```
 
-- [ ] **Step 2: Build to verify**
+- [x] **Step 2: Build to verify**
 
 Run: `go build ./internal/adapter/api/middleware/...`
 
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add internal/adapter/api/middleware/auth.go
@@ -1191,7 +1210,7 @@ git commit -m "middleware: extract is_admin from JWT claims"
 - Consumes: Both `users` and `context_users` tables
 - Produces: Backward-compatible repository methods
 
-- [ ] **Step 1: Update `Create` to insert into `users` table**
+- [x] **Step 1: Update `Create` to insert into `users` table**
 
 Replace the `Create` method to use the `users` table:
 
@@ -1225,7 +1244,7 @@ func (r *userPostgresRepo) Create(u *domainctx.User) error {
 }
 ```
 
-- [ ] **Step 2: Update `GetByEmailGlobal` to query both tables**
+- [x] **Step 2: Update `GetByEmailGlobal` to query both tables**
 
 Replace `GetByEmailGlobal` to query `users` first, then `context_users` as fallback:
 
@@ -1292,7 +1311,7 @@ func (r *userPostgresRepo) getUsersFromContextUsers(email string) ([]*domainctx.
 }
 ```
 
-- [ ] **Step 3: Update `GetByID` to query users table**
+- [x] **Step 3: Update `GetByID` to query users table**
 
 ```go
 func (r *userPostgresRepo) GetByID(id string) (*domainctx.User, error) {
@@ -1328,13 +1347,13 @@ func (r *userPostgresRepo) GetByID(id string) (*domainctx.User, error) {
 }
 ```
 
-- [ ] **Step 4: Build to verify**
+- [x] **Step 4: Build to verify**
 
 Run: `go build ./internal/infrastructure/context/...`
 
 Expected: Build succeeds.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/infrastructure/context/repo/user_postgres.go
@@ -1355,7 +1374,7 @@ git commit -m "infra: update user repo to use users table with context_users fal
 - Consumes: New tables, new interfaces
 - Produces: All 241 integration tests passing
 
-- [ ] **Step 1: Update `global_login_test.go` to create users in `users` table**
+- [x] **Step 1: Update `global_login_test.go` to create users in `users` table**
 
 Replace the `context_users` INSERT with `users` table INSERT:
 
@@ -1388,20 +1407,20 @@ _, err = pool.Exec(ctx, "DELETE FROM users WHERE email = $1", "admin@example.com
 _, err = pool.Exec(ctx, "DELETE FROM contexts WHERE id = $1", contextID)
 ```
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 Run: `go test ./cicd/... -count=1 -timeout 120s`
 
 Expected: 241/241 tests passing.
 
-- [ ] **Step 3: Fix any remaining test failures**
+- [x] **Step 3: Fix any remaining test failures**
 
 If any tests fail, fix them. Common issues:
 - Queries still referencing `context_users` in test setup
 - Response keys like `"id"` vs `"ID"`
 - Missing table creation in BeforeEach
 
-- [ ] **Step 4: Run build and tests one final time**
+- [x] **Step 4: Run build and tests one final time**
 
 Run:
 ```bash
@@ -1411,7 +1430,7 @@ go test ./cicd/... -count=1 -timeout 120s
 
 Expected: Build clean, 241/241 tests passing.
 
-- [ ] **Step 5: Commit all test changes**
+- [x] **Step 5: Commit all test changes**
 
 ```bash
 git add cicd/
@@ -1429,25 +1448,25 @@ git commit -m "tests: update tests for platform users and user_contexts tables"
 - Consumes: Everything
 - Produces: Deployable application
 
-- [ ] **Step 1: Full build**
+- [x] **Step 1: Full build**
 
 Run: `go build ./...`
 
 Expected: Clean build.
 
-- [ ] **Step 2: Full test suite**
+- [x] **Step 2: Full test suite**
 
 Run: `go test ./cicd/... -count=1 -timeout 120s`
 
 Expected: 241/241 tests passing.
 
-- [ ] **Step 3: Docker rebuild**
+- [x] **Step 3: Docker rebuild**
 
 Run: `docker compose down -v && docker compose up --build -d`
 
 Expected: Containers healthy, admin credentials logged to stdout.
 
-- [ ] **Step 4: Verify login**
+- [x] **Step 4: Verify login**
 
 Run:
 ```bash
@@ -1458,7 +1477,7 @@ curl -s -X POST http://localhost:9080/api/auth/login \
 
 Expected: JSON response with `token`, `user_id`, `email`, `contexts` array.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add -A

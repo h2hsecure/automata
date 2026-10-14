@@ -1825,3 +1825,7 @@ curl -X POST http://localhost:8081/api/v1/track \
 | Migration failures | Use `IF NOT EXISTS` in SQL, test on staging first |
 | Dual-server port conflicts | Configurable ports with sensible defaults |
 | Frontend tenant switching race conditions | Use Pinia store for single source of truth |
+
+## Execution Status
+
+**Completed.** The architectural changes are marked Done in `specs/roadmap.md`; the multi-tenant context model, dual-server layout (main API 8080, tracking 8081, BFF 8082), and BFF in `cmd/bff` are in place and covered by the cicd integration suite. The step checkboxes above were not individually ticked during execution.

@@ -811,3 +811,7 @@ If any phase fails:
 | Test failures | Run tests after each phase, not just at the end |
 | JWT compatibility | Keep old JWT claim name as alias during transition |
 | Frontend incompatibility | Update frontend in parallel or provide backward-compatible header |
+
+## Execution Status
+
+**Completed (2026-10-13).** All phases of this plan were executed against the running application. Phase 1 (tenant→context rename) and Phases 2–3 (platform-level users, memberships, admin bootstrap, login simplification) were implemented and verified end-to-end (register → login → refresh → context switch on the deployed build). The checkbox steps below were not individually ticked because Phase 2 was re-planned post-hoc; the canonical completion record is `2026-09-24-context-rename-and-login-simplification.md` (with `2026-09-24-implementation-plan.md` as a duplicate record of the same work).

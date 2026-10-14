@@ -341,3 +341,7 @@ Steps:
 1. BFF/Vue UI: Fetch activities via `GET /api/context/contacts/:id/activity?limit=50&type=form_submission`
 2. Display: Timeline component with type-based filtering tabs
 3. Contact detail page: Show `activity_count` badge
+
+## Execution Status
+
+**Completed.** Marked Done in `specs/roadmap.md` and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.26+, PostgreSQL, zerolog, Ginkgo + testcontainers, Gin (HTTP framework)
 
-**Spec:** docs/prds/2025-09-10-core-platform-prd.md
+**Spec:** docs/superpowers/specs/2025-09-10-core-platform-design.md (PRD: docs/prds/2025-09-10-core-platform-prd.md)
 
 ## Global Constraints
 
@@ -847,3 +847,7 @@ Task 3 (tenant repo) ───────────────────�
 Task 2 (database) ─────────────────────────────────────────────────────────> Task 9 (email queue)
 Task 6 (API server) + Task 7 (proxy) + Task 8 (MCP) + Task 9 (email) ──> Task 10 (main)
 ```
+
+## Execution Status
+
+**Completed.** The work in this plan is marked Done in `specs/roadmap.md` and is covered by the cicd integration suite. The step checkboxes above were not individually ticked during execution.

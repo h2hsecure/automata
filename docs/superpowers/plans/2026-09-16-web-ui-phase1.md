@@ -8,7 +8,7 @@
 
 **Tech Stack:** Vue 3 (Composition API), Vite 5, TypeScript, shadcn-vue, Tailwind CSS 3, Pinia, Vue Router 4, Lucide Vue
 
-**Spec:** `docs/webui-prd.md` (Phase 1 scope: Login + Dashboard + Contacts)
+**Spec:** docs/superpowers/specs/2026-09-16-web-ui-phase1-design.md (PRD: docs/webui-prd.md; Phase 1 scope: Login + Dashboard + Contacts)
 
 ## Global Constraints
 
@@ -441,3 +441,7 @@ After all tasks are complete:
 2. Run Go tests: `make cicd-tests`
 3. Update `docs/webui-prd.md` with completion status
 4. Document API endpoints used by the SPA in `docs/api-webui.md`
+
+## Execution Status
+
+**Completed.** The Web UI work is marked Done in `specs/roadmap.md`; the SPA source lives in `webui/` with built assets in `web/`. The step checkboxes above were not individually ticked during execution.

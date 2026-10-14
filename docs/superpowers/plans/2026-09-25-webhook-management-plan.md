@@ -489,3 +489,7 @@ Steps:
 | `cmd/automata/main.go` | **Modify** — run webhook migrations |
 | `cmd/bff/main.go` | **Modify** — run webhook migrations |
 | `cicd/webhook_endpoint_test.go` | **Create** — integration tests |
+
+## Execution Status
+
+**Completed.** Marked Done in `specs/roadmap.md`; webhook CRUD routes and the delivery handler (`internal/adapter/api/handler/webhook_handler.go`) are implemented and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.

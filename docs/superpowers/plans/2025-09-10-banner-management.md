@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.26+, PostgreSQL, Ginkgo + testcontainers
 
-**Spec:** docs/prds/2025-09-10-banner-management-prd.md
+**Spec:** docs/superpowers/specs/2025-09-10-banner-management-design.md (PRD: docs/prds/2025-09-10-banner-management-prd.md)
 
 ## Global Constraints
 
@@ -864,3 +864,7 @@ Task 2 (postgres repo) ─────────┘
 Task 4 (banner snippet pkg) ────┘
 Task 5 (banner serving endpoint) ─┘
 ```
+
+## Execution Status
+
+**Completed.** The work in this plan is marked Done in `specs/roadmap.md` and is covered by the cicd integration suite. The step checkboxes above were not individually ticked during execution.

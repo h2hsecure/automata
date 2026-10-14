@@ -493,3 +493,7 @@ Steps:
 **Verification:**
 - `go test ./internal/infrastructure/auth/...` passes
 - `go test ./internal/infrastructure/webui/cookie/...` passes
+
+## Execution Status
+
+**Completed.** Marked Done in `specs/roadmap.md`; `POST /auth/refresh` is implemented and registered in `internal/adapter/api/server.go` and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.

@@ -532,3 +532,7 @@ Per the user decision: **Per-user self-service** (any logged-in user can update 
 - `/api/auth/logout-all` — POST for session revocation
 - All use `AuthMiddleware` which sets `user_id` from JWT
 - Users can only modify their own profile (enforced by `userID` from the authenticated token)
+
+## Execution Status
+
+**Completed.** Marked Done in `specs/roadmap.md`; `POST /auth/password` and the profile/settings endpoints are implemented and registered in `internal/adapter/api/server.go` and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.

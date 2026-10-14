@@ -1,5 +1,7 @@
 # Context Rename + Login Simplification — Phase 2 Implementation Plan
 
+> **Superseded / not executed:** This rewrite of the Phase 2 plan was never executed — the work it describes was already completed on 2026-10-13 and is documented in `2026-09-24-context-rename-and-login-simplification.md` (canonical) and `2026-09-24-implementation-plan.md`. Kept for history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add platform-level users and context memberships, admin bootstrap on first startup, user CRUD and membership endpoints, and `/auth/me` — completing the remaining pieces from the context-rename / login-simplification design.

@@ -6,6 +6,8 @@ Architecture: Single Ginkgo suite with a shared PostgreSQL test container. In-me
 
 Tech Stack: Go 1.26+, Ginkgo v2, Gomega, testcontainers-go, pgx/v5, Gin test context, net/smtp mock, net/http httptest.
 
+Spec: docs/superpowers/specs/2026-09-14-cicd-test-suite-design.md
+
 ## Global Constraints
 
 - All tests use Ginkgo v2 + Gomega assertions
@@ -296,3 +298,7 @@ All 84 tests passing in ~4.7 seconds.
 - `internal/infrastructure/banner/repo/migration.sql` - FK constraints with CASCADE
 - `cicd/support/testdb.go` - Load all .sql files from migration directories
 - All test files in `cicd/` - Fixed SQL queries, test assertions, and cleanup
+
+## Execution Status
+
+**Completed.** The cicd suite in `cicd/` is built and runs via `make cicd-tests` (Postgres testcontainer). All step checkboxes above are ticked. The suite has known pre-existing failures in the tracking/form/banner/placement/campaign specs; compare against the baseline in `specs/roadmap.md` rather than assuming regressions.

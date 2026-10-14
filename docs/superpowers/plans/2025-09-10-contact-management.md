@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.26+, PostgreSQL, Ginkgo + testcontainers
 
-**Spec:** docs/prds/2025-09-10-contact-management-prd.md
+**Spec:** docs/superpowers/specs/2025-09-10-contact-management-design.md (PRD: docs/prds/2025-09-10-contact-management-prd.md)
 
 ## Global Constraints
 
@@ -937,3 +937,7 @@ Task 5 (CSV import/export) ─────────────────�
 - Task 3 (tenant repository) must be complete for tenant-scoped queries
 - Task 8 (MCP server base) must be complete for MCP tool registration
 - Task 9 (email queue) not required for contacts
+
+## Execution Status
+
+**Completed.** The work in this plan is marked Done in `specs/roadmap.md` and is covered by the cicd integration suite. The step checkboxes above were not individually ticked during execution.

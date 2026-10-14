@@ -475,3 +475,9 @@ Steps:
 | `cmd/automata/main.go` | **Modify** — run migrations + seed defaults |
 | `cmd/bff/main.go` | **Modify** — run email migrations |
 | `cicd/email_template_test.go` | **Create** — integration tests |
+
+## Execution Status
+
+**Completed as scoped (2026-09-25).** Email templates, CRUD, and send/test-send endpoints are implemented (routes in `internal/adapter/api/server.go`) and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.
+
+**Known gap (out of scope for this plan):** the email *delivery* pipeline is not implemented in production — there is no SMTP `Mailer` implementation (only `cicd/support/smtp_mock.go`), `StartWorker` in `internal/infrastructure/queue/email_worker.go` is never called, and no SMTP keys exist in `config.yaml`/`config.example.yaml`. Jobs enqueued via `email_jobs` are never processed. The `specs/roadmap.md` claim of "SMTP delivery Done" is incorrect; a follow-up spec + plan for the delivery pipeline is required.

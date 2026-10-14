@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.26.5, Gin v1.12.0, PostgreSQL (pgx v5), Vue 3, Vite 5, TypeScript, shadcn-vue, Tailwind CSS 3, Pinia, Vue Router 4, Lucide Vue
 
-**Spec:** `docs/webui-prd.md` (Phase 2 scope: Contacts CRUD, Forms CRUD, Tenants CRUD, API Keys)
+**Spec:** docs/superpowers/specs/2026-09-17-web-ui-phase2-design.md (PRD: docs/webui-prd.md; Phase 2 scope: Contacts CRUD, Forms CRUD, Tenants CRUD, API Keys)
 
 ## Global Constraints
 
@@ -1818,4 +1818,8 @@ If any task fails or causes issues:
 - [ ] API endpoints respond correctly (manual or automated testing)
 - [ ] Database migrations apply cleanly
 - [ ] All new files follow existing code style
+
+## Execution Status
+
+**Completed.** The Web UI work is marked Done in `specs/roadmap.md`; the SPA source lives in `webui/` with built assets in `web/`. The step checkboxes above were not individually ticked during execution.
 

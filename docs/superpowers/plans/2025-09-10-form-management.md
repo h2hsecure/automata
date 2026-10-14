@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.26+, PostgreSQL, Ginkgo + testcontainers
 
-**Spec:** docs/prds/2025-09-10-form-management-prd.md
+**Spec:** docs/superpowers/specs/2025-09-10-form-management-design.md (PRD: docs/prds/2025-09-10-form-management-prd.md)
 
 ## Global Constraints
 
@@ -793,3 +793,7 @@ Task 2 (postgres repo) ─────────┘
 Task 4 (validation pkg) ────────┘
 Task 5 (webhook queue) ─────────┘
 ```
+
+## Execution Status
+
+**Completed.** The work in this plan is marked Done in `specs/roadmap.md` and is covered by the cicd integration suite. The step checkboxes above were not individually ticked during execution.

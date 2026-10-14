@@ -6,7 +6,7 @@
 
 **Architecture:** Vue 3 SPA + Go BFF + existing Go API backend. The BFF sits between the browser and the API, handling auth sessions and serving the Vue dist.
 
-**Spec:** docs/webui-prd.md
+**Spec:** docs/superpowers/specs/2026-09-16-webui-implementation-design.md (PRD: docs/webui-prd.md)
 
 ## Global Constraints
 
@@ -4235,3 +4235,7 @@ Execute tasks in this sequence for optimal dependency resolution:
 - Dark mode toggle (CSS variables prepared, toggle not included)
 - Mobile responsive sidebar (collapsible hamburger menu)
 - Role-based access control beyond is_owner
+
+## Execution Status
+
+**Completed.** The Web UI work is marked Done in `specs/roadmap.md`; the SPA source lives in `webui/` with built assets in `web/`. The step checkboxes above were not individually ticked during execution.
