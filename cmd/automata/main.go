@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -22,9 +23,11 @@ import (
 	"github.com/hekemen/automata/internal/infrastructure/database"
 	context_repo "github.com/hekemen/automata/internal/infrastructure/context/repo"
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
+	mailsmtp "github.com/hekemen/automata/internal/infrastructure/email/smtp"
 	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
+	"github.com/hekemen/automata/internal/infrastructure/queue"
 	"github.com/rs/zerolog/log"
 )
 
@@ -117,6 +120,10 @@ func main() {
 	placementHandler := handler.NewPlacementHandler(bannerRepo)
 	campaignHandler := handler.NewCampaignHandler(bannerRepo)
 
+	// Context for graceful shutdown and background workers
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Admin server (port 8080)
 	adminEngine := gin.Default()
 
@@ -179,10 +186,28 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown on SIGINT/SIGTERM
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Email delivery worker (port 8080 API enqueues jobs; worker delivers via SMTP)
+	portStr := config.Get("smtp.port")
+	smtpPort, _ := strconv.Atoi(portStr)
+	if smtpPort == 0 {
+		smtpPort = 587
+	}
+	smtpCfg := mailsmtp.Config{
+		Host:     config.Get("smtp.host"),
+		Port:     smtpPort,
+		Username: config.Get("smtp.username"),
+		Password: config.Get("smtp.password"),
+		From:     config.Get("smtp.from"),
+		StartTLS: config.Get("smtp.starttls") != "false",
+	}
+	mailer := mailsmtp.NewMailer(smtpCfg)
+	if !mailer.IsConfigured() {
+		log.Warn().Msg("smtp not configured: email jobs will be discarded after max retries")
+	}
+	emailQueue := queue.NewEmailQueue(pool)
+	emailQueue.StartWorker(ctx, mailer)
 
+	// Graceful shutdown on SIGINT/SIGTERM
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

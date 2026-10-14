@@ -19,3 +19,11 @@ auth:
 context:
   resolution: path
   default_path: /
+
+smtp:
+  host: ""
+  port: "587"
+  username: ""
+  password: ""
+  from: ""
+  starttls: true
