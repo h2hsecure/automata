@@ -51,7 +51,7 @@ const isActive = (path: string) => route.path === path || route.path.startsWith(
 <template>
   <!-- Mobile overlay -->
   <div
-    v-if="!props.open"
+    v-if="props.open"
     class="fixed inset-0 z-40 bg-black/50 lg:hidden"
     @click="emit('update:open', false)"
   />

@@ -16,7 +16,10 @@ onMounted(() => {
 <template>
   <div class="flex h-screen bg-background">
     <AppSidebar v-model:open="sidebarOpen" />
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div
+      class="flex-1 flex flex-col overflow-hidden transition-all duration-200"
+      :class="sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'"
+    >
       <AppHeader @toggle-sidebar="sidebarOpen = !sidebarOpen" />
       <main class="flex-1 overflow-y-auto p-6">
         <RouterView />
