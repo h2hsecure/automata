@@ -51,6 +51,18 @@ const routes: RouteRecordRaw[] = [
         name: 'Tracking',
         component: () => import('@/views/TrackingView.vue'),
       },
+      {
+        path: 'contexts',
+        name: 'Contexts',
+        component: () => import('@/views/ContextsView.vue'),
+        meta: { requiresAdmin: true },
+      },
+      {
+        path: 'contexts/:id',
+        name: 'ContextDetail',
+        component: () => import('@/views/ContextDetailView.vue'),
+        meta: { requiresAdmin: true },
+      },
     ],
   },
   {

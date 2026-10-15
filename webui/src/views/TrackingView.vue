@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Eye, MousePointerClick, Globe, Monitor, Smartphone, BarChart3, Users } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
@@ -7,8 +7,10 @@ import DataTable from '@/components/DataTable.vue'
 import Badge from '@/components/Badge.vue'
 import { usePagination } from '@/composables/usePagination'
 import { getDashboardStats, getTrackingEvents } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 import type { TrackingEvent } from '@/types/api'
 
+const authStore = useAuthStore()
 const { page, limit, total, goToPage, setTotal } = usePagination()
 const stats = ref({
   totalVisitors: 0,
@@ -19,39 +21,20 @@ const events = ref<TrackingEvent[]>([])
 const loading = ref(false)
 const chartLoading = ref(true)
 
-// Simple bar chart data
-const pageViewsChart = ref<Array<{ label: string; count: number }>>([
-  { label: 'Jan', count: 1200 },
-  { label: 'Feb', count: 1500 },
-  { label: 'Mar', count: 1800 },
-  { label: 'Apr', count: 2100 },
-  { label: 'May', count: 1900 },
-  { label: 'Jun', count: 2400 },
-  { label: 'Jul', count: 2800 },
-  { label: 'Aug', count: 2600 },
-  { label: 'Sep', count: 3100 },
-])
+const pageViewsChart = ref<Array<{ label: string; count: number }>>([])
+const deviceBreakdown = ref<Array<{ label: string; count: number; pct: number }>>([])
+const referrers = ref<Array<{ domain: string; count: number }>>([])
 
-const deviceBreakdown = ref<Array<{ label: string; count: number; pct: number }>>([
-  { label: 'Desktop', count: 4520, pct: 65 },
-  { label: 'Mobile', count: 1800, pct: 26 },
-  { label: 'Tablet', count: 620, pct: 9 },
-])
-
-const referrers = ref<Array<{ domain: string; count: number }>>([
-  { domain: 'google.com', count: 1250 },
-  { domain: 'facebook.com', count: 680 },
-  { domain: 'twitter.com', count: 420 },
-  { domain: 'linkedin.com', count: 310 },
-  { domain: 'direct', count: 890 },
-])
+const maxPageViews = computed(() =>
+  Math.max(1, ...pageViewsChart.value.map((item) => item.count))
+)
 
 const columns = [
-  { key: 'type', label: 'Type' },
-  { key: 'url', label: 'URL' },
-  { key: 'event_name', label: 'Event' },
-  { key: 'referrer', label: 'Referrer' },
-  { key: 'created_at', label: 'Time' },
+  { key: 'Type', label: 'Type' },
+  { key: 'URL', label: 'URL' },
+  { key: 'EventName', label: 'Event' },
+  { key: 'Referrer', label: 'Referrer' },
+  { key: 'CreatedAt', label: 'Time' },
 ]
 
 async function loadStats() {
@@ -60,7 +43,22 @@ async function loadStats() {
     const dashboard = await getDashboardStats()
     stats.value.totalVisitors = dashboard.total_visitors
     stats.value.activeVisitors = dashboard.active_visitors
-    stats.value.totalPageViews = dashboard.total_page_views
+    stats.value.totalPageViews = dashboard.page_views
+    pageViewsChart.value = (dashboard.top_pages ?? []).map((p) => ({
+      label: p.URL || '(unknown)',
+      count: p.Count,
+    }))
+    const devices = dashboard.device_breakdown ?? {}
+    const deviceTotal = Object.values(devices).reduce((a, b) => a + b, 0) || 1
+    deviceBreakdown.value = Object.entries(devices).map(([label, count]) => ({
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+      count,
+      pct: Math.round((count / deviceTotal) * 100),
+    }))
+    referrers.value = (dashboard.top_referrers ?? []).map((r) => ({
+      domain: r.Referrer || 'direct',
+      count: r.Count,
+    }))
   } finally {
     chartLoading.value = false
   }
@@ -81,6 +79,15 @@ onMounted(() => {
   loadStats()
   loadEvents()
 })
+
+watch(
+  () => authStore.currentContextId,
+  () => {
+    page.value = 1
+    loadStats()
+    loadEvents()
+  }
+)
 </script>
 
 <template>
@@ -130,8 +137,11 @@ onMounted(() => {
     <!-- Charts Row -->
     <div class="grid gap-4 lg:grid-cols-3">
       <!-- Page Views Chart -->
-      <Card class="lg:col-span-2" title="Page Views" description="Monthly page view counts">
-        <div v-if="!chartLoading" class="mt-4 flex items-end gap-2 h-48">
+      <Card class="lg:col-span-2" title="Page Views" description="Top pages by view count">
+        <p v-if="!chartLoading && pageViewsChart.length === 0" class="mt-4 py-8 text-center text-sm text-muted-foreground">
+          No page view data yet.
+        </p>
+        <div v-else-if="!chartLoading" class="mt-4 flex items-end gap-2 h-48">
           <div
             v-for="item in pageViewsChart"
             :key="item.label"
@@ -142,10 +152,10 @@ onMounted(() => {
             </span>
             <div
               class="w-full rounded-t bg-primary opacity-80 hover:opacity-100 transition-all cursor-pointer"
-              :style="{ height: `${(item.count / 3100) * 100}%` }"
+              :style="{ height: `${(item.count / maxPageViews) * 100}%` }"
               :title="`${item.label}: ${item.count}`"
             />
-            <span class="text-xs text-muted-foreground">{{ item.label }}</span>
+            <span class="text-xs text-muted-foreground truncate w-full text-center">{{ item.label }}</span>
           </div>
         </div>
       </Card>
@@ -153,6 +163,9 @@ onMounted(() => {
       <!-- Device Breakdown -->
       <Card title="Devices" description="Visitor device breakdown">
         <div class="mt-4 space-y-3">
+          <p v-if="deviceBreakdown.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+            No device data yet.
+          </p>
           <div
             v-for="device in deviceBreakdown"
             :key="device.label"
@@ -181,6 +194,9 @@ onMounted(() => {
     <!-- Top Referrers -->
     <Card title="Top Referrers" description="Where your visitors come from">
       <div class="mt-4 space-y-3">
+        <p v-if="referrers.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+          No referrer data yet.
+        </p>
         <div
           v-for="(ref, index) in referrers"
           :key="ref.domain"
@@ -204,22 +220,22 @@ onMounted(() => {
         :loading="loading"
         empty-text="No events found."
       >
-        <template #type="{ row }: { row: TrackingEvent }">
-          <Badge :variant="row.type === 'pageview' ? 'info' : 'success'">
-            {{ row.type }}
+        <template #Type="{ row }: { row: TrackingEvent }">
+          <Badge :variant="row.Type === 'pageview' ? 'info' : 'success'">
+            {{ row.Type }}
           </Badge>
         </template>
-        <template #url="{ row }: { row: TrackingEvent }">
-          <span class="text-sm truncate block max-w-[200px]">{{ row.url }}</span>
+        <template #URL="{ row }: { row: TrackingEvent }">
+          <span class="text-sm truncate block max-w-[200px]">{{ row.URL }}</span>
         </template>
-        <template #event_name="{ row }: { row: TrackingEvent }">
-          {{ row.event_name || '-' }}
+        <template #EventName="{ row }: { row: TrackingEvent }">
+          {{ row.EventName || '-' }}
         </template>
-        <template #referrer="{ row }: { row: TrackingEvent }">
-          {{ row.referrer || 'direct' }}
+        <template #Referrer="{ row }: { row: TrackingEvent }">
+          {{ row.Referrer || 'direct' }}
         </template>
-        <template #created_at="{ row }: { row: TrackingEvent }">
-          {{ new Date(row.created_at).toLocaleString() }}
+        <template #CreatedAt="{ row }: { row: TrackingEvent }">
+          {{ new Date(row.CreatedAt).toLocaleString() }}
         </template>
       </DataTable>
 

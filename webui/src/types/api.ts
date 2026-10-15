@@ -149,6 +149,25 @@ export interface ApiKey {
   active: boolean;
 }
 
+export interface Context {
+  ID: string;
+  Slug: string;
+  Name: string;
+  Domain: string | null;
+  IsActive: boolean;
+  CreatedAt: string;
+  UpdatedAt: string;
+  settings: Record<string, unknown>;
+}
+
+export interface ContextInput {
+  slug?: string;
+  name?: string;
+  domain?: string;
+  is_active?: boolean;
+  settings?: Record<string, unknown>;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -159,20 +178,29 @@ export interface PaginatedResponse<T> {
 export interface DashboardStats {
   total_visitors: number;
   active_visitors: number;
-  total_page_views: number;
-  total_contacts: number;
-  total_forms: number;
-  total_banners: number;
+  page_views: number;
+  top_pages: Array<{ URL: string; Count: number }>;
+  top_referrers: Array<{ Referrer: string; Count: number }>;
+  device_breakdown: Record<string, number>;
+  browser_breakdown: Record<string, number>;
 }
 
 export interface TrackingEvent {
-  id: string;
-  type: string;
-  url: string;
-  event_name: string;
-  referrer: string;
-  visitor_id: string;
-  created_at: string;
+  ID: string;
+  ContextID: string;
+  VisitorID: string;
+  Type: string;
+  URL: string;
+  Title: string;
+  Referrer: string;
+  EventName: string;
+  Properties: Record<string, unknown> | null;
+  UserAgent: string;
+  IPHash: string;
+  UTMSource: string;
+  UTMMedium: string;
+  UTMCampaign: string;
+  CreatedAt: string;
 }
 
 export interface User {

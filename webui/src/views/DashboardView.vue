@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import {
   Users,
   FileText,
@@ -13,7 +13,9 @@ import {
 import Card from '@/components/Card.vue'
 import Badge from '@/components/Badge.vue'
 import { listContacts, listForms, listBanners, getDashboardStats } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 
+const authStore = useAuthStore()
 const loading = ref(true)
 const stats = ref({
   totalVisitors: 0,
@@ -49,15 +51,19 @@ async function loadStats() {
     const dashboard = await getDashboardStats()
     stats.value.totalVisitors = dashboard.total_visitors
     stats.value.activeVisitors = dashboard.active_visitors
-    stats.value.totalPageViews = dashboard.total_page_views
+    stats.value.totalPageViews = dashboard.page_views
+    topPages.value = (dashboard.top_pages ?? []).map((p) => ({
+      path: p.URL || '(unknown)',
+      views: p.Count,
+    }))
 
-    const contacts = await listContacts()
+    const contacts = await listContacts(1, 1, '', authStore.currentContextId)
     stats.value.totalContacts = contacts.total || 0
 
-    const forms = await listForms()
+    const forms = await listForms(authStore.currentContextId)
     stats.value.totalForms = forms.length
 
-    const banners = await listBanners()
+    const banners = await listBanners(authStore.currentContextId)
     stats.value.totalBanners = banners.length
   } finally {
     loading.value = false
@@ -65,6 +71,11 @@ async function loadStats() {
 }
 
 onMounted(loadStats)
+
+watch(
+  () => authStore.currentContextId,
+  loadStats
+)
 </script>
 
 <template>

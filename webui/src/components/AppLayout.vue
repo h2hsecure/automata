@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
+import { useAuthStore } from '@/stores/auth'
 
+const authStore = useAuthStore()
 const sidebarOpen = ref(true)
+
+onMounted(() => {
+  authStore.init()
+})
 </script>
 
 <template>

@@ -8,6 +8,8 @@ import type {
   BannerInput,
   Tenant,
   ApiKey,
+  Context,
+  ContextInput,
   PaginatedResponse,
   DashboardStats,
   TrackingEvent,
@@ -29,6 +31,18 @@ client.interceptors.request.use(
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`)
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+// Context interceptor: send the selected context ID with every request.
+client.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const contextId = localStorage.getItem('context_id')
+    if (contextId) {
+      config.headers.set('X-Context-ID', contextId)
     }
     return config
   },
@@ -180,11 +194,51 @@ export async function listCampaigns(contextId = ''): Promise<Campaign[]> {
 
 // Tracking endpoints
 export async function getDashboardStats(): Promise<DashboardStats> {
-  return { total_visitors: 0, active_visitors: 0, total_page_views: 0, total_contacts: 0, total_forms: 0, total_banners: 0 }
+  const response = await client.get('/context/tracking/dashboard')
+  return response.data
 }
 
-export async function getTrackingEvents(page = 1, limit = 50, type = '') {
-  return { data: [], total: 0, page, limit }
+export async function getTrackingEvents(page = 1, limit = 50, type = ''): Promise<PaginatedResponse<TrackingEvent>> {
+  const params: Record<string, string> = {
+    offset: String((page - 1) * limit),
+    limit: String(limit),
+  }
+  if (type) params.type = type
+  const response = await client.get('/context/tracking/events', { params })
+  const d = response.data
+  return {
+    data: d.events ?? [],
+    total: d.total ?? 0,
+    page,
+    limit,
+  }
+}
+
+// Context endpoints (admin only)
+export async function listContexts(offset = 0, limit = 100): Promise<Context[]> {
+  const response = await client.get('/admin/contexts', {
+    params: { offset: String(offset), limit: String(limit) },
+  })
+  return response.data.contexts ?? []
+}
+
+export async function getContext(id: string): Promise<Context> {
+  const response = await client.get(`/admin/contexts/${id}`)
+  return response.data
+}
+
+export async function createContext(data: ContextInput): Promise<Context> {
+  const response = await client.post('/admin/contexts', data)
+  return response.data
+}
+
+export async function updateContext(id: string, data: ContextInput): Promise<Context> {
+  const response = await client.put(`/admin/contexts/${id}`, data)
+  return response.data
+}
+
+export async function deleteContext(id: string): Promise<void> {
+  await client.delete(`/admin/contexts/${id}`)
 }
 
 // Tenant endpoints (admin only)

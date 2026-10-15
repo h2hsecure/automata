@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { Pencil, Trash2, Plus, Users, Search } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
@@ -10,9 +10,11 @@ import Badge from '@/components/Badge.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePagination } from '@/composables/usePagination'
+import { useAuthStore } from '@/stores/auth'
 import { listContacts, deleteContact, createContact, updateContact } from '@/api/client'
 import type { Contact } from '@/types/api'
 
+const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
 const { page, limit, total, goToPage, setTotal } = usePagination()
 const contacts = ref<Contact[]>([])
@@ -47,13 +49,21 @@ const columns = [
 async function loadContacts() {
   loading.value = true
   try {
-    const response = await listContacts(page.value, limit.value, searchQuery.value)
+    const response = await listContacts(page.value, limit.value, searchQuery.value, authStore.currentContextId)
     contacts.value = response.data || []
     setTotal(response.total || 0)
   } finally {
     loading.value = false
   }
 }
+
+watch(
+  () => authStore.currentContextId,
+  () => {
+    page.value = 1
+    loadContacts()
+  }
+)
 
 function handleSearch() {
   page.value = 1

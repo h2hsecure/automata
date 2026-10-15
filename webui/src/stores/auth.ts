@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as loginApi, logout as logoutApi, getMe } from '@/api/client'
+import { login as loginApi, logout as logoutApi, getMe, listContexts } from '@/api/client'
 import type { User, LoginResponse } from '@/types/api'
 
 interface Context {
@@ -48,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (response.contexts && response.contexts.length > 0) {
         contexts.value = response.contexts
+        localStorage.setItem('contexts', JSON.stringify(response.contexts))
         if (!currentContextId.value) {
           currentContextId.value = response.contexts[0].id
           localStorage.setItem('context_id', response.contexts[0].id)
@@ -76,6 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.removeItem('token')
       localStorage.removeItem('context_id')
       localStorage.removeItem('user')
+      localStorage.removeItem('contexts')
     }
   }
 
@@ -83,13 +85,30 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return
     try {
       user.value = await getMe()
-      // Load contexts from localStorage or API
-      const savedContexts = localStorage.getItem('contexts')
-      if (savedContexts) {
-        contexts.value = JSON.parse(savedContexts)
-      }
+      await loadContexts()
     } catch {
       await logout()
+    }
+  }
+
+  async function loadContexts() {
+    try {
+      const list = await listContexts()
+      if (list.length > 0) {
+        contexts.value = list.map((c) => ({ id: c.ID, slug: c.Slug, name: c.Name }))
+        localStorage.setItem('contexts', JSON.stringify(contexts.value))
+        if (!contexts.value.some((c) => c.id === currentContextId.value)) {
+          currentContextId.value = contexts.value[0].id
+          localStorage.setItem('context_id', currentContextId.value)
+        }
+        return
+      }
+    } catch {
+      // fall back to saved contexts below
+    }
+    const savedContexts = localStorage.getItem('contexts')
+    if (savedContexts) {
+      contexts.value = JSON.parse(savedContexts)
     }
   }
 
@@ -117,6 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     init,
+    loadContexts,
     switchContext,
   }
 })

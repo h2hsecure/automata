@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bell, LogOut, Menu, Moon, Sun, User, ChevronDown } from 'lucide-vue-next'
+import { Bell, LogOut, Menu, Moon, Sun, ChevronDown } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -34,6 +34,18 @@ async function handleLogout() {
 
     <!-- Actions -->
     <div class="flex items-center gap-2">
+      <!-- Context selector -->
+      <select
+        v-if="authStore.contexts.length > 0"
+        :value="authStore.currentContextId"
+        class="max-w-[180px] truncate rounded-md border bg-background px-2 py-1.5 text-sm"
+        @change="authStore.switchContext(($event.target as HTMLSelectElement).value)"
+      >
+        <option v-for="ctx in authStore.contexts" :key="ctx.id" :value="ctx.id">
+          {{ ctx.name }}
+        </option>
+      </select>
+
       <button class="p-2 hover:bg-muted rounded relative">
         <Bell class="h-5 w-5" />
         <span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
@@ -71,14 +83,6 @@ async function handleLogout() {
           <div class="px-3 py-2 text-sm text-muted-foreground border-b">
             {{ authStore.user?.email }}
           </div>
-          <RouterLink
-            to="/settings"
-            class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
-            @click="dropdownOpen = false"
-          >
-            <User class="h-4 w-4" />
-            Profile
-          </RouterLink>
           <button
             class="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-muted"
             @click="handleLogout"

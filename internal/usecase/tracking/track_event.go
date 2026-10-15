@@ -15,6 +15,11 @@ func TrackEvent(repo tracking.Repository, contextID string, event *tracking.Even
 
 	event.ContextID = contextID
 
+	// Normalize the snippet's "page_view" sentinel to the canonical event type.
+	if event.Type == "page_view" {
+		event.Type = tracking.EventTypePageView
+	}
+
 	if err := repo.CreateEvent(event); err != nil {
 		return fmt.Errorf("create event: %w", err)
 	}
@@ -42,6 +47,11 @@ func TrackEventWithTime(repo tracking.Repository, contextID string, event *track
 
 	event.ContextID = contextID
 	event.CreatedAt = now
+
+	// Normalize the snippet's "page_view" sentinel to the canonical event type.
+	if event.Type == "page_view" {
+		event.Type = tracking.EventTypePageView
+	}
 
 	if err := repo.CreateEvent(event); err != nil {
 		return fmt.Errorf("create event: %w", err)

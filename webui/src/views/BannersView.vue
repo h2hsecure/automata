@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { Pencil, Trash2, Plus, Eye, MousePointerClick, BarChart3 } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
@@ -10,9 +10,11 @@ import Input from '@/components/Input.vue'
 import Textarea from '@/components/Textarea.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAuthStore } from '@/stores/auth'
 import { listBanners, createBanner, updateBanner, deleteBanner } from '@/api/client'
 import type { Banner, BannerInput } from '@/types/api'
 
+const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
 const banners = ref<Banner[]>([])
 const loading = ref(false)
@@ -39,11 +41,16 @@ const columns = [
 async function loadBanners() {
   loading.value = true
   try {
-    banners.value = await listBanners()
+    banners.value = await listBanners(authStore.currentContextId)
   } finally {
     loading.value = false
   }
 }
+
+watch(
+  () => authStore.currentContextId,
+  () => loadBanners()
+)
 
 function openCreate() {
   isEdit.value = false
