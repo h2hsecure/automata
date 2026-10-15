@@ -21,7 +21,13 @@ func (h *SnippetHandler) ServeSnippet(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "context ID required"})
 			return
 		}
-		js, err := snippet.Generate(contextID, "", nil)
+		// Derive the tracking host from the request so the snippet posts back
+		// to the same origin it was served from (e.g. the website's own host).
+		host := c.GetHeader("Host")
+		if host == "" {
+			host = c.Request.Host
+		}
+		js, err := snippet.Generate(contextID, "http://"+host, nil)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

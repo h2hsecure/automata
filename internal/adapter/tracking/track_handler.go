@@ -22,12 +22,8 @@ type Repository interface {
 
 // Track handles POST /track — single event tracking.
 func (h *TrackHandler) Track(c *gin.Context) {
-	contextID := ResolveContext(c)
-	if contextID == "" {
-		return
-	}
-
 	var req struct {
+		ContextID  string                 `json:"contextId"`
 		Type       string                 `json:"type"`
 		URL        string                 `json:"url"`
 		Title      string                 `json:"title"`
@@ -40,6 +36,18 @@ func (h *TrackHandler) Track(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Prefer a valid contextId in the body (sent by the snippet); otherwise
+	// fall back to header/subdomain resolution.
+	contextID := ""
+	if _, err := uuid.Parse(req.ContextID); err == nil {
+		contextID = req.ContextID
+	} else {
+		contextID = ResolveContext(c)
+		if contextID == "" {
+			return
+		}
 	}
 
 	userAgent := c.GetHeader("User-Agent")
@@ -68,11 +76,6 @@ func (h *TrackHandler) Track(c *gin.Context) {
 
 // TrackBatch handles POST /track/batch — batch event tracking.
 func (h *TrackHandler) TrackBatch(c *gin.Context) {
-	contextID := ResolveContext(c)
-	if contextID == "" {
-		return
-	}
-
 	var req struct {
 		Events []map[string]interface{} `json:"events"`
 	}
@@ -82,8 +85,30 @@ func (h *TrackHandler) TrackBatch(c *gin.Context) {
 		return
 	}
 
+	// Events may carry their own valid contextId; header/subdomain resolution
+	// is used as a fallback only when needed.
+	var fallbackContextID string
+	fallbackResolved := false
+
 	events := make([]*tracking.Event, 0, len(req.Events))
 	for _, e := range req.Events {
+		contextID := ""
+		if v, ok := e["contextId"].(string); ok {
+			if _, err := uuid.Parse(v); err == nil {
+				contextID = v
+			}
+		}
+		if contextID == "" {
+			if !fallbackResolved {
+				fallbackContextID = ResolveContext(c)
+				fallbackResolved = true
+				if fallbackContextID == "" {
+					return
+				}
+			}
+			contextID = fallbackContextID
+		}
+
 		event := &tracking.Event{
 			ID:        uuid.New().String(),
 			ContextID:  contextID,
