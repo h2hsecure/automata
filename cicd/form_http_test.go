@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/cicd/support"
 	bhandler "github.com/hekemen/automata/internal/adapter/api/handler"
+	ttracking "github.com/hekemen/automata/internal/adapter/tracking"
 	formRepo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -21,6 +22,7 @@ func setupFormEngine() *gin.Engine {
 	formHandler := bhandler.NewFormHandler(formRepo)
 
 	forms := engine.Group("/form")
+	forms.Use(ttracking.ContextMiddleware())
 	{
 		forms.GET("/list", formHandler.List)
 		forms.GET("/:id", formHandler.Get)

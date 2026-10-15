@@ -17,6 +17,11 @@ func NewFormHandler(repo form.Repository) *FormHandler {
 	return &FormHandler{repo: repo}
 }
 
+// Repo exposes the form repository for adapters that need direct access.
+func (h *FormHandler) Repo() form.Repository {
+	return h.repo
+}
+
 type CreateFormInput struct {
 	Slug        string                 `json:"slug" binding:"required"`
 	Name        string                 `json:"name" binding:"required"`

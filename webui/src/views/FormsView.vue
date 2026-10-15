@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Pencil, Trash2, Plus, ExternalLink } from 'lucide-vue-next'
+import { Pencil, Trash2, Plus, ExternalLink, Code2, Copy, Check } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -25,12 +25,17 @@ const formSlug = ref('')
 const formFields = ref<Array<{ name: string; type: string; required: boolean; label: string }>>([])
 const formError = ref('')
 
+const embedOpen = ref(false)
+const embedTag = ref('')
+const embedSlug = ref('')
+const copied = ref(false)
+
 const columns = [
   { key: 'name', label: 'Name' },
   { key: 'slug', label: 'Slug' },
   { key: 'fields_count', label: 'Fields' },
   { key: 'created_at', label: 'Created' },
-  { key: 'actions', label: 'Actions', width: '100px' },
+  { key: 'actions', label: 'Actions', width: '140px' },
 ]
 
 async function loadForms() {
@@ -122,6 +127,36 @@ async function handleSave() {
   }
 }
 
+function openEmbed(f: Form) {
+  embedSlug.value = f.Slug
+  // Note: the closing tag is escaped below because a literal closing
+  // script tag inside this block would terminate it.
+  embedTag.value = `<script src="/form/snippet/${authStore.currentContextId}/${f.Slug}"><\/script>`
+  copied.value = false
+  embedOpen.value = true
+}
+
+async function copyEmbed() {
+  const text = embedTag.value
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // Non-secure context (plain HTTP): fall back to execCommand.
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
+  } catch {
+    // Ignore — the user can select the text manually.
+  }
+}
+
 async function handleDelete(f: Form) {
   const confirmed = await show({
     title: 'Delete Form',
@@ -175,6 +210,13 @@ onMounted(loadForms)
         </template>
         <template #actions="{ row }: { row: Form }">
           <div class="flex gap-1">
+            <button
+              class="p-1.5 rounded hover:bg-muted"
+              title="Embed"
+              @click="openEmbed(row)"
+            >
+              <Code2 class="h-4 w-4" />
+            </button>
             <button
               class="p-1.5 rounded hover:bg-muted"
               title="Edit"
@@ -263,6 +305,29 @@ onMounted(loadForms)
           <Button variant="outline" @click="modalOpen = false">Cancel</Button>
           <Button :loading="loading" @click="handleSave">
             {{ isEdit ? 'Save' : 'Create' }}
+          </Button>
+        </div>
+      </template>
+    </Modal>
+
+    <!-- Embed Modal -->
+    <Modal :open="embedOpen" title="Embed Form" @close="embedOpen = false">
+      <div class="space-y-3">
+        <p class="text-sm text-muted-foreground">
+          Add this script tag to your page's HTML. The form renders inside an
+          element with
+          <code class="text-xs bg-muted px-1.5 py-0.5 rounded">[data-automata-form="{{ embedSlug }}"]</code>
+          if present, otherwise at the end of the body.
+        </p>
+        <pre class="rounded-md bg-muted p-3 text-xs overflow-x-auto">{{ embedTag }}</pre>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button variant="outline" @click="embedOpen = false">Close</Button>
+          <Button @click="copyEmbed">
+            <Check v-if="copied" class="mr-2 h-4 w-4" />
+            <Copy v-else class="mr-2 h-4 w-4" />
+            {{ copied ? 'Copied!' : 'Copy' }}
           </Button>
         </div>
       </template>
