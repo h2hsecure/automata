@@ -41,3 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_tracking_visitors_context_last_seen
     ON tracking_visitors(context_id, last_seen DESC);
 CREATE INDEX IF NOT EXISTS idx_tracking_visitors_context_page_views
     ON tracking_visitors(context_id, page_views DESC);
+
+ALTER TABLE tracking_events ADD COLUMN IF NOT EXISTS ip VARCHAR(64);
+ALTER TABLE tracking_visitors ADD COLUMN IF NOT EXISTS last_ip VARCHAR(64);
+ALTER TABLE tracking_visitors ADD COLUMN IF NOT EXISTS contact_id VARCHAR(128);

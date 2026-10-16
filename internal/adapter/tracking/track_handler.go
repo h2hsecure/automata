@@ -63,6 +63,7 @@ func (h *TrackHandler) Track(c *gin.Context) {
 		EventName:   req.EventName,
 		Properties:  req.Properties,
 		UserAgent:   userAgent,
+		IP:          c.ClientIP(),
 		CreatedAt:   time.Now(),
 	}
 

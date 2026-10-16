@@ -41,10 +41,10 @@ func (r *repo) CreateEvent(e *tracking.Event) error {
 		return fmt.Errorf("marshal event properties: %w", err)
 	}
 	query := `
-		INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+		INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
 	`
-	_, err = r.pool.Exec(ctx, query, e.ID, e.ContextID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
+	_, err = r.pool.Exec(ctx, query, e.ID, e.ContextID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IP, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
 	if err != nil {
 		return fmt.Errorf("create event: %w", err)
 	}
@@ -60,10 +60,10 @@ func (r *repo) CreateEventsBatch(events []*tracking.Event) error {
 			return fmt.Errorf("marshal event properties: %w", err)
 		}
 		query := `
-			INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+			INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
 		`
-		batch.Queue(query, e.ID, e.ContextID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
+		batch.Queue(query, e.ID, e.ContextID, e.VisitorID, e.Type, e.URL, e.Title, e.Referrer, e.EventName, propertiesJSON, e.UserAgent, e.IP, e.IPHash, e.UTMSource, e.UTMMedium, e.UTMCampaign)
 	}
 	results := r.pool.SendBatch(ctx, batch)
 	defer results.Close()
@@ -103,13 +103,14 @@ func (r *repo) UpsertVisitor(v *tracking.Visitor) error {
 		v.ID = uuid.New().String()
 	}
 	query := `
-		INSERT INTO tracking_visitors (id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO tracking_visitors (id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views, last_ip)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (context_id, cookie_value) DO UPDATE
 			SET last_seen = EXCLUDED.last_seen,
-				page_views = tracking_visitors.page_views + EXCLUDED.page_views
+				page_views = tracking_visitors.page_views + EXCLUDED.page_views,
+				last_ip = EXCLUDED.last_ip
 	`
-	_, err := r.pool.Exec(ctx, query, v.ID, v.ContextID, v.CookieValue, v.Fingerprint, v.FirstSeen, v.LastSeen, v.PageViews)
+	_, err := r.pool.Exec(ctx, query, v.ID, v.ContextID, v.CookieValue, v.Fingerprint, v.FirstSeen, v.LastSeen, v.PageViews, v.LastIP)
 	if err != nil {
 		return fmt.Errorf("upsert visitor: %w", err)
 	}
@@ -368,7 +369,7 @@ func (r *repo) ListVisitors(ctx context.Context, contextID string, opts tracking
 
 	countQuery := `SELECT COUNT(*) FROM tracking_visitors WHERE context_id = $1`
 	dataQuery := `
-		SELECT id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views
+		SELECT id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views, last_ip, contact_id
 		FROM tracking_visitors
 		WHERE context_id = $1
 		ORDER BY ` + sortCol + ` DESC
@@ -399,7 +400,7 @@ func (r *repo) ListVisitors(ctx context.Context, contextID string, opts tracking
 	var visitors []*tracking.Visitor
 	for rows.Next() {
 		v := &tracking.Visitor{}
-		err := rows.Scan(&v.ID, &v.ContextID, &v.CookieValue, &v.Fingerprint, &v.FirstSeen, &v.LastSeen, &v.PageViews)
+		err := rows.Scan(&v.ID, &v.ContextID, &v.CookieValue, &v.Fingerprint, &v.FirstSeen, &v.LastSeen, &v.PageViews, &v.LastIP, &v.ContactID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan visitor: %w", err)
 		}
@@ -413,14 +414,14 @@ func (r *repo) ListVisitors(ctx context.Context, contextID string, opts tracking
 
 func (r *repo) GetVisitorByID(ctx context.Context, contextID, visitorID string) (*tracking.Visitor, error) {
 	query := `
-		SELECT id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views
+		SELECT id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views, last_ip, contact_id
 		FROM tracking_visitors
 		WHERE context_id = $1 AND id = $2
 	`
 	v := &tracking.Visitor{}
 	err := r.pool.QueryRow(ctx, query, contextID, visitorID).Scan(
 		&v.ID, &v.ContextID, &v.CookieValue, &v.Fingerprint,
-		&v.FirstSeen, &v.LastSeen, &v.PageViews,
+		&v.FirstSeen, &v.LastSeen, &v.PageViews, &v.LastIP, &v.ContactID,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -441,7 +442,7 @@ func (r *repo) GetVisitorEvents(ctx context.Context, contextID, visitorID string
 
 	countQuery := `SELECT COUNT(*) FROM tracking_events WHERE context_id = $1 AND visitor_id = $2`
 	dataQuery := `
-		SELECT id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at
+		SELECT id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip, ip_hash, utm_source, utm_medium, utm_campaign, created_at
 		FROM tracking_events
 		WHERE context_id = $1 AND visitor_id = $2
 	`
@@ -482,7 +483,7 @@ func (r *repo) GetVisitorEvents(ctx context.Context, contextID, visitorID string
 		var propertiesJSON []byte
 		err := rows.Scan(
 			&e.ID, &e.ContextID, &e.VisitorID, &e.Type, &e.URL, &e.Title,
-			&e.Referrer, &e.EventName, &propertiesJSON, &e.UserAgent, &e.IPHash,
+			&e.Referrer, &e.EventName, &propertiesJSON, &e.UserAgent, &e.IP, &e.IPHash,
 			&e.UTMSource, &e.UTMMedium, &e.UTMCampaign, &e.CreatedAt,
 		)
 		if err != nil {
@@ -497,4 +498,18 @@ func (r *repo) GetVisitorEvents(ctx context.Context, contextID, visitorID string
 		return nil, 0, fmt.Errorf("iterate events: %w", err)
 	}
 	return events, total, nil
+}
+
+// SetVisitorContactID links a visitor to a contact. It only sets the link when
+// the visitor is not already identified, so an upsert can never un-identify a
+// visitor.
+func (r *repo) SetVisitorContactID(ctx context.Context, contextID, visitorID, contactID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE tracking_visitors SET contact_id = $3
+		 WHERE context_id = $1 AND id = $2 AND (contact_id IS NULL OR contact_id = '')`,
+		contextID, visitorID, contactID)
+	if err != nil {
+		return fmt.Errorf("set visitor contact: %w", err)
+	}
+	return nil
 }

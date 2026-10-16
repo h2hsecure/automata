@@ -10,4 +10,6 @@ type Visitor struct {
 	FirstSeen   time.Time
 	LastSeen    time.Time
 	PageViews   int
+	LastIP      string
+	ContactID   string
 }

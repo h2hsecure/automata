@@ -30,6 +30,7 @@ func TrackEvent(repo tracking.Repository, contextID string, event *tracking.Even
 		PageViews:   1,
 		FirstSeen:   event.CreatedAt,
 		LastSeen:    event.CreatedAt,
+		LastIP:      event.IP,
 	}
 
 	if err := repo.UpsertVisitor(visitor); err != nil {
@@ -63,6 +64,7 @@ func TrackEventWithTime(repo tracking.Repository, contextID string, event *track
 		PageViews:   1,
 		FirstSeen:   now,
 		LastSeen:    now,
+		LastIP:      event.IP,
 	}
 
 	if err := repo.UpsertVisitor(visitor); err != nil {

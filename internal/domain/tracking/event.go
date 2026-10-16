@@ -20,6 +20,7 @@ type Event struct {
 	EventName   string
 	Properties  map[string]interface{}
 	UserAgent   string
+	IP          string
 	IPHash      string
 	UTMSource   string
 	UTMMedium   string
