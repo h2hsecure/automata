@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Pencil, Trash2, Plus, Users, Search } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
+import Modal from '@/components/Modal.vue'
 import DataTable from '@/components/DataTable.vue'
 import SearchBar from '@/components/SearchBar.vue'
 import Badge from '@/components/Badge.vue'
@@ -11,9 +13,10 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePagination } from '@/composables/usePagination'
 import { useAuthStore } from '@/stores/auth'
-import { listContacts, deleteContact, createContact, updateContact } from '@/api/client'
+import { listContacts, deleteContact, updateContact } from '@/api/client'
 import type { Contact } from '@/types/api'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
 const { page, limit, total, goToPage, setTotal } = usePagination()
@@ -24,7 +27,6 @@ const searchDebounce = ref<ReturnType<typeof setTimeout> | null>(null)
 
 // Modal state
 const modalOpen = ref(false)
-const isEdit = ref(false)
 const editingId = ref('')
 const form = ref({
   email: '',
@@ -70,23 +72,7 @@ function handleSearch() {
   loadContacts()
 }
 
-function openCreate() {
-  isEdit.value = false
-  editingId.value = ''
-  form.value = {
-    email: '',
-    first_name: '',
-    last_name: '',
-    phone: '',
-    tags: [],
-    custom_fields: {},
-  }
-  formError.value = ''
-  modalOpen.value = true
-}
-
 function openEdit(contact: Contact) {
-  isEdit.value = true
   editingId.value = contact.ID
   form.value = {
     email: contact.Email ?? '',
@@ -107,11 +93,7 @@ async function handleSave() {
   }
   loading.value = true
   try {
-    if (isEdit.value) {
-      await updateContact(editingId.value, form.value)
-    } else {
-      await createContact(form.value)
-    }
+    await updateContact(editingId.value, form.value)
     modalOpen.value = false
     loadContacts()
   } catch (e: any) {
@@ -147,7 +129,7 @@ onMounted(loadContacts)
         <h1 class="text-2xl font-bold">Contacts</h1>
         <p class="text-muted-foreground">Manage your contact list</p>
       </div>
-      <Button @click="openCreate">
+      <Button @click="router.push('/contacts/new')">
         <Plus class="mr-2 h-4 w-4" />
         Add Contact
       </Button>
@@ -241,8 +223,8 @@ onMounted(loadContacts)
       </div>
     </Card>
 
-    <!-- Create/Edit Modal -->
-    <Modal :open="modalOpen" :title="isEdit ? 'Edit Contact' : 'Add Contact'" @close="modalOpen = false">
+    <!-- Edit Modal -->
+    <Modal :open="modalOpen" title="Edit Contact" @close="modalOpen = false">
       <div class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <Input
@@ -275,7 +257,7 @@ onMounted(loadContacts)
         <div class="flex justify-end gap-2">
           <Button variant="outline" @click="modalOpen = false">Cancel</Button>
           <Button :loading="loading" @click="handleSave">
-            {{ isEdit ? 'Save' : 'Create' }}
+            Save
           </Button>
         </div>
       </template>
