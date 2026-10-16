@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 const BASE = 'http://localhost:8081';
-const TENANT = 'demo';
 const EMAIL = 'admin@demo.com';
 const PASSWORD = 'REDACTED';
 
@@ -11,7 +10,6 @@ async function login(page: any) {
   await page.waitForSelector('form');
   
   // Fill fields by placeholder since labels aren't associated with inputs
-  await page.fill('input[placeholder="mycompany"]', TENANT);
   await page.fill('input[type="email"]', EMAIL);
   await page.fill('input[type="password"]', PASSWORD);
   
@@ -65,7 +63,6 @@ test.describe('Authentication', () => {
     await page.goto(`${BASE}/login`);
     await page.waitForLoadState('networkidle');
     await page.waitForSelector('form');
-    await page.fill('input[placeholder="mycompany"]', TENANT);
     await page.fill('input[type="email"]', EMAIL);
     await page.fill('input[type="password"]', 'wrongpassword');
     await page.click('button[type="submit"]');
@@ -123,18 +120,6 @@ test.describe('Forms', () => {
   });
 });
 
-test.describe('Tenants', () => {
-  test.beforeEach(async ({ page }) => {
-    await login(page);
-  });
-
-  test('tenants page loads', async ({ page }) => {
-    await page.goto(`${BASE}/tenants`);
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('#app')).toBeVisible();
-  });
-});
-
 test.describe('API Keys', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -157,7 +142,6 @@ test.describe('Navigation', () => {
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Contacts' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Tenants' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Forms' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'API Keys' })).toBeVisible();
   });
@@ -174,10 +158,6 @@ test.describe('Navigation', () => {
     await page.waitForURL('**/forms**');
     await expect(page.locator('#app')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Tenants' }).click();
-    await page.waitForURL('**/tenants**');
-    await expect(page.locator('#app')).toBeVisible();
-
     await page.getByText('API Keys').click();
     await page.waitForFunction(() => window.location.pathname.includes('/api-keys'));
     await expect(page.locator('#app')).toBeVisible();
@@ -185,21 +165,9 @@ test.describe('Navigation', () => {
 });
 
 test.describe('API Endpoints', () => {
-  test('admin tenants endpoint exists', async ({ request }) => {
-    const loginRes = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: 'admin@demo.com', password: 'REDACTED', tenant: 'demo' }
-    });
-    const { token } = await loginRes.json();
-    
-    const res = await request.get(`${BASE}/api/admin/tenants`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    expect(res.status()).toBe(200);
-  });
-
   test('admin api-keys endpoint exists', async ({ request }) => {
     const loginRes = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: 'admin@demo.com', password: 'REDACTED', tenant: 'demo' }
+      data: { email: 'admin@demo.com', password: 'REDACTED' }
     });
     const { token } = await loginRes.json();
     

@@ -14,7 +14,7 @@ var (
 	domainRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-\.]*\.[a-zA-Z]{2,}$`)
 )
 
-// Context represents a tenant/website context in the platform.
+// Context represents a website context in the platform.
 // Each context has its own contacts, forms, tracking data, banners, and configuration.
 type Context struct {
 	ID        string

@@ -48,7 +48,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	log.Info().Str("email", req.Email).Msg("login attempt")
 
-	token, userID, tenantInfos, err := h.authService.Login(req.Email, req.Password)
+	token, userID, contextInfos, err := h.authService.Login(req.Email, req.Password)
 	if err != nil {
 		log.Error().Err(err).Str("email", req.Email).Msg("auth service login failed")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
@@ -90,8 +90,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	)
 
 	// Fill context details from contextRepo
-	contexts := make([]gin.H, 0, len(tenantInfos))
-	for _, ti := range tenantInfos {
+	contexts := make([]gin.H, 0, len(contextInfos))
+	for _, ti := range contextInfos {
 		t, err := h.contextRepo.GetByID(ti.ID)
 		if err != nil {
 			continue

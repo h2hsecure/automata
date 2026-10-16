@@ -7,7 +7,6 @@ import {
   FileText,
   Image,
   Key,
-  Settings,
   BarChart3,
   Globe,
   Menu,
@@ -38,7 +37,6 @@ const navItems: NavItem[] = [
   { name: 'Tracking', path: '/tracking', icon: BarChart3 },
   { name: 'Websites', path: '/contexts', icon: Globe, adminOnly: true },
   { name: 'API Keys', path: '/api-keys', icon: Key, adminOnly: true },
-  { name: 'Tenants', path: '/tenants', icon: Settings, adminOnly: true },
 ]
 
 const filteredItems = computed(() =>

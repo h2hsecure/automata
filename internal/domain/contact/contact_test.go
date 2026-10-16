@@ -27,7 +27,7 @@ func TestContactValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "missing tenant_id",
+			name: "missing context_id",
 			contact: Contact{
 				Email: strPtr("user@example.com"),
 			},

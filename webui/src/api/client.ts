@@ -6,7 +6,6 @@ import type {
   FormInput,
   Banner,
   BannerInput,
-  Tenant,
   ApiKey,
   Context,
   ContextInput,
@@ -62,8 +61,8 @@ client.interceptors.response.use(
 )
 
 // Auth endpoints
-export async function login(email: string, password: string, tenant?: string) {
-  const response = await client.post('/auth/login', { email, password, tenant })
+export async function login(email: string, password: string) {
+  const response = await client.post('/auth/login', { email, password })
   return response.data
 }
 
@@ -240,21 +239,6 @@ export async function updateContext(id: string, data: ContextInput): Promise<Con
 export async function deleteContext(id: string): Promise<void> {
   await client.delete(`/admin/contexts/${id}`)
 }
-
-// Tenant endpoints (admin only)
-export async function listTenants(page = 1, limit = 20): Promise<PaginatedResponse<Tenant>> {
-  return { data: [], total: 0, page, limit }
-}
-
-export async function createTenant(data: Partial<Tenant>): Promise<Tenant> {
-  return {} as Tenant
-}
-
-export async function updateTenant(id: string, data: Partial<Tenant>): Promise<Tenant> {
-  return {} as Tenant
-}
-
-export async function deleteTenant(id: string): Promise<void> {}
 
 // API Key endpoints (admin only)
 export async function listApiKeys(): Promise<ApiKey[]> {

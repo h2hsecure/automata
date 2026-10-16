@@ -116,7 +116,7 @@ func (r *postgresRepo) List(offset, limit int) ([]*domainctx.Context, error) {
 	}
 	defer rows.Close()
 
-	var tenants []*domainctx.Context
+	var contexts []*domainctx.Context
 	for rows.Next() {
 		t := &domainctx.Context{}
 		var settingsBytes []byte
@@ -130,10 +130,10 @@ func (r *postgresRepo) List(offset, limit int) ([]*domainctx.Context, error) {
 		if len(settingsBytes) > 0 {
 			_ = json.Unmarshal(settingsBytes, &t.Settings)
 		}
-		tenants = append(tenants, t)
+		contexts = append(contexts, t)
 	}
 
-	return tenants, rows.Err()
+	return contexts, rows.Err()
 }
 
 func (r *postgresRepo) Update(t *domainctx.Context) error {

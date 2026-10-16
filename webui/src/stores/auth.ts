@@ -29,11 +29,11 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.is_admin ?? false)
   const currentContext = computed(() => contexts.value.find((c) => c.id === currentContextId.value) || null)
 
-  async function login(email: string, password: string, tenant?: string) {
+  async function login(email: string, password: string) {
     loading.value = true
     error.value = null
     try {
-      const response = await loginApi(email, password, tenant)
+      const response = await loginApi(email, password)
       token.value = response.token
       localStorage.setItem('token', response.token)
 
@@ -42,7 +42,6 @@ export const useAuthStore = defineStore('auth', () => {
           id: response.user_id,
           email: response.email,
           is_admin: response.is_admin || false,
-          tenant_id: response.tenant_id || '',
         }
       }
 

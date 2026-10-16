@@ -198,21 +198,21 @@ var _ = Describe("Admin Config Repository Integration Tests", func() {
 		})
 	})
 
-	Describe("Multiple tenants isolation", func() {
-		It("should allow same config key for different tenants", func() {
-			tenant1 := createTestContext()
-			tenant2 := createTestContext()
+	Describe("Multiple contexts isolation", func() {
+		It("should allow same config key for different contexts", func() {
+			context1 := createTestContext()
+			context2 := createTestContext()
 
 			_, err := pool.Exec(ctx, `
 				INSERT INTO admin_configs (id, context_id, key, value, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, NOW(), NOW())
-			`, support.NewTestUUID(), tenant1, "cors", `{"origins":["https://tenant1.com"]}`)
+			`, support.NewTestUUID(), context1, "cors", `{"origins":["https://context1.com"]}`)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = pool.Exec(ctx, `
 				INSERT INTO admin_configs (id, context_id, key, value, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, NOW(), NOW())
-			`, support.NewTestUUID(), tenant2, "cors", `{"origins":["https://tenant2.com"]}`)
+			`, support.NewTestUUID(), context2, "cors", `{"origins":["https://context2.com"]}`)
 			Expect(err).NotTo(HaveOccurred())
 
 			var count int

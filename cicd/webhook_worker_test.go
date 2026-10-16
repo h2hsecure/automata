@@ -67,7 +67,7 @@ var _ = Describe("Webhook Delivery Worker", func() {
 		Expect(ok).To(BeTrue())
 		// Header names are captured in canonical MIME form (RFC 7230: case-insensitive).
 		Expect(req.Headers["X-Webhook-Source"]).To(Equal("automata"))
-		Expect(req.Headers["X-Tenant-Id"]).To(Equal(contextID))
+		Expect(req.Headers["X-Context-Id"]).To(Equal(contextID))
 		Expect(req.Headers["X-Form-Id"]).To(Equal(formID))
 		Expect(req.Payload["contact_email"]).To(Equal("worker-test@example.com"))
 	})

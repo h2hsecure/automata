@@ -136,7 +136,7 @@ var _ = Describe("Validation Tests", func() {
 		})
 	})
 
-	Describe("Tenant slug validation", func() {
+	Describe("Context slug validation", func() {
 		It("should validate context slug format", func() {
 			validSlugs := []string{
 				"test-context",
@@ -155,9 +155,9 @@ var _ = Describe("Validation Tests", func() {
 		It("should reject invalid context slug format", func() {
 			invalidSlugs := []string{
 				"",
-				"Tenant With Spaces",
-				"tenant_with_underscores",
-				"Tenant123",
+				"Context With Spaces",
+				"context_with_underscores",
+				"Context123",
 				"context..double",
 			}
 

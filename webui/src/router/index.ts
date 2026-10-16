@@ -25,12 +25,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/ContactsView.vue'),
       },
       {
-        path: 'tenants',
-        name: 'Tenants',
-        component: () => import('@/views/TenantsView.vue'),
-        meta: { requiresAdmin: true },
-      },
-      {
         path: 'forms',
         name: 'Forms',
         component: () => import('@/views/FormsView.vue'),

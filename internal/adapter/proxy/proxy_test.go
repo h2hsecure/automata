@@ -20,7 +20,7 @@ var _ = Describe("Proxy Adapter", func() {
 	BeforeEach(func() {
 		gin.SetMode(gin.TestMode)
 		engine = gin.New()
-		proxyObj = NewProxy(&mockTenantRepo{}, engine)
+		proxyObj = NewProxy(&mockContextRepo{}, engine)
 	})
 
 	Describe("Form route", func() {
@@ -48,7 +48,7 @@ var _ = Describe("Proxy Adapter", func() {
 				c.Set("context", t)
 				c.Next()
 			})
-			proxyObj = NewProxy(&mockTenantRepo{}, freshEngine)
+			proxyObj = NewProxy(&mockContextRepo{}, freshEngine)
 
 			req := httptest.NewRequest("GET", "/form/my-form", nil)
 			w := httptest.NewRecorder()
@@ -107,30 +107,30 @@ var _ = Describe("Proxy Adapter", func() {
 	_ = proxyObj // avoid unused variable warning
 })
 
-// mockTenantRepo implements context.Repository for testing
-type mockTenantRepo struct{}
+// mockContextRepo implements context.Repository for testing
+type mockContextRepo struct{}
 
-func (m *mockTenantRepo) Create(t *context.Context) error {
+func (m *mockContextRepo) Create(t *context.Context) error {
 	t.ID = "550e8400-e29b-41d4-a716-446655440000"
 	return nil
 }
-func (m *mockTenantRepo) GetByID(id string) (*context.Context, error) {
+func (m *mockContextRepo) GetByID(id string) (*context.Context, error) {
 	return nil, nil
 }
-func (m *mockTenantRepo) GetBySlug(slug string) (*context.Context, error) {
+func (m *mockContextRepo) GetBySlug(slug string) (*context.Context, error) {
 	return nil, nil
 }
-func (m *mockTenantRepo) List(offset, limit int) ([]*context.Context, error) {
+func (m *mockContextRepo) List(offset, limit int) ([]*context.Context, error) {
 	return nil, nil
 }
-func (m *mockTenantRepo) Update(t *context.Context) error {
+func (m *mockContextRepo) Update(t *context.Context) error {
 	return nil
 }
-func (m *mockTenantRepo) Delete(id string) error {
+func (m *mockContextRepo) Delete(id string) error {
 	return nil
 }
 
-func (m *mockTenantRepo) GetByUserEmail(email string) ([]*context.Context, error) {
+func (m *mockContextRepo) GetByUserEmail(email string) ([]*context.Context, error) {
 	return nil, nil
 }
 

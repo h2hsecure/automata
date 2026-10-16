@@ -785,7 +785,7 @@ var _ = Describe("Admin Handler Routes", func() {
 	})
 })
 
-var _ = Describe("Tenant Send Email", func() {
+var _ = Describe("Context Send Email", func() {
 	BeforeEach(func() {
 		mockSMTP = support.NewMockSMTP()
 		mockSMTP.Start()
@@ -815,28 +815,28 @@ var _ = Describe("Tenant Send Email", func() {
 		mockSMTP.Clear()
 	})
 
-	It("enqueues email for tenant send", func() {
+	It("enqueues email for context send", func() {
 		gin.SetMode(gin.TestMode)
 
 		emailRepo.Create(&email.EmailTemplate{
 			ContextID: testContextID,
-			Key:       "tenant_test",
-			Subject:   "Tenant: {{ .Name }}",
-			BodyText:  "Tenant body for {{ .Name }}",
-			BodyHTML:  "<p>Tenant HTML</p>",
+			Key:       "context_test",
+			Subject:   "Context: {{ .Name }}",
+			BodyText:  "Context body for {{ .Name }}",
+			BodyHTML:  "<p>Context HTML</p>",
 		})
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest("POST", "/api/tenant/test-slug/email/send", nil)
+		c.Request = httptest.NewRequest("POST", "/api/context/test-slug/email/send", nil)
 		c.Request.Header.Set("Content-Type", "application/json")
 		c.Set("context_id", testContextID)
 		c.Params = []gin.Param{{Key: "slug", Value: "test-slug"}}
 
 		body := strings.NewReader(`{
-			"template": "tenant_test",
-			"to_array": ["tenant@example.com"],
-			"variables": {"Name": "Tenant User"}
+			"template": "context_test",
+			"to_array": ["context@example.com"],
+			"variables": {"Name": "Context User"}
 		}`)
 		c.Request.Body = io.NopCloser(body)
 		emailHandler.Send(c)
@@ -852,7 +852,7 @@ var _ = Describe("Tenant Send Email", func() {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest("POST", "/api/tenant/test-slug/email/send", nil)
+		c.Request = httptest.NewRequest("POST", "/api/context/test-slug/email/send", nil)
 		c.Request.Header.Set("Content-Type", "application/json")
 		c.Set("context_id", testContextID)
 		c.Params = []gin.Param{{Key: "slug", Value: "test-slug"}}
@@ -881,7 +881,7 @@ var _ = Describe("Tenant Send Email", func() {
 		// Test with "to" string
 		w1 := httptest.NewRecorder()
 		c1, _ := gin.CreateTestContext(w1)
-		c1.Request = httptest.NewRequest("POST", "/api/tenant/test-slug/email/send", nil)
+		c1.Request = httptest.NewRequest("POST", "/api/context/test-slug/email/send", nil)
 		c1.Request.Header.Set("Content-Type", "application/json")
 		c1.Set("context_id", testContextID)
 		c1.Params = []gin.Param{{Key: "slug", Value: "test-slug"}}
@@ -897,7 +897,7 @@ var _ = Describe("Tenant Send Email", func() {
 		// Test with "to_array"
 		w2 := httptest.NewRecorder()
 		c2, _ := gin.CreateTestContext(w2)
-		c2.Request = httptest.NewRequest("POST", "/api/tenant/test-slug/email/send", nil)
+		c2.Request = httptest.NewRequest("POST", "/api/context/test-slug/email/send", nil)
 		c2.Request.Header.Set("Content-Type", "application/json")
 		c2.Set("context_id", testContextID)
 		c2.Params = []gin.Param{{Key: "slug", Value: "test-slug"}}

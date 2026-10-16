@@ -37,7 +37,7 @@ type UpdateTemplateRequest struct {
 	IsDefault *bool  `json:"is_default"`
 }
 
-// SendEmailRequest is the tenant-scoped send-email request.
+// SendEmailRequest is the context-scoped send-email request.
 type SendEmailRequest struct {
 	To              string            `json:"to"`
 	ToArray         []string          `json:"to_array"`

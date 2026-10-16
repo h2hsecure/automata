@@ -114,16 +114,16 @@ func performRequest(engine *gin.Engine, req *http.Request) *httptest.ResponseRec
 	return w
 }
 
-// tenantCapture holds the captured context from a middleware execution.
-type tenantCapture struct {
+// contextCapture holds the captured context from a middleware execution.
+type contextCapture struct {
 	Context *context.Context
 	Found   bool
 }
 
 // runWithCapture creates a fresh engine with the middleware and a capture handler,
 // then executes the request to capture the context from context.
-func runWithCapture(middleware gin.HandlerFunc, repo *mockContextRepo, req *http.Request) (*httptest.ResponseRecorder, *tenantCapture) {
-	captured := &tenantCapture{}
+func runWithCapture(middleware gin.HandlerFunc, repo *mockContextRepo, req *http.Request) (*httptest.ResponseRecorder, *contextCapture) {
+	captured := &contextCapture{}
 	engine := gin.New()
 	engine.Use(middleware)
 	engine.GET(req.URL.Path, func(c *gin.Context) {

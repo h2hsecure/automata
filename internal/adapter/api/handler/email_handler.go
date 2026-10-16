@@ -195,7 +195,7 @@ func (h *EmailHandler) TestSend(c *gin.Context) {
 	})
 }
 
-// Send handles POST /api/tenant/:slug/email/send — tenant-scoped send.
+// Send handles POST /api/context/:slug/email/send — context-scoped send.
 func (h *EmailHandler) Send(c *gin.Context) {
 	contextID := c.GetString("context_id")
 	if contextID == "" {

@@ -109,7 +109,7 @@ func NewServer(
 		admin.GET("/tracking/visitors/:id/events", trackingHandler.GetVisitorEvents)
 	}
 
-	// Email template routes (declared outside admin block for tenant route access)
+	// Email template routes (declared outside admin block for context route access)
 	emailRepo := email_repo.New(pool)
 	emailQueue := queue.NewEmailQueue(pool)
 	emailUsecase := emailusecase.NewEmailUsecase(emailRepo, emailQueue)
@@ -136,9 +136,9 @@ func NewServer(
 
 	// Context-resolved routes (forms, snippets, static assets)
 	api.Use(ContextResolver(contextRepo))
-	tenantEmailGroup := api.Group("/tenant/:slug/email")
+	contextEmailGroup := api.Group("/context/:slug/email")
 	{
-		tenantEmailGroup.POST("/send", emailHandler.Send)
+		contextEmailGroup.POST("/send", emailHandler.Send)
 	}
 
 	contactRepo := crepo.New(pool)

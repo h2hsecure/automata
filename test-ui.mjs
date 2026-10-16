@@ -114,17 +114,17 @@ try {
   warnings.push('Tracking load failed');
 }
 
-// ========== 7. TENANTS ==========
-console.log('\n7. TENANTS');
+// ========== 7. CONTEXTS ==========
+console.log('\n7. CONTEXTS');
 try {
-  await page.goto('http://192.168.178.4/tenants', { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto('http://192.168.178.4/contexts', { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForTimeout(3000);
   console.log('   URL:', page.url());
   const body = await page.textContent('body');
   console.log('   Page loaded:', body.length > 0);
 } catch (e) {
-  console.log('   Tenants error:', e.message);
-  warnings.push('Tenants load failed');
+  console.log('   Contexts error:', e.message);
+  warnings.push('Contexts load failed');
 }
 
 // ========== 8. API KEYS ==========

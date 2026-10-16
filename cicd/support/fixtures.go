@@ -260,8 +260,8 @@ func NewTestBannerClick(bannerID, contextID, visitorID string) map[string]interf
 	}
 }
 
-// NewTestTenantUser generates a test context user.
-func NewTestTenantUser(contextID string) map[string]interface{} {
+// NewTestContextUser generates a test context user.
+func NewTestContextUser(contextID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":           uuid.New().String(),
 		"context_id":    contextID,

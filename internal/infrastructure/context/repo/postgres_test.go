@@ -133,9 +133,9 @@ var _ = Describe("Postgres Context Repository", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			tenants, err := contextRepo.List(0, 10)
+			contexts, err := contextRepo.List(0, 10)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(tenants).To(HaveLen(3))
+			Expect(contexts).To(HaveLen(3))
 		})
 
 		It("respects pagination", func() {
@@ -145,13 +145,13 @@ var _ = Describe("Postgres Context Repository", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			tenants, err := contextRepo.List(0, 2)
+			contexts, err := contextRepo.List(0, 2)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(tenants).To(HaveLen(2))
+			Expect(contexts).To(HaveLen(2))
 
-			tenants, err = contextRepo.List(2, 2)
+			contexts, err = contextRepo.List(2, 2)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(tenants).To(HaveLen(2))
+			Expect(contexts).To(HaveLen(2))
 		})
 	})
 

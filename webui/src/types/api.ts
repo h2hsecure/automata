@@ -131,15 +131,6 @@ export interface Campaign {
   created_at: string;
 }
 
-export interface Tenant {
-  id: string;
-  slug: string;
-  name: string;
-  domain: string;
-  active: boolean;
-  created_at: string;
-}
-
 export interface ApiKey {
   id: string;
   name: string;
@@ -207,5 +198,4 @@ export interface User {
   id: string;
   email: string;
   is_admin: boolean;
-  tenant_id: string;
 }

@@ -2,7 +2,7 @@ package config
 
 import "time"
 
-// ConfigKey represents a configuration key for a tenant.
+// ConfigKey represents a configuration key for a context.
 type ConfigKey string
 
 const (
@@ -11,18 +11,18 @@ const (
 	ConfigKeyDisplay ConfigKey = "display"
 )
 
-// CORSConfig holds CORS settings for a tenant.
+// CORSConfig holds CORS settings for a context.
 type CORSConfig struct {
 	Origins []string `json:"origins"`
 }
 
-// DomainConfig holds domain settings for a tenant.
+// DomainConfig holds domain settings for a context.
 type DomainConfig struct {
 	Primary string   `json:"primary"`
 	Aliases []string `json:"aliases"`
 }
 
-// DisplayConfig holds display settings for a tenant.
+// DisplayConfig holds display settings for a context.
 type DisplayConfig struct {
 	Name    string `json:"name"`
 	LogoURL string `json:"logo_url"`
