@@ -264,4 +264,81 @@ var _ = Describe("Shadow User Tracking", func() {
 			Expect(resp.Events[0]["IP"]).To(Equal("203.0.113.7"))
 		})
 	})
+
+	Describe("legacy rows with NULL ip/last_ip/contact_id (pre-migration data)", func() {
+		var (
+			contextID  string
+			legacyID   string
+			visitorAPI *gin.Engine
+		)
+
+		BeforeEach(func() {
+			contextID = support.NewTestContextID()
+			legacyID = support.NewTestUUID()
+
+			// Simulate a visitor row created before the ip/last_ip/contact_id migration:
+// fingerprint is '' (Go always writes empty strings), new columns are NULL.
+			_, err := pool.Exec(ctx, `
+				INSERT INTO tracking_visitors (id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views)
+				VALUES ($1, $2, 'legacy-cookie', '', NOW(), NOW(), 1)
+			`, legacyID, contextID)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Simulate an event row created before the ip column migration: text
+// columns are '' (Go always writes empty strings), ip is NULL.
+			_, err = pool.Exec(ctx, `
+				INSERT INTO tracking_events (context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
+				VALUES ($1, $2, 'page_view', '/legacy', '', '', '', '{}', '', '', '', '', '', NOW())
+			`, contextID, legacyID)
+			Expect(err).NotTo(HaveOccurred())
+
+			visitorAPI = gin.New()
+			visitorAPI.Use(func(c *gin.Context) {
+				c.Set("context_id", contextID)
+				c.Next()
+			})
+			trackingHandler := bhandler.NewTrackingHandler(trepo.New(pool))
+			visitorAPI.GET("/context/tracking/visitors", trackingHandler.ListVisitors)
+			visitorAPI.GET("/context/tracking/visitors/:id/events", trackingHandler.GetVisitorEvents)
+		})
+
+		It("lists the legacy visitor with empty LastIP/ContactID instead of erroring", func() {
+			req := httptest.NewRequest("GET", "/context/tracking/visitors?limit=10", nil)
+			vw := httptest.NewRecorder()
+			visitorAPI.ServeHTTP(vw, req)
+			Expect(vw.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Visitors []map[string]interface{} `json:"visitors"`
+				Total    int                      `json:"total"`
+			}
+			Expect(json.Unmarshal(vw.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Total).To(Equal(1))
+			Expect(resp.Visitors[0]["LastIP"]).To(Equal(""))
+			Expect(resp.Visitors[0]["ContactID"]).To(Equal(""))
+		})
+
+		It("returns the legacy visitor's events with an empty IP instead of erroring", func() {
+			req := httptest.NewRequest("GET", "/context/tracking/visitors/"+legacyID+"/events?limit=10", nil)
+			vw := httptest.NewRecorder()
+			visitorAPI.ServeHTTP(vw, req)
+			Expect(vw.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Events []map[string]interface{} `json:"events"`
+				Total  int                      `json:"total"`
+			}
+			Expect(json.Unmarshal(vw.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Total).To(Equal(1))
+			Expect(resp.Events[0]["IP"]).To(Equal(""))
+		})
+
+		It("returns the legacy visitor by ID via the repo without a NULL scan error", func() {
+			v, err := trackingRepo.GetVisitorByID(ctx, contextID, legacyID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(v.CookieValue).To(Equal("legacy-cookie"))
+			Expect(v.LastIP).To(Equal(""))
+			Expect(v.ContactID).To(Equal(""))
+		})
+	})
 })

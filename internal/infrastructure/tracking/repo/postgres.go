@@ -414,7 +414,7 @@ func (r *repo) ListVisitors(ctx context.Context, contextID string, opts tracking
 
 func (r *repo) GetVisitorByID(ctx context.Context, contextID, visitorID string) (*tracking.Visitor, error) {
 	query := `
-		SELECT id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views, last_ip, contact_id
+		SELECT id, context_id, cookie_value, COALESCE(fingerprint, ''), first_seen, last_seen, page_views, COALESCE(last_ip, ''), COALESCE(contact_id, '')
 		FROM tracking_visitors
 		WHERE context_id = $1 AND id = $2
 	`
@@ -442,7 +442,7 @@ func (r *repo) GetVisitorEvents(ctx context.Context, contextID, visitorID string
 
 	countQuery := `SELECT COUNT(*) FROM tracking_events WHERE context_id = $1 AND visitor_id = $2`
 	dataQuery := `
-		SELECT id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip, ip_hash, utm_source, utm_medium, utm_campaign, created_at
+		SELECT id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, COALESCE(ip, ''), COALESCE(ip_hash, ''), utm_source, utm_medium, utm_campaign, created_at
 		FROM tracking_events
 		WHERE context_id = $1 AND visitor_id = $2
 	`
