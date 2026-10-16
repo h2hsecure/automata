@@ -12,6 +12,7 @@ import type {
   PaginatedResponse,
   DashboardStats,
   TrackingEvent,
+  Visitor,
   User,
   Campaign,
   Placement,
@@ -211,6 +212,20 @@ export async function getTrackingEvents(page = 1, limit = 50, type = ''): Promis
     page,
     limit,
   }
+}
+
+export async function listVisitors(page = 1, limit = 20, sort = 'last_seen'): Promise<PaginatedResponse<Visitor>> {
+  const params: Record<string, string> = { offset: String((page - 1) * limit), limit: String(limit), sort }
+  const response = await client.get('/context/tracking/visitors', { params })
+  const d = response.data
+  return { data: d.visitors ?? [], total: d.total ?? 0, page, limit }
+}
+
+export async function getVisitorEvents(visitorId: string, page = 1, limit = 20): Promise<PaginatedResponse<TrackingEvent>> {
+  const params: Record<string, string> = { offset: String((page - 1) * limit), limit: String(limit) }
+  const response = await client.get(`/context/tracking/visitors/${visitorId}/events`, { params })
+  const d = response.data
+  return { data: d.events ?? [], total: d.total ?? 0, page, limit }
 }
 
 // Context endpoints (admin only)

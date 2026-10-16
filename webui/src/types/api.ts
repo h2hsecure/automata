@@ -187,11 +187,24 @@ export interface TrackingEvent {
   EventName: string;
   Properties: Record<string, unknown> | null;
   UserAgent: string;
+  IP: string;
   IPHash: string;
   UTMSource: string;
   UTMMedium: string;
   UTMCampaign: string;
   CreatedAt: string;
+}
+
+export interface Visitor {
+  ID: string;
+  ContextID: string;
+  CookieValue: string;
+  Fingerprint: string;
+  FirstSeen: string;
+  LastSeen: string;
+  PageViews: number;
+  LastIP: string;
+  ContactID: string;
 }
 
 export interface User {

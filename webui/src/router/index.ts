@@ -41,11 +41,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/BannersView.vue'),
       },
       {
-        path: 'tracking',
-        name: 'Tracking',
-        component: () => import('@/views/TrackingView.vue'),
-      },
-      {
         path: 'contexts',
         name: 'Contexts',
         component: () => import('@/views/ContextsView.vue'),

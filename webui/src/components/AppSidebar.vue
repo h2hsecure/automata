@@ -7,7 +7,6 @@ import {
   FileText,
   Image,
   Key,
-  BarChart3,
   Globe,
   Menu,
   X,
@@ -34,7 +33,6 @@ const navItems: NavItem[] = [
   { name: 'Contacts', path: '/contacts', icon: Users },
   { name: 'Forms', path: '/forms', icon: FileText },
   { name: 'Banners', path: '/banners', icon: Image },
-  { name: 'Tracking', path: '/tracking', icon: BarChart3 },
   { name: 'Websites', path: '/contexts', icon: Globe, adminOnly: true },
   { name: 'API Keys', path: '/api-keys', icon: Key, adminOnly: true },
 ]
