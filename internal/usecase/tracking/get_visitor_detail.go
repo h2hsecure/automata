@@ -32,8 +32,8 @@ func GetVisitorDetail(repo tracking.Repository, contextID, visitorID string, lim
 		return nil, fmt.Errorf("get visitor: %w", err)
 	}
 
-	// Fetch recent events
-	events, _, err := repo.GetVisitorEvents(nil, contextID, visitorID, tracking.GetVisitorEventsOpts{
+	// Fetch recent events (events store the cookie value, not the UUID PK)
+	events, _, err := repo.GetVisitorEvents(nil, contextID, visitor.CookieValue, tracking.GetVisitorEventsOpts{
 		Limit: limit,
 	})
 	if err != nil {

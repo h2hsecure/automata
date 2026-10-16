@@ -26,7 +26,14 @@ func GetVisitorEvents(repo tracking.Repository, contextID, visitorID string, opt
 		return nil, 0, fmt.Errorf("limit must be between 1 and 100")
 	}
 
-	events, total, err := repo.GetVisitorEvents(context.Background(), contextID, visitorID, opts)
+	// tracking_events.visitor_id stores the cookie value, not the visitor
+	// UUID PK, so resolve the visitor first.
+	visitor, err := repo.GetVisitorByID(context.Background(), contextID, visitorID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get visitor: %w", err)
+	}
+
+	events, total, err := repo.GetVisitorEvents(context.Background(), contextID, visitor.CookieValue, opts)
 	if err != nil {
 		return nil, 0, fmt.Errorf("get visitor events: %w", err)
 	}

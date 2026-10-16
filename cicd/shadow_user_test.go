@@ -249,7 +249,13 @@ var _ = Describe("Shadow User Tracking", func() {
 		})
 
 		It("returns the visitor's events with the stored IP", func() {
-			req := httptest.NewRequest("GET", "/context/tracking/visitors/"+vid1+"/events?limit=10", nil)
+			// The route is keyed by the visitor UUID PK; events are stored
+			// under the cookie value, so resolve the UUID first.
+			var visitorUUID string
+			err := pool.QueryRow(ctx, "SELECT id FROM tracking_visitors WHERE context_id = $1 AND cookie_value = $2", contextID, vid1).Scan(&visitorUUID)
+			Expect(err).NotTo(HaveOccurred())
+
+			req := httptest.NewRequest("GET", "/context/tracking/visitors/"+visitorUUID+"/events?limit=10", nil)
 			vw := httptest.NewRecorder()
 			visitorAPI.ServeHTTP(vw, req)
 			Expect(vw.Code).To(Equal(http.StatusOK))
@@ -285,11 +291,12 @@ var _ = Describe("Shadow User Tracking", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Simulate an event row created before the ip column migration: text
-// columns are '' (Go always writes empty strings), ip is NULL.
+// columns are '' (Go always writes empty strings), ip is NULL, and
+// visitor_id holds the cookie value (the real data model).
 			_, err = pool.Exec(ctx, `
 				INSERT INTO tracking_events (context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
-				VALUES ($1, $2, 'page_view', '/legacy', '', '', '', '{}', '', '', '', '', '', NOW())
-			`, contextID, legacyID)
+				VALUES ($1, 'legacy-cookie', 'page_view', '/legacy', '', '', '', '{}', '', '', '', '', '', NOW())
+			`, contextID)
 			Expect(err).NotTo(HaveOccurred())
 
 			visitorAPI = gin.New()
