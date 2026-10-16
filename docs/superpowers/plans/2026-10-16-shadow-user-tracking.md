@@ -331,7 +331,7 @@
 
 ## Execution Status
 
-**Complete** — 2026-10-16, branch `phase2-auth-changes`, commits `0801aa9` → `0f154ae` (Tasks 1–6) + plan commit.
+**Complete** — 2026-10-16, branch `phase2-auth-changes`, commits `0801aa9` → `aaede01` (Tasks 1–6 + final-review fix) + plan commit.
 
 - Task 1 (storage: ip/last_ip/contact_id + IP capture): `0801aa9` — review Approved
 - Task 2 (form JS sends visitor_id): `01d8626` — review Approved
