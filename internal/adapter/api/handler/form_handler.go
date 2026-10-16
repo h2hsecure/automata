@@ -6,15 +6,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/domain/form"
+	"github.com/hekemen/automata/internal/domain/tracking"
+	contactuc "github.com/hekemen/automata/internal/usecase/contact"
 	uc "github.com/hekemen/automata/internal/usecase/form"
+	"github.com/rs/zerolog/log"
 )
 
 type FormHandler struct {
-	repo form.Repository
+	repo         form.Repository
+	contactRepo  contactuc.Repository
+	trackingRepo tracking.Repository
 }
 
 func NewFormHandler(repo form.Repository) *FormHandler {
 	return &FormHandler{repo: repo}
+}
+
+// NewFormHandlerWithIdentifiers builds a form handler that also identifies
+// the submitting visitor as a contact on form submission.
+func NewFormHandlerWithIdentifiers(repo form.Repository, contactRepo contactuc.Repository, trackingRepo tracking.Repository) *FormHandler {
+	return &FormHandler{repo: repo, contactRepo: contactRepo, trackingRepo: trackingRepo}
 }
 
 // Repo exposes the form repository for adapters that need direct access.
@@ -44,7 +55,8 @@ type SubmitFormInput struct {
 }
 
 type SubmitFormBody struct {
-	Data map[string]interface{} `json:"data" form:"data"`
+	Data      map[string]interface{} `json:"data" form:"data"`
+	VisitorID string                 `json:"visitor_id"`
 }
 
 func (h *FormHandler) List(c *gin.Context) {
@@ -190,8 +202,9 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 	}
 
 	submitInput := uc.SubmitFormInput{
-		Slug: slug,
-		Data: data,
+		Slug:      slug,
+		Data:      data,
+		VisitorID: body.VisitorID,
 	}
 
 	sub, err := uc.SubmitForm(h.repo, contextID, submitInput)
@@ -202,6 +215,12 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	if body.VisitorID != "" && h.contactRepo != nil && h.trackingRepo != nil {
+		if _, err := uc.IdentifyVisitor(h.contactRepo, h.trackingRepo, contextID, slug, body.VisitorID, data); err != nil {
+			log.Warn().Err(err).Msg("identify visitor from form submission")
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"ID": sub.ID})

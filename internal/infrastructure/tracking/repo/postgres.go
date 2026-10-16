@@ -500,13 +500,14 @@ func (r *repo) GetVisitorEvents(ctx context.Context, contextID, visitorID string
 	return events, total, nil
 }
 
-// SetVisitorContactID links a visitor to a contact. It only sets the link when
-// the visitor is not already identified, so an upsert can never un-identify a
-// visitor.
+// SetVisitorContactID links a visitor to a contact. The visitor is matched by
+// cookie value (the value the client carries, e.g. the automata_visitor
+// cookie). It only sets the link when the visitor is not already identified,
+// so an upsert can never un-identify a visitor.
 func (r *repo) SetVisitorContactID(ctx context.Context, contextID, visitorID, contactID string) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE tracking_visitors SET contact_id = $3
-		 WHERE context_id = $1 AND id = $2 AND (contact_id IS NULL OR contact_id = '')`,
+		 WHERE context_id = $1 AND cookie_value = $2 AND (contact_id IS NULL OR contact_id = '')`,
 		contextID, visitorID, contactID)
 	if err != nil {
 		return fmt.Errorf("set visitor contact: %w", err)

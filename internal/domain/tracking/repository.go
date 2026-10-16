@@ -41,8 +41,9 @@ type Repository interface {
 	// GetVisitorEvents returns a paginated list of events for a specific visitor.
 	GetVisitorEvents(ctx context.Context, contextID, visitorID string, opts GetVisitorEventsOpts) ([]*Event, int64, error)
 
-	// SetVisitorContactID links a visitor to a contact. It only sets the link
-	// when the visitor is not already identified, so an upsert can never
-	// un-identify a visitor.
+	// SetVisitorContactID links a visitor to a contact. The visitor is matched
+	// by cookie value (the value the client carries, e.g. the automata_visitor
+	// cookie). It only sets the link when the visitor is not already
+	// identified, so an upsert can never un-identify a visitor.
 	SetVisitorContactID(ctx context.Context, contextID, visitorID, contactID string) error
 }

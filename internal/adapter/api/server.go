@@ -155,7 +155,8 @@ func NewServer(
 
 	// Form routes (context-resolved)
 	formRepo := formRepo.New(pool)
-	formHandler := handler.NewFormHandler(formRepo)
+	trackingRepo := trackingRepo.New(pool)
+	formHandler := handler.NewFormHandlerWithIdentifiers(formRepo, contactRepo, trackingRepo)
 	{
 		api.GET("/context/forms", middleware.AuthMiddleware(authService), formHandler.List)
 		api.GET("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Get)
@@ -191,7 +192,7 @@ func NewServer(
 	}
 
 	// Tracking dashboard routes (context-resolved)
-	trackingHandler := handler.NewTrackingHandler(trackingRepo.New(pool))
+	trackingHandler := handler.NewTrackingHandler(trackingRepo)
 	{
 		api.GET("/context/tracking/dashboard", middleware.AuthMiddleware(authService), trackingHandler.GetDashboard)
 		api.GET("/context/tracking/events", middleware.AuthMiddleware(authService), trackingHandler.GetEvents)

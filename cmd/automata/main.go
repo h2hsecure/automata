@@ -17,6 +17,7 @@ import (
 	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	banner_repo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
+	contact_repo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
 	"github.com/hekemen/automata/internal/infrastructure/config"
 	"github.com/hekemen/automata/internal/infrastructure/bootstrap"
 	"github.com/hekemen/automata/internal/infrastructure/contact"
@@ -101,6 +102,7 @@ func main() {
 	formRepo := form_repo.New(pool)
 	bannerRepo := banner_repo.New(pool)
 	trackingRepo := tracking_repo.New(pool)
+	contactRepo := contact_repo.New(pool)
 
 	// Admin bootstrap: create admin user on first startup
 	if err := bootstrap.Run(pool, userRepo, contextRepo); err != nil {
@@ -119,7 +121,7 @@ func main() {
 	authService := infraauth.NewService(userRepo)
 
 	// Create handlers for tracking server
-	formHandler := handler.NewFormHandler(formRepo)
+	formHandler := handler.NewFormHandlerWithIdentifiers(formRepo, contactRepo, trackingRepo)
 	bannerHandler := handler.NewBannerHandler(bannerRepo)
 	placementHandler := handler.NewPlacementHandler(bannerRepo)
 	campaignHandler := handler.NewCampaignHandler(bannerRepo)

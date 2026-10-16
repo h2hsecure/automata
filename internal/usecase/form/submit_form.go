@@ -10,9 +10,10 @@ import (
 
 // SubmitFormInput holds the input for submitting a form.
 type SubmitFormInput struct {
-	Slug    string
-	Data    map[string]interface{}
-	Files   []form.FileUpload
+	Slug      string
+	Data      map[string]interface{}
+	Files     []form.FileUpload
+	VisitorID string
 }
 
 // SubmitForm submits a form by slug, validating data against form fields.
