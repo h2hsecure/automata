@@ -23,6 +23,18 @@ func TestGenerateForm(t *testing.T) {
 	}
 }
 
+func TestGenerateFormSendsVisitorID(t *testing.T) {
+	js, err := GenerateForm("00000000-0000-4000-8000-000000000000", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`_getCookie("automata_visitor")`, `visitor_id:visitorId`} {
+		if !strings.Contains(js, want) {
+			t.Errorf("snippet missing %q", want)
+		}
+	}
+}
+
 func TestGenerateFormValidation(t *testing.T) {
 	if _, err := GenerateForm("", "contact"); err == nil {
 		t.Error("expected error for empty contextID")

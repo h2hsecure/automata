@@ -29,6 +29,8 @@ var contextId=__AUTOMATA_CONTEXT_ID__;
 var slug=__AUTOMATA_FORM_SLUG__;
 var definitionUrl=__AUTOMATA_DEFINITION_URL__;
 var submitUrl=__AUTOMATA_SUBMIT_URL__;
+function _getCookie(n){var m=n+"=";var c=document.cookie.split(";");for(var i=0;i<c.length;i++){var v=c[i].trim();if(v.indexOf(m)===0)return v.substring(m.length,v.length)}return null}
+var visitorId=_getCookie("automata_visitor");
 function container(){
 var el=document.querySelector('[data-automata-form="'+slug+'"]');
 if(el)return el;
@@ -105,7 +107,7 @@ status.style.color="#555";
 fetch(submitUrl,{
 method:"POST",
 headers:{"Content-Type":"application/json","X-Context-ID":contextId},
-body:JSON.stringify({data:data})
+body:JSON.stringify({data:data,visitor_id:visitorId})
 }).then(function(res){
 return res.text().then(function(t){return{ok:res.ok,text:t};});
 }).then(function(out){
