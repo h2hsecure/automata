@@ -189,4 +189,79 @@ var _ = Describe("Shadow User Tracking", func() {
 			Expect(cid).To(Equal(c.ID))
 		})
 	})
+
+	Describe("GET /context/tracking/visitors (context-scoped)", func() {
+		var (
+			contextID  string
+			vid1       string
+			vid2       string
+			visitorAPI *gin.Engine
+		)
+
+		BeforeEach(func() {
+			contextID = support.NewTestContextID()
+			vid1 = support.NewTestUUID()
+			vid2 = support.NewTestUUID()
+
+			// Seed two visitors via the tracking server with distinct client IPs.
+			track := func(visitorID, remoteAddr string) {
+				body := `{"contextId":"` + contextID + `","type":"page_view","url":"/home","visitor_id":"` + visitorID + `"}`
+				req := httptest.NewRequest("POST", "/track", bytes.NewBufferString(body))
+				req.Header.Set("Content-Type", "application/json")
+				req.RemoteAddr = remoteAddr
+				tw := httptest.NewRecorder()
+				engine.ServeHTTP(tw, req)
+				Expect(tw.Code).To(Equal(http.StatusNoContent))
+			}
+			track(vid1, "203.0.113.7:1234")
+			track(vid2, "203.0.113.9:1234")
+
+			// Main-API-style engine mounting the context tracking visitor routes.
+			visitorAPI = gin.New()
+			visitorAPI.Use(func(c *gin.Context) {
+				c.Set("context_id", contextID)
+				c.Next()
+			})
+			trackingHandler := bhandler.NewTrackingHandler(trepo.New(pool))
+			visitorAPI.GET("/context/tracking/visitors", trackingHandler.ListVisitors)
+			visitorAPI.GET("/context/tracking/visitors/:id/events", trackingHandler.GetVisitorEvents)
+		})
+
+		It("lists visitors with LastIP and ContactID fields", func() {
+			req := httptest.NewRequest("GET", "/context/tracking/visitors?limit=10", nil)
+			vw := httptest.NewRecorder()
+			visitorAPI.ServeHTTP(vw, req)
+			Expect(vw.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Visitors []map[string]interface{} `json:"visitors"`
+				Total    int                      `json:"total"`
+			}
+			Expect(json.Unmarshal(vw.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Total).To(Equal(2))
+			Expect(resp.Visitors).To(HaveLen(2))
+			for _, v := range resp.Visitors {
+				_, hasLastIP := v["LastIP"]
+				Expect(hasLastIP).To(BeTrue())
+				_, hasContactID := v["ContactID"]
+				Expect(hasContactID).To(BeTrue())
+			}
+		})
+
+		It("returns the visitor's events with the stored IP", func() {
+			req := httptest.NewRequest("GET", "/context/tracking/visitors/"+vid1+"/events?limit=10", nil)
+			vw := httptest.NewRecorder()
+			visitorAPI.ServeHTTP(vw, req)
+			Expect(vw.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Events []map[string]interface{} `json:"events"`
+				Total  int                      `json:"total"`
+			}
+			Expect(json.Unmarshal(vw.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Total).To(Equal(1))
+			Expect(resp.Events).To(HaveLen(1))
+			Expect(resp.Events[0]["IP"]).To(Equal("203.0.113.7"))
+		})
+	})
 })

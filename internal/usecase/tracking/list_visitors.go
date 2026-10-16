@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hekemen/automata/internal/domain/tracking"
@@ -23,7 +24,7 @@ func ListVisitors(repo tracking.Repository, contextID string, opts tracking.List
 		return nil, 0, fmt.Errorf("limit must be between 1 and 100")
 	}
 
-	visitors, total, err := repo.ListVisitors(nil, contextID, opts)
+	visitors, total, err := repo.ListVisitors(context.Background(), contextID, opts)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list visitors: %w", err)
 	}

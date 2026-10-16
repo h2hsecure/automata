@@ -359,17 +359,17 @@ func (r *repo) ListVisitors(ctx context.Context, contextID string, opts tracking
 	switch opts.Sort {
 	case "first_seen":
 		sortCol = "first_seen"
-	case "last_seen":
-		sortCol = "last_seen"
 	case "page_views":
 		sortCol = "page_views"
+	case "", "last_seen":
+		sortCol = "last_seen"
 	default:
 		return nil, 0, fmt.Errorf("invalid sort field: %s", opts.Sort)
 	}
 
 	countQuery := `SELECT COUNT(*) FROM tracking_visitors WHERE context_id = $1`
 	dataQuery := `
-		SELECT id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views, last_ip, contact_id
+		SELECT id, context_id, cookie_value, COALESCE(fingerprint, ''), first_seen, last_seen, page_views, COALESCE(last_ip, ''), COALESCE(contact_id, '')
 		FROM tracking_visitors
 		WHERE context_id = $1
 		ORDER BY ` + sortCol + ` DESC

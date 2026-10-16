@@ -196,6 +196,8 @@ func NewServer(
 	{
 		api.GET("/context/tracking/dashboard", middleware.AuthMiddleware(authService), trackingHandler.GetDashboard)
 		api.GET("/context/tracking/events", middleware.AuthMiddleware(authService), trackingHandler.GetEvents)
+		api.GET("/context/tracking/visitors", middleware.AuthMiddleware(authService), trackingHandler.ListVisitors)
+		api.GET("/context/tracking/visitors/:id/events", middleware.AuthMiddleware(authService), trackingHandler.GetVisitorEvents)
 	}
 
 	// API keys list/revoke (admin routes)
