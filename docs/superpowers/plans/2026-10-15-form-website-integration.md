@@ -401,30 +401,39 @@ where `contextID` is `authStore.currentContextId` and `slug` is the form's slug.
 
 ## Task 5: Full cicd run + commit
 
-- [ ] 5.1 Run the full cicd suite: `make test` (or `go test ./cicd/ -run TestCicd`).
-- [ ] 5.2 Compare against baseline (300 passed | 23 failed). Expected: **313 passed | 10 failed**, with all 10 failures in `banner_campaign_http` (documented out-of-scope pre-existing).
-- [ ] 5.3 `go vet ./...` — no new failures (pre-existing failure in `internal/adapter/proxy/proxy_test.go:23` is allowed).
-- [ ] 5.4 Commit all changes (Go, cicd, spec/plan docs, rebuilt `web/`) on `phase2-auth-changes`. Do NOT commit the user's uncommitted files (`AGENTS.md`, `helm/automata/values.yaml`, `automata` binary, `.playwright-mcp/`, the 7 uncommitted cicd tests, `docs/phase1.md`).
+- [x] 5.1 Run the full cicd suite: `make test` (or `go test ./cicd/ -run TestCicd`).
+- [x] 5.2 Compare against baseline (300 passed | 23 failed). Actual: **320 passed | 10 failed** of 330 (suite grew to 330 with the 7 new Public Form Endpoints specs), with all 10 failures in `banner_campaign_http` (documented out-of-scope pre-existing).
+- [x] 5.3 `go vet ./...` — no new failures (pre-existing failure in `internal/adapter/proxy/proxy_test.go:23` is allowed).
+- [x] 5.4 Commit all changes (Go, cicd, spec/plan docs, rebuilt `web/`) on `phase2-auth-changes`. Do NOT commit the user's uncommitted files (`AGENTS.md`, `helm/automata/values.yaml`, `automata` binary, `.playwright-mcp/`, the 7 uncommitted cicd tests, `docs/phase1.md`). — Commit `6c96319` (47 files; user files verified unstaged).
 
 ## Task 6: Deploy + ingress + live verification
 
-- [ ] 6.1 Reset `/tmp/opencode/automata-deploy` worktree to the new commit.
-- [ ] 6.2 Build static binaries in the worktree: `CGO_ENABLED=0 go build -o automata ./cmd/automata` and `CGO_ENABLED=0 go build -o bff ./cmd/bff`; verify with `file` that both say "statically linked".
-- [ ] 6.3 `docker build -f /tmp/opencode/Dockerfile.deploy` → tag `latest` + short-sha; push both tags.
-- [ ] 6.4 `kubectl -n automata rollout restart deployment/automata-automata deployment/automata-bff`; wait for `1/1 Running`, 0 restarts.
-- [ ] 6.5 Live HTTP verification (text only, no screenshots):
-  - `curl -s http://automata-automata.automata.svc.cluster.local:8081/health` or via port-forward → 200.
+- [x] 6.1 Reset `/tmp/opencode/automata-deploy` worktree to the new commit. — Reset to `6c96319`; `web/` assets are the new build.
+- [x] 6.2 Build static binaries in the worktree: `CGO_ENABLED=0 go build -o automata ./cmd/automata` and `CGO_ENABLED=0 go build -o bff ./cmd/bff`; verify with `file` that both say "statically linked". — Both reported "statically linked".
+- [x] 6.3 `docker build -f /tmp/opencode/Dockerfile.deploy` → tag `latest` + short-sha; push both tags. — Digest `sha256:11dce9ee…`; both tags pushed.
+- [x] 6.4 `kubectl -n automata rollout restart deployment/automata-automata deployment/automata-bff`; wait for `1/1 Running`, 0 restarts. — Both rolled out, 0 restarts. Note: rollout changed the tracking pod IP; the pweb shim `automata-tracking` EndpointSlice (Helm-managed in `pdaccess-web`) was repatched to the stable ClusterIP `10.43.126.203` of `automata-automata` (pod IP would break on every rollout).
+- [x] 6.5 Live HTTP verification (text only, no screenshots):
+  - `curl -s http://automata-automata.automata.svc.cluster.local:8081/health` or via port-forward → 200. — Port-forward: `/health` → 200.
   - Create a form via the API (or use an existing one in the default context `8c61ddc4-debd-445e-b90b-3c62f89dfcfc`):
-    - `GET /form/definition/<ctx>/<slug>` → 200 JSON with the form.
-    - `GET /form/snippet/<ctx>/<slug>` → 200, `Content-Type: application/javascript`, body contains the context ID.
-    - `GET /form/definition/<ctx>/unknown` → 404.
-    - `GET /form/list` without header → 401; with `X-Context-ID` → 200.
-- [ ] 6.6 Patch the pweb ingress: add `/form` (Prefix) → `automata-tracking:8081` alongside the existing `/track` and `/snippet` paths; update `/tmp/opencode/pweb-automata-tracking.yaml` to match.
-- [ ] 6.7 Verify through the pweb ingress host (`pweb.home.arpa`): `/form/snippet/<ctx>/<slug>` → 200 JS; `/form/definition/<ctx>/<slug>` → 200 JSON.
-- [ ] 6.8 Hand the embed tag to the user for on-page testing.
+    - `GET /form/definition/<ctx>/<slug>` → 200 JSON with the form. — 200, normalized lowercase contract (existing form slug `test`).
+    - `GET /form/snippet/<ctx>/<slug>` → 200, `Content-Type: application/javascript`, body contains the context ID. — 200 `application/javascript; charset=utf-8`; body contains context ID, slug, and inlined definition/submit URLs. `.js`-suffixed URL also 200.
+    - `GET /form/definition/<ctx>/unknown` → 404. — 404.
+    - `GET /form/list` without header → 401; with `X-Context-ID` → 200. — 401 / 200 with the form list.
+- [x] 6.6 Patch the pweb ingress: add `/form` (Prefix) → `automata-tracking:8081` alongside the existing `/track` and `/snippet` paths; update `/tmp/opencode/pweb-automata-tracking.yaml` to match. — Ingress now has `/`, `/track`, `/snippet`, `/form`; YAML updated (validated: 3 docs parse, all 4 paths present).
+- [x] 6.7 Verify through the pweb ingress host (`pweb.home.arpa`): `/form/snippet/<ctx>/<slug>` → 200 JS; `/form/definition/<ctx>/<slug>` → 200 JSON. — Both 200 via `http://pweb.home.arpa`; unknown slug 404; `/` still serves the site (200 text/html); `/track` with a valid contextId → 204 (empty-body 500 is pre-existing handler behavior, untouched by Option B).
+- [x] 6.8 Hand the embed tag to the user for on-page testing. — Tag delivered: `<script src="/form/snippet/8c61ddc4-debd-445e-b90b-3c62f89dfcfc/test"></script>` (Web UI Forms page → Embed action generates it per form).
 
 ---
 
 ## Execution Status
 
-_(to be filled in after completion)_
+**Completed 2026-10-15.** All tasks (1–6) executed and verified.
+
+- **Code**: committed as `6c96319` on `phase2-auth-changes` (47 files: Go, cicd, spec/plan docs, `FormsView.vue`, rebuilt `web/`). User's uncommitted files were excluded and left untouched.
+- **Tests**: full cicd suite `320 passed | 10 failed` of 330 — all 10 failures are the documented out-of-scope pre-existing `banner_campaign_http` set. `go vet ./...` clean except the pre-existing `internal/adapter/proxy/proxy_test.go:23` failure.
+- **Deploy**: image built from `6c96319` (digest `sha256:11dce9ee…`), both `automata-automata` and `automata-bff` rolled out `1/1 Running`, 0 restarts. The pweb shim `automata-tracking` EndpointSlice was repatched to the stable ClusterIP `10.43.126.203` (pod IP changes on every rollout).
+- **Ingress**: pweb ingress now routes `/`, `/track`, `/snippet`, `/form` (all to the right backends). Chart-ready source of truth updated in `/tmp/opencode/pweb-automata-tracking.yaml`.
+- **Live verification** (text/DOM/HTTP only, no screenshots): tracking server `/health` 200; `/form/definition/<ctx>/test` 200 normalized JSON; `/form/snippet/<ctx>/test` 200 `application/javascript` with context ID + inlined URLs (`.js` suffix also 200); unknown slug 404; `/form/list` 401 without header / 200 with `X-Context-ID`. Through `pweb.home.arpa`: `/form/snippet` 200 JS, `/form/definition` 200 JSON, unknown 404, `/` still serves the site, `/track` with a valid contextId 204.
+- **Embed tag delivered**: `<script src="/form/snippet/8c61ddc4-debd-445e-b90b-3c62f89dfcfc/test"></script>` (Web UI Forms page → Embed action generates it per form).
+
+**Remaining (manual, not blocking)**: user on-page testing of the rendered form and the Web UI Embed action; email relay verification (separate plan).
