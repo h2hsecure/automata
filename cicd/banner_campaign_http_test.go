@@ -15,9 +15,24 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// testContextMiddleware mirrors the production ContextResolver contract for
+// these handler tests: it resolves context_id from the X-Context-ID header.
+// Tests use random context IDs that are not rows in the contexts table, so
+// the middleware intentionally skips the DB validation that production does.
+// Routes that require a context return 400 themselves when it is absent.
+func testContextMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if contextID := c.GetHeader("X-Context-ID"); contextID != "" {
+			c.Set("context_id", contextID)
+		}
+		c.Next()
+	}
+}
+
 func setupBannerEngine() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
+	engine.Use(testContextMiddleware())
 	bannerRepo := brepo.New(pool)
 	bannerHandler := bhandler.NewBannerHandler(bannerRepo)
 	placementHandler := bhandler.NewPlacementHandler(bannerRepo)
