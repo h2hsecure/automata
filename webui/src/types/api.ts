@@ -134,10 +134,9 @@ export interface Campaign {
 export interface ApiKey {
   id: string;
   name: string;
-  key_prefix: string;
+  key: string;
   expires_at: string | null;
   created_at: string;
-  active: boolean;
 }
 
 export interface Context {

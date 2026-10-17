@@ -36,9 +36,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'api-keys',
-        name: 'ApiKeys',
-        component: () => import('@/views/ApiKeysView.vue'),
-        meta: { requiresAdmin: true },
+        redirect: '/settings?tab=api-keys',
       },
       {
         path: 'banners',

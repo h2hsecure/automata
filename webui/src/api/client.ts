@@ -257,14 +257,18 @@ export async function deleteContext(id: string): Promise<void> {
 
 // API Key endpoints (admin only)
 export async function listApiKeys(): Promise<ApiKey[]> {
-  return [] // TODO: implement API keys endpoint
+  const response = await client.get('/admin/api-keys')
+  return response.data.keys ?? []
 }
 
-export async function createApiKey(data: { name: string; expires_at?: string }): Promise<ApiKey> {
-  return {} as ApiKey
+export async function createApiKey(data: { name: string; expires_in?: number }): Promise<{ key: string }> {
+  const response = await client.post('/admin/api-keys', data)
+  return response.data
 }
 
-export async function revokeApiKey(id: string): Promise<void> {}
+export async function revokeApiKey(id: string): Promise<void> {
+  await client.delete(`/admin/api-keys/${id}`)
+}
 
 // Global settings endpoints (admin only)
 export async function listSettings(): Promise<Record<string, string>> {

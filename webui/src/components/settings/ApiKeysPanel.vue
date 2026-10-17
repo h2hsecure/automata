@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Pencil, Trash2, Plus, Key, Copy } from 'lucide-vue-next'
+import { ref, computed, onMounted } from 'vue'
+import { Key, Copy, Plus, Trash2 } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -12,12 +12,18 @@ import { useConfirm } from '@/composables/useConfirm'
 import { listApiKeys, createApiKey, revokeApiKey } from '@/api/client'
 import type { ApiKey } from '@/types/api'
 
-const { confirmStore, show, confirm } = useConfirm()
+const { show } = useConfirm()
 const keys = ref<ApiKey[]>([])
 const loading = ref(false)
 const modalOpen = ref(false)
 const keyName = ref('')
-const keyExpiry = ref('')
+const keyExpiry = ref<number | null>(null)
+const keyExpiryDays = computed({
+  get: () => (keyExpiry.value === null ? '' : String(keyExpiry.value)),
+  set: (v: string) => {
+    keyExpiry.value = v === '' ? null : Number(v)
+  },
+})
 const newKey = ref('')
 const formError = ref('')
 const justCreated = ref(false)
@@ -42,7 +48,7 @@ async function loadKeys() {
 
 function openCreate() {
   keyName.value = ''
-  keyExpiry.value = ''
+  keyExpiry.value = null
   newKey.value = ''
   formError.value = ''
   justCreated.value = false
@@ -56,8 +62,8 @@ async function handleSave() {
   }
   loading.value = true
   try {
-    const data: { name: string; expires_at?: string } = { name: keyName.value }
-    if (keyExpiry.value) data.expires_at = keyExpiry.value
+    const data: { name: string; expires_in?: number } = { name: keyName.value }
+    if (keyExpiry.value !== null) data.expires_in = keyExpiry.value
     const result = await createApiKey(data)
     newKey.value = result.key || ''
     justCreated.value = true
@@ -100,11 +106,6 @@ async function handleRevoke(key: ApiKey) {
   }
 }
 
-function maskKey(key: string): string {
-  if (key.length <= 8) return key
-  return key.substring(0, 8) + '...'
-}
-
 onMounted(loadKeys)
 </script>
 
@@ -135,12 +136,10 @@ onMounted(loadKeys)
           </div>
         </template>
         <template #key="{ row }: { row: ApiKey }">
-          <code class="text-sm bg-muted px-1.5 py-0.5 rounded">{{ row.key_prefix || '••••••' }}</code>
+          <code class="text-sm bg-muted px-1.5 py-0.5 rounded">{{ row.key || '••••••' }}</code>
         </template>
-        <template #status="{ row }: { row: ApiKey }">
-          <Badge :variant="row.active ? 'success' : 'destructive'">
-            {{ row.active ? 'Active' : 'Revoked' }}
-          </Badge>
+        <template #status>
+          <Badge variant="success">Active</Badge>
         </template>
         <template #expires_at="{ row }: { row: ApiKey }">
           {{ row.expires_at ? new Date(row.expires_at).toLocaleDateString() : 'Never' }}
@@ -150,7 +149,6 @@ onMounted(loadKeys)
         </template>
         <template #actions="{ row }: { row: ApiKey }">
           <button
-            v-if="row.active"
             class="p-1.5 rounded hover:bg-muted text-destructive"
             @click="handleRevoke(row)"
           >
@@ -176,7 +174,7 @@ onMounted(loadKeys)
       </div>
       <div v-else class="space-y-4">
         <Input v-model="keyName" label="Key Name" placeholder="Production API Key" />
-        <Input v-model="keyExpiry" type="date" label="Expiry Date (optional)" />
+        <Input v-model="keyExpiryDays" type="number" label="Expiry (days, optional)" placeholder="e.g. 30" />
         <p v-if="formError" class="text-sm text-destructive">{{ formError }}</p>
       </div>
       <template #footer>

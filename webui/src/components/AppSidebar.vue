@@ -6,7 +6,6 @@ import {
   Users,
   FileText,
   Image,
-  Key,
   Globe,
   Menu,
   X,
@@ -35,7 +34,6 @@ const navItems: NavItem[] = [
   { name: 'Forms', path: '/forms', icon: FileText },
   { name: 'Banners', path: '/banners', icon: Image },
   { name: 'Websites', path: '/contexts', icon: Globe, adminOnly: true },
-  { name: 'API Keys', path: '/api-keys', icon: Key, adminOnly: true },
   { name: 'Settings', path: '/settings', icon: Settings, adminOnly: true },
 ]
 
