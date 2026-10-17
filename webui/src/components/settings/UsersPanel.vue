@@ -150,7 +150,11 @@ const memberColumns = [
 ]
 
 async function loadContexts() {
-  contexts.value = await listContexts(0, 100)
+  try {
+    contexts.value = await listContexts(0, 1000)
+  } catch {
+    // handled: select stays empty
+  }
 }
 
 async function loadMembers() {

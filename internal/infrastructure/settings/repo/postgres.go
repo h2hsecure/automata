@@ -3,9 +3,9 @@ package repo
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"errors"
 	"fmt"
-	_ "embed"
 
 	"github.com/hekemen/automata/internal/domain/settings"
 	"github.com/jackc/pgx/v5/pgxpool"

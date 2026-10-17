@@ -27,14 +27,14 @@ func (c Config) IsConfigured() bool { return c.Host != "" && c.From != "" }
 type ConfigProvider func() Config
 
 // MergeConfig applies non-empty smtp.* overrides from a key-value settings
-// map onto base. A non-numeric smtp.port is ignored; smtp.starttls is true
-// unless the override is "false".
+// map onto base. A non-numeric or non-positive smtp.port is ignored;
+// smtp.starttls is true unless the override is "false".
 func MergeConfig(base Config, overrides map[string]string) Config {
 	if v := overrides["smtp.host"]; v != "" {
 		base.Host = v
 	}
 	if v := overrides["smtp.port"]; v != "" {
-		if p, err := strconv.Atoi(v); err == nil {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
 			base.Port = p
 		}
 	}

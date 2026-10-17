@@ -20,7 +20,6 @@ const loading = ref(false)
 const saving = ref(false)
 const modalOpen = ref(false)
 const isEdit = ref(false)
-const editingKey = ref('')
 const key = ref('')
 const value = ref('')
 const formError = ref('')
@@ -43,7 +42,6 @@ async function loadSettings() {
 
 function openCreate() {
   isEdit.value = false
-  editingKey.value = ''
   key.value = ''
   value.value = ''
   formError.value = ''
@@ -52,7 +50,6 @@ function openCreate() {
 
 function openEdit(row: SettingRow) {
   isEdit.value = true
-  editingKey.value = row.key
   key.value = row.key
   value.value = row.value
   formError.value = ''
