@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,13 +31,29 @@ type UpdateUserRequest struct {
 	IsAdmin  *bool   `json:"is_admin"`
 }
 
+type userDTO struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	IsAdmin   bool      `json:"is_admin"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 func (h *UserHandler) List(c *gin.Context) {
 	users, err := h.userRepo.ListAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"users": users})
+	dtos := make([]userDTO, 0, len(users))
+	for _, u := range users {
+		dtos = append(dtos, userDTO{
+			ID:        u.ID,
+			Email:     u.Email,
+			IsAdmin:   u.IsAdmin,
+			CreatedAt: u.CreatedAt,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"users": dtos})
 }
 
 func (h *UserHandler) Create(c *gin.Context) {

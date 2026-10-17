@@ -82,6 +82,23 @@ var _ = Describe("User CRUD", func() {
 			Expect(ok).To(BeTrue())
 			Expect(len(usersArr)).To(Equal(2))
 		})
+
+		It("returns snake_case DTOs without password hashes", func() {
+			userID := support.NewTestUUID()
+			_, err := pool.Exec(ctx, `
+				INSERT INTO users (id, email, password_hash, is_admin, created_at, updated_at)
+				VALUES ($1, 'dto@test.local', '$2a$10$secretsecretsecretsecretsecretse', true, NOW(), NOW())`,
+				userID)
+			Expect(err).NotTo(HaveOccurred())
+
+			req := httptest.NewRequest("GET", "/admin/users", nil)
+			engine.ServeHTTP(w, req)
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Body.String()).To(ContainSubstring(`"email":"dto@test.local"`))
+			Expect(w.Body.String()).To(ContainSubstring(`"is_admin":true`))
+			Expect(w.Body.String()).ToNot(ContainSubstring("secretsecret"))
+			Expect(w.Body.String()).ToNot(ContainSubstring("PasswordHash"))
+		})
 	})
 
 	Describe("POST /admin/users", func() {
