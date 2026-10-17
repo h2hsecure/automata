@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Zap,
+  Settings,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { name: 'Banners', path: '/banners', icon: Image },
   { name: 'Websites', path: '/contexts', icon: Globe, adminOnly: true },
   { name: 'API Keys', path: '/api-keys', icon: Key, adminOnly: true },
+  { name: 'Settings', path: '/settings', icon: Settings, adminOnly: true },
 ]
 
 const filteredItems = computed(() =>

@@ -266,4 +266,18 @@ export async function createApiKey(data: { name: string; expires_at?: string }):
 
 export async function revokeApiKey(id: string): Promise<void> {}
 
+// Global settings endpoints (admin only)
+export async function listSettings(): Promise<Record<string, string>> {
+  const { data } = await client.get('/admin/settings')
+  return data.settings
+}
+
+export async function upsertSetting(key: string, value: string): Promise<void> {
+  await client.put('/admin/settings', { key, value })
+}
+
+export async function deleteSetting(key: string): Promise<void> {
+  await client.delete(`/admin/settings/${key}`)
+}
+
 export default client
