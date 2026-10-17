@@ -45,9 +45,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'contexts',
-        name: 'Contexts',
-        component: () => import('@/views/ContextsView.vue'),
-        meta: { requiresAdmin: true },
+        redirect: '/settings?tab=websites',
       },
       {
         path: 'contexts/:id',

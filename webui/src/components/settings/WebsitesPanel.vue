@@ -118,7 +118,7 @@ async function handleDelete(c: Context) {
 }
 
 function viewContext(c: Context) {
-  router.push(`/contexts/${c.ID}`)
+  router.push({ name: 'ContextDetail', params: { id: c.ID } })
 }
 
 onMounted(loadContexts)

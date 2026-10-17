@@ -1,4 +1,4 @@
-import{D as a}from"./index-CCdq06e6.js";/**
+import{D as a}from"./index-BqhCmP9P.js";/**
  * @license lucide-vue-next v0.400.0 - ISC
  *
  * This source code is licensed under the ISC license.
