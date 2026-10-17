@@ -4,18 +4,20 @@ import { useRoute, useRouter } from 'vue-router'
 import Card from '@/components/Card.vue'
 import SettingsPanel from '@/components/settings/SettingsPanel.vue'
 import ApiKeysPanel from '@/components/settings/ApiKeysPanel.vue'
+import UsersPanel from '@/components/settings/UsersPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const tabs = [
+  { id: 'users', label: 'Users' },
   { id: 'settings', label: 'Settings' },
   { id: 'api-keys', label: 'API Keys' },
 ]
 
 const activeTab = computed(() => {
   const tab = route.query.tab
-  return tabs.some((t) => t.id === tab) ? (tab as string) : 'settings'
+  return tabs.some((t) => t.id === tab) ? (tab as string) : 'users'
 })
 
 function selectTab(id: string) {
@@ -47,7 +49,8 @@ function selectTab(id: string) {
       </div>
     </div>
 
-    <Card v-if="activeTab === 'settings'">
+    <UsersPanel v-if="activeTab === 'users'" />
+    <Card v-else-if="activeTab === 'settings'">
       <SettingsPanel />
     </Card>
     <ApiKeysPanel v-else-if="activeTab === 'api-keys'" />

@@ -16,6 +16,7 @@ import type {
   User,
   Campaign,
   Placement,
+  ContextUser,
 } from '@/types/api'
 
 const client: AxiosInstance = axios.create({
@@ -268,6 +269,40 @@ export async function createApiKey(data: { name: string; expires_in?: number }):
 
 export async function revokeApiKey(id: string): Promise<void> {
   await client.delete(`/admin/api-keys/${id}`)
+}
+
+// User endpoints (admin only)
+export async function listUsers(): Promise<User[]> {
+  const response = await client.get('/admin/users')
+  return response.data.users ?? []
+}
+
+export async function createUser(data: { email: string; password: string; is_admin?: boolean }): Promise<User> {
+  const response = await client.post('/admin/users', data)
+  return response.data
+}
+
+export async function updateUser(id: string, data: { email?: string; password?: string; is_admin?: boolean }): Promise<User> {
+  const response = await client.put(`/admin/users/${id}`, data)
+  return response.data
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await client.delete(`/admin/users/${id}`)
+}
+
+// Context membership endpoints (admin only)
+export async function listContextUsers(contextId: string): Promise<ContextUser[]> {
+  const response = await client.get(`/admin/contexts/${contextId}/users`)
+  return response.data.members ?? []
+}
+
+export async function assignContextUser(contextId: string, data: { user_id: string; role: string }): Promise<void> {
+  await client.post(`/admin/contexts/${contextId}/users`, data)
+}
+
+export async function removeContextUser(contextId: string, userId: string): Promise<void> {
+  await client.delete(`/admin/contexts/${contextId}/users/${userId}`)
 }
 
 // Global settings endpoints (admin only)

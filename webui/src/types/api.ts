@@ -210,4 +210,14 @@ export interface User {
   id: string;
   email: string;
   is_admin: boolean;
+  created_at: string;
+}
+
+// NOTE: the backend UserContext domain struct has no json tags, so list
+// responses use Go's PascalCase field names.
+export interface ContextUser {
+  ID: string;
+  UserID: string;
+  ContextID: string;
+  Role: string;
 }
