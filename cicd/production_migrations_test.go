@@ -9,6 +9,7 @@ import (
 	"github.com/hekemen/automata/internal/infrastructure/database"
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
 	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
+	settings_repo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
@@ -50,6 +51,9 @@ func runProductionMigrations(pool *pgxpool.Pool) error {
 	if err := database.RunUserContextMigrations(pool); err != nil {
 		return fmt.Errorf("user-context: %w", err)
 	}
+	if err := settings_repo.RunMigrations(pool); err != nil {
+		return fmt.Errorf("settings: %w", err)
+	}
 	return nil
 }
 
@@ -61,7 +65,7 @@ var _ = Describe("Production startup migrations", func() {
 
 		Expect(runProductionMigrations(fresh.Pool)).To(Succeed())
 
-		for _, table := range []string{"email_jobs", "webhook_deliveries"} {
+		for _, table := range []string{"email_jobs", "webhook_deliveries", "global_settings"} {
 			var count int
 			err := fresh.Pool.QueryRow(ctx,
 				"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = $1", table).Scan(&count)

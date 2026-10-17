@@ -29,6 +29,7 @@ import (
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
+	settings_repo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
 	"github.com/rs/zerolog/log"
 )
 
@@ -88,6 +89,10 @@ func main() {
 
 	if err := database.RunUserContextMigrations(pool); err != nil {
 		log.Fatal().Err(err).Msg("failed to run user-context migrations")
+	}
+
+	if err := settings_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("settings migration failed")
 	}
 
 	// Verify database connection

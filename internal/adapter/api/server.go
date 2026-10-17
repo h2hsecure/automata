@@ -19,6 +19,7 @@ import (
 	config_repo "github.com/hekemen/automata/internal/infrastructure/config/repo"
 	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
+	settingsrepo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
 	webhook_svc "github.com/hekemen/automata/internal/infrastructure/webhook"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
@@ -100,6 +101,13 @@ func NewServer(
 		admin.PUT("/configs/:contextId/cors", configHandler.UpdateCORS)
 		admin.PUT("/configs/:contextId/domain", configHandler.UpdateDomain)
 		admin.PUT("/configs/:contextId/display", configHandler.UpdateDisplay)
+
+		// Global settings routes
+		settingsRepo := settingsrepo.New(pool)
+		settingsHandler := handler.NewSettingsHandler(settingsRepo)
+		admin.GET("/settings", settingsHandler.List)
+		admin.PUT("/settings", settingsHandler.Upsert)
+		admin.DELETE("/settings/:key", settingsHandler.Delete)
 
 		// Tracking visitor routes
 		trackingRepo := trackingRepo.New(pool)
