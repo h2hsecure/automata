@@ -211,7 +211,15 @@ func main() {
 		From:     config.Get("smtp.from"),
 		StartTLS: config.Get("smtp.starttls") != "false",
 	}
-	mailer := mailsmtp.NewMailer(smtpCfg)
+	settingsRepo := settings_repo.New(pool)
+	mailer := mailsmtp.NewMailerWithProvider(
+		func() mailsmtp.Config {
+			m, _ := settingsRepo.List()
+			return mailsmtp.MergeConfig(smtpCfg, m)
+		},
+		smtpCfg,
+		mailsmtp.DefaultDialer,
+	)
 	if !mailer.IsConfigured() {
 		log.Warn().Msg("smtp not configured: email jobs will be discarded after max retries")
 	}

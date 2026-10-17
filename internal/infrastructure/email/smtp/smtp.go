@@ -22,6 +22,37 @@ type Config struct {
 
 func (c Config) IsConfigured() bool { return c.Host != "" && c.From != "" }
 
+// ConfigProvider resolves the effective SMTP config at send time, e.g. by
+// merging yaml defaults with global settings stored in the database.
+type ConfigProvider func() Config
+
+// MergeConfig applies non-empty smtp.* overrides from a key-value settings
+// map onto base. A non-numeric smtp.port is ignored; smtp.starttls is true
+// unless the override is "false".
+func MergeConfig(base Config, overrides map[string]string) Config {
+	if v := overrides["smtp.host"]; v != "" {
+		base.Host = v
+	}
+	if v := overrides["smtp.port"]; v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			base.Port = p
+		}
+	}
+	if v := overrides["smtp.username"]; v != "" {
+		base.Username = v
+	}
+	if v := overrides["smtp.password"]; v != "" {
+		base.Password = v
+	}
+	if v := overrides["smtp.from"]; v != "" {
+		base.From = v
+	}
+	if v := overrides["smtp.starttls"]; v != "" {
+		base.StartTLS = v != "false"
+	}
+	return base
+}
+
 type Client interface {
 	Mail(from string) error
 	Rcpt(to string) error
@@ -34,8 +65,10 @@ type Dialer interface {
 }
 
 type SMTPMailer struct {
-	cfg    Config
-	dialer Dialer
+	cfg       Config
+	dialer    Dialer
+	provider  ConfigProvider
+	dialerFor func(Config) Dialer
 }
 
 func NewMailer(cfg Config) *SMTPMailer {
@@ -48,21 +81,34 @@ func NewMailerWithDialer(cfg Config, dialer Dialer) *SMTPMailer {
 	return &SMTPMailer{cfg: cfg, dialer: dialer}
 }
 
+// NewMailerWithProvider resolves the config from provider (and the dialer
+// from dialerFor) on every Send call, so config changes take effect without
+// a restart. fallback is stored as the mailer's static config so
+// IsConfigured() reflects the yaml base at startup.
+func NewMailerWithProvider(provider ConfigProvider, fallback Config, dialerFor func(Config) Dialer) *SMTPMailer {
+	return &SMTPMailer{cfg: fallback, provider: provider, dialerFor: dialerFor}
+}
+
 func (m *SMTPMailer) IsConfigured() bool { return m.cfg.IsConfigured() }
 
 func (m *SMTPMailer) Send(to []string, subject, body, htmlBody string) error {
-	if !m.cfg.IsConfigured() {
+	cfg, dialer := m.cfg, m.dialer
+	if m.provider != nil {
+		cfg = m.provider()
+		dialer = m.dialerFor(cfg)
+	}
+	if !cfg.IsConfigured() {
 		return errors.New("smtp not configured")
 	}
 	if len(to) == 0 {
 		return errors.New("no recipients")
 	}
-	client, err := m.dialer.Dial()
+	client, err := dialer.Dial()
 	if err != nil {
 		return fmt.Errorf("smtp dial: %w", err)
 	}
 	defer client.Close()
-	if err := client.Mail(m.cfg.From); err != nil {
+	if err := client.Mail(cfg.From); err != nil {
 		return fmt.Errorf("smtp mail from: %w", err)
 	}
 	for _, r := range to {
@@ -70,7 +116,7 @@ func (m *SMTPMailer) Send(to []string, subject, body, htmlBody string) error {
 			return fmt.Errorf("smtp rcpt to %s: %w", r, err)
 		}
 	}
-	if err := client.Data(buildMessage(m.cfg.From, to, subject, body, htmlBody)); err != nil {
+	if err := client.Data(buildMessage(cfg.From, to, subject, body, htmlBody)); err != nil {
 		return fmt.Errorf("smtp data: %w", err)
 	}
 	return nil
