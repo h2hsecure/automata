@@ -1,91 +1,77 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Pencil, Trash2, Plus } from 'lucide-vue-next'
+import { ref, computed, onMounted } from 'vue'
+import { Trash2 } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
-import DataTable from '@/components/DataTable.vue'
-import Modal from '@/components/Modal.vue'
+import Card from '@/components/Card.vue'
 import Input from '@/components/Input.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { useConfirm } from '@/composables/useConfirm'
 import { listSettings, upsertSetting, deleteSetting } from '@/api/client'
+import { settingGroups, knownSettingKeys } from './settingsCatalog'
+import type { SettingField } from './settingsCatalog'
 
-interface SettingRow {
-  key: string
-  value: string
-}
-
-const { show } = useConfirm()
-const settings = ref<SettingRow[]>([])
+const values = ref<Record<string, string>>({})
+const original = ref<Record<string, string>>({})
 const loading = ref(false)
 const saving = ref(false)
-const modalOpen = ref(false)
-const isEdit = ref(false)
-const key = ref('')
-const value = ref('')
-const formError = ref('')
+const saveError = ref('')
+const saveSuccess = ref(false)
 
-const columns = [
-  { key: 'key', label: 'Key' },
-  { key: 'value', label: 'Value' },
-  { key: 'actions', label: 'Actions', width: '100px' },
-]
+const unknownKeys = computed(() =>
+  Object.keys(values.value).filter((k) => !knownSettingKeys.has(k)),
+)
+
+const dirtyKeys = computed(() =>
+  Object.keys(values.value).filter((k) => values.value[k] !== original.value[k]),
+)
+
+const isDirty = computed(() => dirtyKeys.value.length > 0)
+
+function fieldChecked(field: SettingField): boolean {
+  return values.value[field.key] !== 'false'
+}
+
+function setFieldChecked(field: SettingField, checked: boolean) {
+  values.value[field.key] = checked ? 'true' : 'false'
+}
 
 async function loadSettings() {
   loading.value = true
   try {
     const data = await listSettings()
-    settings.value = Object.entries(data).map(([k, v]) => ({ key: k, value: v }))
+    const next: Record<string, string> = {}
+    for (const group of settingGroups) {
+      for (const field of group.fields) {
+        next[field.key] = data[field.key] ?? ''
+      }
+    }
+    for (const [k, v] of Object.entries(data)) {
+      if (!knownSettingKeys.has(k)) next[k] = v
+    }
+    values.value = next
+    original.value = { ...next }
   } finally {
     loading.value = false
   }
 }
 
-function openCreate() {
-  isEdit.value = false
-  key.value = ''
-  value.value = ''
-  formError.value = ''
-  modalOpen.value = true
-}
-
-function openEdit(row: SettingRow) {
-  isEdit.value = true
-  key.value = row.key
-  value.value = row.value
-  formError.value = ''
-  modalOpen.value = true
-}
-
 async function handleSave() {
-  if (!key.value.trim()) {
-    formError.value = 'Key is required.'
-    return
-  }
   saving.value = true
+  saveError.value = ''
+  saveSuccess.value = false
   try {
-    await upsertSetting(key.value.trim(), value.value)
-    modalOpen.value = false
-    await loadSettings()
+    for (const key of dirtyKeys.value) {
+      const next = values.value[key]
+      if (next === '') {
+        await deleteSetting(key)
+      } else {
+        await upsertSetting(key, next)
+      }
+    }
+    original.value = { ...values.value }
+    saveSuccess.value = true
   } catch (e: any) {
-    formError.value = e.response?.data?.error || 'Failed to save setting.'
+    saveError.value = e.response?.data?.error || 'Failed to save settings.'
   } finally {
     saving.value = false
-  }
-}
-
-async function handleDelete(row: SettingRow) {
-  const confirmed = await show({
-    title: 'Delete Setting',
-    description: `Are you sure you want to delete "${row.key}"?`,
-    variant: 'destructive',
-  })
-  if (confirmed) {
-    try {
-      await deleteSetting(row.key)
-      await loadSettings()
-    } catch {
-      // handled
-    }
   }
 }
 
@@ -96,63 +82,77 @@ onMounted(loadSettings)
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <p class="text-sm text-muted-foreground">
-        Global settings applied across all websites
+        Global settings applied across all websites. Empty fields fall back to
+        the defaults in config.yaml.
       </p>
-      <Button @click="openCreate">
-        <Plus class="mr-2 h-4 w-4" />
-        Add Setting
+      <Button :disabled="!isDirty || saving" :loading="saving" @click="handleSave">
+        Save Changes
       </Button>
     </div>
 
-    <DataTable
-      :columns="columns"
-      :data="settings"
-      :loading="loading"
-      empty-text="No settings found."
-    >
-      <template #key="{ row }: { row: SettingRow }">
-        <code class="text-sm bg-muted px-1.5 py-0.5 rounded">{{ row.key }}</code>
-      </template>
-      <template #value="{ row }: { row: SettingRow }">
-        {{ row.value || '-' }}
-      </template>
-      <template #actions="{ row }: { row: SettingRow }">
-        <div class="flex gap-1">
-          <button
-            class="p-1.5 rounded hover:bg-muted"
-            title="Edit"
-            @click="openEdit(row)"
-          >
-            <Pencil class="h-4 w-4" />
-          </button>
-          <button
-            class="p-1.5 rounded hover:bg-muted text-destructive"
-            title="Delete"
-            @click="handleDelete(row)"
-          >
-            <Trash2 class="h-4 w-4" />
-          </button>
-        </div>
-      </template>
-    </DataTable>
+    <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
+    <p v-if="saveSuccess" class="text-sm text-green-600">Settings saved.</p>
 
-    <!-- Modal -->
-    <Modal :open="modalOpen" :title="isEdit ? 'Edit Setting' : 'Add Setting'" @close="modalOpen = false">
-      <div class="space-y-4">
-        <Input v-model="key" label="Key" placeholder="e.g. default_redirect" :disabled="isEdit" />
-        <Input v-model="value" label="Value" placeholder="Setting value" />
-        <p v-if="formError" class="text-sm text-destructive">{{ formError }}</p>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <Button variant="outline" @click="modalOpen = false">Cancel</Button>
-          <Button :loading="saving" @click="handleSave">
-            {{ isEdit ? 'Save' : 'Create' }}
-          </Button>
-        </div>
-      </template>
-    </Modal>
+    <div v-if="loading" class="py-8 text-center text-sm text-muted-foreground">
+      Loading settings…
+    </div>
 
-    <ConfirmDialog />
+    <template v-else>
+      <Card
+        v-for="group in settingGroups"
+        :key="group.id"
+        :title="group.title"
+        :description="group.description"
+      >
+        <div class="grid gap-4 sm:grid-cols-2">
+          <template v-for="field in group.fields" :key="field.key">
+            <div v-if="field.type === 'boolean'" class="flex items-center gap-2">
+              <input
+                :id="field.key"
+                type="checkbox"
+                class="h-4 w-4 rounded border"
+                :checked="fieldChecked(field)"
+                @change="setFieldChecked(field, ($event.target as HTMLInputElement).checked)"
+              />
+              <label :for="field.key" class="text-sm">
+                {{ field.label }}
+                <span v-if="field.description" class="text-muted-foreground">
+                  — {{ field.description }}
+                </span>
+              </label>
+            </div>
+            <Input
+              v-else
+              v-model="values[field.key]"
+              :label="field.label"
+              :type="field.type"
+              :placeholder="field.placeholder"
+            />
+          </template>
+        </div>
+      </Card>
+
+      <Card
+        v-if="unknownKeys.length"
+        title="Other"
+        description="Settings not part of a known group."
+      >
+        <div class="space-y-3">
+          <div v-for="key in unknownKeys" :key="key" class="flex items-center gap-2">
+            <code class="w-56 shrink-0 truncate text-sm bg-muted px-1.5 py-0.5 rounded">
+              {{ key }}
+            </code>
+            <Input v-model="values[key]" placeholder="Value" />
+            <button
+              class="p-1.5 rounded hover:bg-muted text-destructive"
+              title="Delete"
+              @click="values[key] = ''"
+            >
+              <Trash2 class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </Card>
+    </template>
   </div>
 </template>
