@@ -132,9 +132,10 @@ func NewServer(
 	}
 
 	// Email template routes (declared outside admin block for context route access)
+	contactRepo := crepo.New(pool)
 	emailRepo := email_repo.New(pool)
 	emailQueue := queue.NewEmailQueue(pool)
-	emailUsecase := emailusecase.NewEmailUsecase(emailRepo, emailQueue)
+	emailUsecase := emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
 	emailHandler := handler.NewEmailHandler(emailUsecase)
 
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("", emailHandler.List)
@@ -143,6 +144,7 @@ func NewServer(
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).PUT("/:id", emailHandler.Update)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).DELETE("/:id", emailHandler.Delete)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("/:id/test", emailHandler.TestSend)
+	admin.POST("/contexts/:id/email-templates/:tid/send", middleware.AuthMiddleware(authService), emailHandler.SendToContact)
 
 	// Tracking visitor admin routes (already above)
 
@@ -163,7 +165,6 @@ func NewServer(
 		contextEmailGroup.POST("/send", emailHandler.Send)
 	}
 
-	contactRepo := crepo.New(pool)
 	contactHandler := handler.NewContactHandler(contactRepo)
 	{
 		api.GET("/context/contacts", middleware.AuthMiddleware(authService), contactHandler.List)

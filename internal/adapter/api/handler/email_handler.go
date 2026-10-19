@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -234,6 +235,36 @@ func (h *EmailHandler) Send(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, ewemail.SendEmailResponse{JobID: jobID})
+}
+
+// SendToContact handles POST /api/admin/contexts/:id/email-templates/:tid/send.
+func (h *EmailHandler) SendToContact(c *gin.Context) {
+	contextID := c.Param("id")
+	templateID := c.Param("tid")
+
+	var req struct {
+		ContactID string `json:"contact_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	jobID, err := h.usecase.SendToContact(contextID, templateID, req.ContactID)
+	if err != nil {
+		switch {
+		case errors.Is(err, email.ErrTemplateNotFound), errors.Is(err, email.ErrContactNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case errors.Is(err, email.ErrNotStandalone), errors.Is(err, email.ErrNoEmail):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		default:
+			log.Error().Err(err).Msg("standalone send failed")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"job_id": jobID})
 }
 
 // toTemplateResponse converts a domain model to API response.

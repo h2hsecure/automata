@@ -9,24 +9,27 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/hekemen/automata/cicd/support"
 	"github.com/hekemen/automata/internal/adapter/api/handler"
+	cd "github.com/hekemen/automata/internal/domain/contact"
 	"github.com/hekemen/automata/internal/domain/email"
-	emailusecase "github.com/hekemen/automata/internal/usecase/email"
+	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
 	"github.com/hekemen/automata/internal/infrastructure/email/repo"
 	email_infra "github.com/hekemen/automata/internal/infrastructure/queue"
+	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var (
-	emailRepo      email.Repository
-	emailQueue     email_infra.Queue
-	emailUsecase   *emailusecase.EmailUsecase
-	emailHandler   *handler.EmailHandler
+	emailRepo    email.Repository
+	emailQueue   email_infra.Queue
+	emailUsecase *emailusecase.EmailUsecase
+	emailHandler *handler.EmailHandler
 	// mockSMTP is declared in email_queue_test.go (same package)
-	testContextID  string
-	testContext    map[string]interface{}
+	testContextID string
+	testContext   map[string]interface{}
 )
 
 var _ = Describe("Email Template CRUD", func() {
@@ -192,7 +195,7 @@ var _ = Describe("Email Template CRUD", func() {
 		var resp email.TemplateResponse
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		Expect(resp.Subject).To(Equal("Updated Subject"))
-		Expect(resp.BodyText).To(Equal("Original Body")) // unchanged
+		Expect(resp.BodyText).To(Equal("Original Body"))        // unchanged
 		Expect(resp.BodyHTML).To(Equal("<p>Original Body</p>")) // unchanged
 	})
 
@@ -383,8 +386,8 @@ var _ = Describe("Send Email", func() {
 		})
 
 		req := email.SendEmailRequest{
-			ToArray: []string{"alice@example.com", "bob@example.com"},
-			Template: "send_test",
+			ToArray:   []string{"alice@example.com", "bob@example.com"},
+			Template:  "send_test",
 			Variables: map[string]string{"Name": "Test User"},
 		}
 
@@ -410,8 +413,8 @@ var _ = Describe("Send Email", func() {
 
 		// Single string
 		req1 := email.SendEmailRequest{
-			To:     "single@example.com",
-			Template: "to_field_test",
+			To:        "single@example.com",
+			Template:  "to_field_test",
 			Variables: map[string]string{},
 		}
 		jobID1, err := emailUsecase.SendEmail(testContextID, req1)
@@ -420,8 +423,8 @@ var _ = Describe("Send Email", func() {
 
 		// Array
 		req2 := email.SendEmailRequest{
-			ToArray: []string{"one@example.com", "two@example.com"},
-			Template: "to_field_test",
+			ToArray:   []string{"one@example.com", "two@example.com"},
+			Template:  "to_field_test",
 			Variables: map[string]string{},
 		}
 		jobID2, err := emailUsecase.SendEmail(testContextID, req2)
@@ -502,8 +505,8 @@ var _ = Describe("Test Send", func() {
 		})
 
 		req := email.TestSendRequest{
-			To:      "tester@example.com",
-			Template: "test_send",
+			To:        "tester@example.com",
+			Template:  "test_send",
 			Variables: map[string]string{"Name": "Tester"},
 		}
 
@@ -530,8 +533,8 @@ var _ = Describe("Test Send", func() {
 		})
 
 		req := email.TestSendRequest{
-			To:      "preview@example.com",
-			Template: "preview_test",
+			To:        "preview@example.com",
+			Template:  "preview_test",
 			Variables: map[string]string{"Company": "Big Corp"},
 		}
 
@@ -1089,5 +1092,186 @@ var _ = Describe("Email Template kind and form binding", func() {
 		Expect(resp.Kind).To(Equal("form"))
 		Expect(resp.FormID).NotTo(BeNil())
 		Expect(*resp.FormID).To(Equal(formID))
+	})
+})
+
+var _ = Describe("Standalone template send", func() {
+	var contactRepo cd.Repository
+	var contactID string
+
+	BeforeEach(func() {
+		mockSMTP = support.NewMockSMTP()
+		mockSMTP.Start()
+		pool = db.Pool
+
+		testContext = support.NewTestContext()
+		settingsJSON, _ := json.Marshal(testContext["settings"])
+		_, err := pool.Exec(ctx,
+			`INSERT INTO contexts (id, slug, name, domain, is_active, settings, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+			testContext["id"], testContext["slug"], testContext["name"],
+			testContext["domain"], testContext["is_active"], settingsJSON,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		testContextID = testContext["id"].(string)
+
+		contactRepo = crepo.New(pool)
+		emailRepo = repo.New(pool)
+		emailQueue = email_infra.NewEmailQueue(pool)
+		emailUsecase = emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
+		emailHandler = handler.NewEmailHandler(emailUsecase)
+
+		// Create a contact with an email
+		contactEmail := "standalone@example.com"
+		contactID = uuid.New().String()
+		err = contactRepo.Create(&cd.Contact{
+			ID:        contactID,
+			ContextID: testContextID,
+			Email:     &contactEmail,
+			FirstName: "Ada",
+			LastName:  "Lovelace",
+			Company:   "Analytical Engines",
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM email_jobs")
+		_, _ = pool.Exec(ctx, "DELETE FROM email_templates")
+		_, _ = pool.Exec(ctx, "DELETE FROM contact_activities WHERE context_id = $1", testContextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM contacts WHERE id = $1", contactID)
+		_, _ = pool.Exec(ctx, "DELETE FROM contexts WHERE id = $1", testContextID)
+		mockSMTP.Clear()
+	})
+
+	createStandaloneTemplate := func(key, subject, body string) string {
+		emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       key,
+			Subject:   subject,
+			BodyText:  body,
+			BodyHTML:  "<p>" + body + "</p>",
+			Kind:      email.TemplateKindStandalone,
+		})
+		templates, err := emailRepo.List(testContextID)
+		Expect(err).NotTo(HaveOccurred())
+		return templates[0].ID
+	}
+
+	It("sends a standalone template to a contact and records activity", func() {
+		gin.SetMode(gin.TestMode)
+		tid := createStandaloneTemplate("solo_send", "Hello {{ .first_name }}", "Hi {{ .first_name }} from {{ .company }}")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/contexts/"+testContextID+"/email-templates/"+tid+"/send", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Params = []gin.Param{{Key: "id", Value: testContextID}, {Key: "tid", Value: tid}}
+		c.Request.Body = io.NopCloser(strings.NewReader(fmt.Sprintf(`{"contact_id": "%s"}`, contactID)))
+
+		emailHandler.SendToContact(c)
+		Expect(w.Code).To(Equal(http.StatusAccepted))
+
+		var resp struct {
+			JobID string `json:"job_id"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.JobID).NotTo(BeEmpty())
+
+		// Job enqueued with rendered subject/body
+		var subject, body string
+		err := pool.QueryRow(ctx,
+			"SELECT subject, body FROM email_jobs WHERE id = $1", resp.JobID,
+		).Scan(&subject, &body)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(subject).To(Equal("Hello Ada"))
+		Expect(body).To(Equal("Hi Ada from Analytical Engines"))
+
+		// Activity recorded on the contact
+		var count int
+		err = pool.QueryRow(ctx,
+			"SELECT COUNT(*) FROM contact_activities WHERE contact_id = $1 AND type = 'email_sent'", contactID,
+		).Scan(&count)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(count).To(Equal(1))
+	})
+
+	It("rejects send to a contact without an email", func() {
+		gin.SetMode(gin.TestMode)
+		tid := createStandaloneTemplate("no_email", "Hi", "Body")
+
+		noEmailID := uuid.New().String()
+		err := contactRepo.Create(&cd.Contact{
+			ID:        noEmailID,
+			ContextID: testContextID,
+			FirstName: "No",
+			LastName:  "Email",
+		})
+		Expect(err).NotTo(HaveOccurred())
+		defer pool.Exec(ctx, "DELETE FROM contacts WHERE id = $1", noEmailID)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/contexts/"+testContextID+"/email-templates/"+tid+"/send", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Params = []gin.Param{{Key: "id", Value: testContextID}, {Key: "tid", Value: tid}}
+		c.Request.Body = io.NopCloser(strings.NewReader(fmt.Sprintf(`{"contact_id": "%s"}`, noEmailID)))
+
+		emailHandler.SendToContact(c)
+		Expect(w.Code).To(Equal(http.StatusBadRequest))
+	})
+
+	It("rejects send with a form-kind template", func() {
+		gin.SetMode(gin.TestMode)
+		formID := "33333333-3333-3333-3333-333333333333"
+		emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       "form_only",
+			Subject:   "Form reply",
+			BodyText:  "Body",
+			Kind:      email.TemplateKindForm,
+			FormID:    &formID,
+		})
+		templates, err := emailRepo.List(testContextID)
+		Expect(err).NotTo(HaveOccurred())
+		tid := templates[0].ID
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/contexts/"+testContextID+"/email-templates/"+tid+"/send", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Params = []gin.Param{{Key: "id", Value: testContextID}, {Key: "tid", Value: tid}}
+		c.Request.Body = io.NopCloser(strings.NewReader(fmt.Sprintf(`{"contact_id": "%s"}`, contactID)))
+
+		emailHandler.SendToContact(c)
+		Expect(w.Code).To(Equal(http.StatusBadRequest))
+	})
+
+	It("returns 404 for unknown template id", func() {
+		gin.SetMode(gin.TestMode)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/contexts/"+testContextID+"/email-templates/99999999-9999-9999-9999-999999999999/send", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Params = []gin.Param{{Key: "id", Value: testContextID}, {Key: "tid", Value: "99999999-9999-9999-9999-999999999999"}}
+		c.Request.Body = io.NopCloser(strings.NewReader(fmt.Sprintf(`{"contact_id": "%s"}`, contactID)))
+
+		emailHandler.SendToContact(c)
+		Expect(w.Code).To(Equal(http.StatusNotFound))
+	})
+
+	It("returns 404 for unknown contact id", func() {
+		gin.SetMode(gin.TestMode)
+		tid := createStandaloneTemplate("unknown_contact", "Hi", "Body")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/contexts/"+testContextID+"/email-templates/"+tid+"/send", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Params = []gin.Param{{Key: "id", Value: testContextID}, {Key: "tid", Value: tid}}
+		c.Request.Body = io.NopCloser(strings.NewReader(`{"contact_id": "99999999-9999-9999-9999-999999999999"}`))
+
+		emailHandler.SendToContact(c)
+		Expect(w.Code).To(Equal(http.StatusNotFound))
 	})
 })
