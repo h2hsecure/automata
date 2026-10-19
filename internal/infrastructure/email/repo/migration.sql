@@ -14,3 +14,7 @@ CREATE TABLE IF NOT EXISTS email_templates (
 );
 
 CREATE INDEX IF NOT EXISTS idx_email_templates_context ON email_templates(context_id);
+
+-- Template kind (standalone | form) and optional form binding
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'standalone';
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS form_id UUID;

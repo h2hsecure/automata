@@ -911,3 +911,161 @@ var _ = Describe("Context Send Email", func() {
 		Expect(w2.Code).To(Equal(http.StatusAccepted))
 	})
 })
+
+var _ = Describe("Email Template kind and form binding", func() {
+	BeforeEach(func() {
+		mockSMTP = support.NewMockSMTP()
+		mockSMTP.Start()
+		pool = db.Pool
+
+		testContext = support.NewTestContext()
+		settingsJSON, _ := json.Marshal(testContext["settings"])
+		_, err := pool.Exec(ctx,
+			`INSERT INTO contexts (id, slug, name, domain, is_active, settings, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+			testContext["id"], testContext["slug"], testContext["name"],
+			testContext["domain"], testContext["is_active"], settingsJSON,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		testContextID = testContext["id"].(string)
+
+		emailRepo = repo.New(pool)
+		emailQueue = email_infra.NewEmailQueue(pool)
+		emailUsecase = emailusecase.NewEmailUsecase(emailRepo, emailQueue)
+		emailHandler = handler.NewEmailHandler(emailUsecase)
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM email_jobs")
+		_, _ = pool.Exec(ctx, "DELETE FROM email_templates")
+		_, _ = pool.Exec(ctx, "DELETE FROM contexts WHERE id = $1", testContextID)
+		mockSMTP.Clear()
+	})
+
+	It("creates a form-kind template with form_id", func() {
+		gin.SetMode(gin.TestMode)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/email-templates", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		formID := "11111111-1111-1111-1111-111111111111"
+		body := strings.NewReader(fmt.Sprintf(`{
+			"context_id": "%s",
+			"key": "form_reply",
+			"subject": "Thanks for reaching out",
+			"body_text": "Hello {{ .first_name }}",
+			"kind": "form",
+			"form_id": "%s"
+		}`, testContextID, formID))
+		c.Request.Body = io.NopCloser(body)
+
+		emailHandler.Create(c)
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		var resp email.TemplateResponse
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.Kind).To(Equal("form"))
+		Expect(resp.FormID).NotTo(BeNil())
+		Expect(*resp.FormID).To(Equal(formID))
+	})
+
+	It("rejects form-kind template without form_id", func() {
+		gin.SetMode(gin.TestMode)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/email-templates", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		body := strings.NewReader(fmt.Sprintf(`{
+			"context_id": "%s",
+			"key": "form_noid",
+			"subject": "No Form ID",
+			"body_text": "Body",
+			"kind": "form"
+		}`, testContextID))
+		c.Request.Body = io.NopCloser(body)
+
+		emailHandler.Create(c)
+		Expect(w.Code).To(Equal(http.StatusBadRequest))
+	})
+
+	It("rejects invalid kind", func() {
+		gin.SetMode(gin.TestMode)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/email-templates", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		body := strings.NewReader(fmt.Sprintf(`{
+			"context_id": "%s",
+			"key": "bad_kind",
+			"subject": "Bad Kind",
+			"body_text": "Body",
+			"kind": "bulk"
+		}`, testContextID))
+		c.Request.Body = io.NopCloser(body)
+
+		emailHandler.Create(c)
+		Expect(w.Code).To(Equal(http.StatusBadRequest))
+	})
+
+	It("defaults kind to standalone when omitted", func() {
+		gin.SetMode(gin.TestMode)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/email-templates", nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		body := strings.NewReader(fmt.Sprintf(`{
+			"context_id": "%s",
+			"key": "no_kind",
+			"subject": "Default Kind",
+			"body_text": "Body"
+		}`, testContextID))
+		c.Request.Body = io.NopCloser(body)
+
+		emailHandler.Create(c)
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		var resp email.TemplateResponse
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.Kind).To(Equal("standalone"))
+		Expect(resp.FormID).To(BeNil())
+	})
+
+	It("updates a template to form kind with form_id", func() {
+		gin.SetMode(gin.TestMode)
+
+		emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       "kind_flip",
+			Subject:   "Flip Subject",
+			BodyText:  "Flip Body",
+		})
+
+		templates, err := emailRepo.List(testContextID)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(templates).To(HaveLen(1))
+		template := templates[0]
+		Expect(template.Kind).To(Equal("standalone"))
+
+		formID := "22222222-2222-2222-2222-222222222222"
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("PUT", "/admin/email-templates/"+template.ID, nil)
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Params = append(c.Params, gin.Param{Key: "id", Value: template.ID})
+
+		body := strings.NewReader(fmt.Sprintf(`{"kind": "form", "form_id": "%s"}`, formID))
+		c.Request.Body = io.NopCloser(body)
+		emailHandler.Update(c)
+		Expect(w.Code).To(Equal(http.StatusOK))
+
+		var resp email.TemplateResponse
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.Kind).To(Equal("form"))
+		Expect(resp.FormID).NotTo(BeNil())
+		Expect(*resp.FormID).To(Equal(formID))
+	})
+})

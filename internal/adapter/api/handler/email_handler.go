@@ -85,6 +85,8 @@ func (h *EmailHandler) Create(c *gin.Context) {
 		BodyText:  req.BodyText,
 		BodyHTML:  req.BodyHTML,
 		IsDefault: req.IsDefault,
+		Kind:      req.Kind,
+		FormID:    req.FormID,
 	}
 
 	if err := h.usecase.Repo().Create(tmpl); err != nil {
@@ -141,6 +143,21 @@ func (h *EmailHandler) Update(c *gin.Context) {
 	}
 	if req.IsDefault != nil {
 		existing.IsDefault = *req.IsDefault
+	}
+	if req.Kind != nil {
+		if err := ewemail.ValidateKind(*req.Kind); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		existing.Kind = *req.Kind
+	}
+	if req.FormID != nil {
+		existing.FormID = *req.FormID
+	}
+	// Final state must be consistent: form kind requires a form_id.
+	if existing.Kind == ewemail.TemplateKindForm && existing.FormID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "form_id required for form templates"})
+		return
 	}
 
 	if err := h.usecase.Repo().Update(existing); err != nil {
@@ -221,6 +238,10 @@ func (h *EmailHandler) Send(c *gin.Context) {
 
 // toTemplateResponse converts a domain model to API response.
 func toTemplateResponse(t *ewemail.EmailTemplate) *ewemail.TemplateResponse {
+	kind := t.Kind
+	if kind == "" {
+		kind = ewemail.TemplateKindStandalone
+	}
 	return &ewemail.TemplateResponse{
 		ID:        t.ID,
 		ContextID: t.ContextID,
@@ -229,6 +250,8 @@ func toTemplateResponse(t *ewemail.EmailTemplate) *ewemail.TemplateResponse {
 		BodyText:  t.BodyText,
 		BodyHTML:  t.BodyHTML,
 		IsDefault: t.IsDefault,
+		Kind:      kind,
+		FormID:    t.FormID,
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,
 	}

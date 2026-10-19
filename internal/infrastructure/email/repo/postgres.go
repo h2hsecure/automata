@@ -28,14 +28,19 @@ func (r *emailRepo) Create(t *email.EmailTemplate) error {
 
 	t.ID = uuid.New().String()
 
+	kind := t.Kind
+	if kind == "" {
+		kind = email.TemplateKindStandalone
+	}
+
 	query := `
-		INSERT INTO email_templates (id, context_id, key, subject, body_text, body_html, is_default, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+		INSERT INTO email_templates (id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
 		ON CONFLICT (context_id, key) DO NOTHING
 	`
 
 	result, err := r.pool.Exec(ctx, query,
-		t.ID, t.ContextID, t.Key, t.Subject, t.BodyText, t.BodyHTML, t.IsDefault,
+		t.ID, t.ContextID, t.Key, t.Subject, t.BodyText, t.BodyHTML, t.IsDefault, kind, t.FormID,
 	)
 	if err != nil {
 		return fmt.Errorf("create email template: %w", err)
@@ -52,7 +57,7 @@ func (r *emailRepo) Create(t *email.EmailTemplate) error {
 func (r *emailRepo) GetByID(id string) (*email.EmailTemplate, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, key, subject, body_text, body_html, is_default, created_at, updated_at
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
 		FROM email_templates
 		WHERE id = $1
 	`
@@ -60,7 +65,7 @@ func (r *emailRepo) GetByID(id string) (*email.EmailTemplate, error) {
 	t := &email.EmailTemplate{}
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
-		&t.IsDefault, &t.CreatedAt, &t.UpdatedAt,
+		&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -76,7 +81,7 @@ func (r *emailRepo) GetByID(id string) (*email.EmailTemplate, error) {
 func (r *emailRepo) GetByKey(contextID, key string) (*email.EmailTemplate, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, key, subject, body_text, body_html, is_default, created_at, updated_at
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
 		FROM email_templates
 		WHERE context_id = $1 AND key = $2
 	`
@@ -84,7 +89,7 @@ func (r *emailRepo) GetByKey(contextID, key string) (*email.EmailTemplate, error
 	t := &email.EmailTemplate{}
 	err := r.pool.QueryRow(ctx, query, contextID, key).Scan(
 		&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
-		&t.IsDefault, &t.CreatedAt, &t.UpdatedAt,
+		&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -100,7 +105,7 @@ func (r *emailRepo) GetByKey(contextID, key string) (*email.EmailTemplate, error
 func (r *emailRepo) List(contextID string) ([]*email.EmailTemplate, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, key, subject, body_text, body_html, is_default, created_at, updated_at
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
 		FROM email_templates
 		WHERE context_id = $1
 		ORDER BY key ASC
@@ -117,7 +122,7 @@ func (r *emailRepo) List(contextID string) ([]*email.EmailTemplate, error) {
 		t := &email.EmailTemplate{}
 		err := rows.Scan(
 			&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
-			&t.IsDefault, &t.CreatedAt, &t.UpdatedAt,
+			&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan email template: %w", err)
@@ -156,6 +161,15 @@ func (r *emailRepo) Update(t *email.EmailTemplate) error {
 		args = append(args, t.BodyHTML)
 		argIndex++
 	}
+	if t.Kind != "" {
+		setClauses = append(setClauses, fmt.Sprintf("kind = $%d", argIndex))
+		args = append(args, t.Kind)
+		argIndex++
+	}
+	// form_id is always written (nullable) so it can be set or cleared.
+	setClauses = append(setClauses, fmt.Sprintf("form_id = $%d", argIndex))
+	args = append(args, t.FormID)
+	argIndex++
 
 	// If nothing to update, just touch updated_at
 	setClauses = append(setClauses, "updated_at = NOW()")

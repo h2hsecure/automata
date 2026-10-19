@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+// Template kinds.
+const (
+	TemplateKindStandalone = "standalone"
+	TemplateKindForm       = "form"
+)
+
 // EmailTemplate represents a stored email template scoped to a context.
 type EmailTemplate struct {
 	ID        string
@@ -15,26 +21,32 @@ type EmailTemplate struct {
 	BodyText  string
 	BodyHTML  string
 	IsDefault bool
+	Kind      string
+	FormID    *string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
 // CreateTemplateRequest is the request body for creating a template.
 type CreateTemplateRequest struct {
-	ContextID string `json:"context_id" binding:"required,uuid"`
-	Key       string `json:"key" binding:"required,min=1,max=64"`
-	Subject   string `json:"subject" binding:"required"`
-	BodyText  string `json:"body_text"`
-	BodyHTML  string `json:"body_html"`
-	IsDefault bool   `json:"is_default"`
+	ContextID string  `json:"context_id" binding:"required,uuid"`
+	Key       string  `json:"key" binding:"required,min=1,max=64"`
+	Subject   string  `json:"subject" binding:"required"`
+	BodyText  string  `json:"body_text"`
+	BodyHTML  string  `json:"body_html"`
+	IsDefault bool    `json:"is_default"`
+	Kind      string  `json:"kind"`
+	FormID    *string `json:"form_id"`
 }
 
 // UpdateTemplateRequest is the request body for updating a template (all fields optional).
 type UpdateTemplateRequest struct {
-	Subject   string `json:"subject"`
-	BodyText  string `json:"body_text"`
-	BodyHTML  string `json:"body_html"`
-	IsDefault *bool  `json:"is_default"`
+	Subject   string   `json:"subject"`
+	BodyText  string   `json:"body_text"`
+	BodyHTML  string   `json:"body_html"`
+	IsDefault *bool    `json:"is_default"`
+	Kind      *string  `json:"kind"`
+	FormID    **string `json:"form_id"`
 }
 
 // SendEmailRequest is the context-scoped send-email request.
@@ -64,6 +76,8 @@ type TemplateResponse struct {
 	BodyText  string    `json:"body_text"`
 	BodyHTML  string    `json:"body_html"`
 	IsDefault bool      `json:"is_default"`
+	Kind      string    `json:"kind"`
+	FormID    *string   `json:"form_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -97,10 +111,28 @@ func ValidateKey(key string) error {
 	return nil
 }
 
-// ValidateCreateRequest checks that at least body_text or body_html is non-empty.
+// ValidateKind checks that a template kind is one of the allowed values.
+// An empty kind is allowed (defaults to standalone).
+func ValidateKind(kind string) error {
+	switch kind {
+	case "", TemplateKindStandalone, TemplateKindForm:
+		return nil
+	default:
+		return fmt.Errorf("invalid kind %q: must be %q or %q", kind, TemplateKindStandalone, TemplateKindForm)
+	}
+}
+
+// ValidateCreateRequest checks that at least body_text or body_html is non-empty,
+// that the kind is valid, and that form-kind templates have a form_id.
 func ValidateCreateRequest(req CreateTemplateRequest) error {
 	if req.BodyText == "" && req.BodyHTML == "" {
 		return fmt.Errorf("at least one of body_text or body_html must be non-empty")
+	}
+	if err := ValidateKind(req.Kind); err != nil {
+		return err
+	}
+	if req.Kind == TemplateKindForm && req.FormID == nil {
+		return fmt.Errorf("form_id required for form templates")
 	}
 	return nil
 }
