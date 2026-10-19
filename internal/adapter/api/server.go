@@ -109,6 +109,13 @@ func NewServer(
 		admin.PUT("/settings", settingsHandler.Upsert)
 		admin.DELETE("/settings/:key", settingsHandler.Delete)
 
+		// Per-context settings routes
+		contextSettingsRepo := settingsrepo.NewContext(pool)
+		contextSettingsHandler := handler.NewContextSettingsHandler(contextSettingsRepo)
+		admin.GET("/contexts/:id/settings", contextSettingsHandler.List)
+		admin.PUT("/contexts/:id/settings", contextSettingsHandler.Upsert)
+		admin.DELETE("/contexts/:id/settings/:key", contextSettingsHandler.Delete)
+
 		// Tracking visitor routes
 		trackingRepo := trackingRepo.New(pool)
 		trackingHandler := handler.NewTrackingHandler(trackingRepo)
