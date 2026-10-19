@@ -13,6 +13,7 @@ import (
 type jobRow struct {
 	id         string
 	contextID  string
+	to         []string
 	toStr      string
 	subject    string
 	body       string
@@ -22,11 +23,14 @@ type jobRow struct {
 	createdAt  time.Time
 }
 
-// StartWorker polls for pending jobs and processes them.
+// StartWorker polls for pending jobs and processes them. It also prunes
+// email history older than 30 days once per hour.
 func (q *emailQueue) StartWorker(ctx context.Context, mailer Mailer) {
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
+
+		var lastPrune time.Time
 
 		log.Info().Msg("email queue worker started")
 
@@ -36,6 +40,15 @@ func (q *emailQueue) StartWorker(ctx context.Context, mailer Mailer) {
 				log.Info().Msg("email queue worker stopped")
 				return
 			case <-ticker.C:
+				if time.Since(lastPrune) >= time.Hour {
+					removed, err := q.PruneHistory(time.Now().Add(-30 * 24 * time.Hour))
+					if err != nil {
+						log.Error().Err(err).Msg("error pruning email history")
+					} else if removed > 0 {
+						log.Info().Int64("removed", removed).Msg("pruned old email history")
+					}
+					lastPrune = time.Now()
+				}
 				if err := q.processNextBatch(ctx, mailer); err != nil {
 					log.Error().Err(err).Msg("error processing email batch")
 				}
@@ -50,12 +63,25 @@ func (q *emailQueue) StopWorker(cancel context.CancelFunc) {
 }
 
 func (q *emailQueue) processNextBatch(ctx context.Context, mailer Mailer) error {
+	// Per-context starvation guard: at most 3 jobs per context per batch. The
+	// window function lives in the CTE because FOR UPDATE cannot be combined
+	// with window functions in the same query.
 	query := `
-		SELECT id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, created_at
-		FROM email_jobs
-		WHERE next_retry <= NOW() AND attempts < max_retries
-		ORDER BY created_at ASC
-		LIMIT $1
+		WITH candidates AS (
+			SELECT id, created_at
+			FROM (
+				SELECT id, created_at, ROW_NUMBER() OVER (PARTITION BY context_id ORDER BY created_at) AS rn
+				FROM email_jobs
+				WHERE next_retry <= NOW() AND attempts < max_retries
+			) t
+			WHERE rn <= 3
+			ORDER BY created_at
+			LIMIT $1
+		)
+		SELECT e.id, e.context_id, e.to_addresses, e.subject, e.body, e.html_body, e.attempts, e.max_retries, e.created_at
+		FROM email_jobs e
+		JOIN candidates c ON c.id = e.id
+		ORDER BY e.created_at
 		FOR UPDATE SKIP LOCKED
 	`
 
@@ -79,6 +105,7 @@ func (q *emailQueue) processNextBatch(ctx context.Context, mailer Mailer) error 
 		if toAddresses.Valid && len(toAddresses.Elements) > 0 {
 			to = toAddresses.Elements
 		}
+		j.to = to
 		j.toStr = strings.Join(to, ",")
 
 		jobs = append(jobs, j)
@@ -113,16 +140,49 @@ func (q *emailQueue) sendJob(ctx context.Context, j jobRow, mailer Mailer) error
 		}
 	}
 
-	return q.completeJob(ctx, j.id)
+	return q.completeJob(ctx, j)
 }
 
-func (q *emailQueue) completeJob(ctx context.Context, id string) error {
-	query := `DELETE FROM email_jobs WHERE id = $1`
-	_, err := q.pool.Exec(ctx, query, id)
+// toArray builds a pgtype.Array for a string slice. pgx encodes arrays
+// from their dimensions, so Dims must be set for non-empty slices or the
+// value is encoded as NULL.
+func toArray(elements []string) pgtype.Array[string] {
+	if len(elements) == 0 {
+		return pgtype.Array[string]{}
+	}
+	return pgtype.Array[string]{
+		Elements: elements,
+		Dims:     []pgtype.ArrayDimension{{Length: int32(len(elements)), LowerBound: 1}},
+		Valid:    true,
+	}
+}
+
+func (q *emailQueue) completeJob(ctx context.Context, j jobRow) error {
+	tx, err := q.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin complete transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	toArr := toArray(j.to)
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO email_history (id, context_id, to_addresses, subject, body, html_body, attempts, status, created_at, finished_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'sent', $8, NOW())
+	`, j.id, j.contextID, toArr, j.subject, j.body, j.htmlBody, j.attempts, j.createdAt)
+	if err != nil {
+		return fmt.Errorf("insert sent history: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM email_jobs WHERE id = $1`, j.id)
 	if err != nil {
 		return fmt.Errorf("complete job: %w", err)
 	}
-	log.Info().Str("id", id).Msg("email job completed")
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit complete transaction: %w", err)
+	}
+	log.Info().Str("id", j.id).Msg("email job completed")
 	return nil
 }
 
@@ -131,11 +191,30 @@ func (q *emailQueue) retryJob(ctx context.Context, j jobRow, err error) error {
 
 	var nextRetry time.Time
 	if newAttempts >= j.maxRetries {
-		// Max retries exceeded, delete the job
-		query := `DELETE FROM email_jobs WHERE id = $1`
-		_, execErr := q.pool.Exec(ctx, query, j.id)
+		// Max retries exceeded: record the failure in history, then delete the job.
+		tx, txErr := q.pool.Begin(ctx)
+		if txErr != nil {
+			return fmt.Errorf("begin failed history transaction: %w", txErr)
+		}
+		defer tx.Rollback(ctx)
+
+		toArr := toArray(j.to)
+
+		_, execErr := tx.Exec(ctx, `
+			INSERT INTO email_history (id, context_id, to_addresses, subject, body, html_body, attempts, status, last_error, created_at, finished_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 'failed', $8, $9, NOW())
+		`, j.id, j.contextID, toArr, j.subject, j.body, j.htmlBody, newAttempts, err.Error(), j.createdAt)
+		if execErr != nil {
+			return fmt.Errorf("insert failed history: %w", execErr)
+		}
+
+		_, execErr = tx.Exec(ctx, `DELETE FROM email_jobs WHERE id = $1`, j.id)
 		if execErr != nil {
 			return fmt.Errorf("remove max-retry job: %w", execErr)
+		}
+
+		if execErr = tx.Commit(ctx); execErr != nil {
+			return fmt.Errorf("commit failed history transaction: %w", execErr)
 		}
 		log.Error().Str("id", j.id).Int("attempts", newAttempts).Msg("email job max retries exceeded")
 		return nil
