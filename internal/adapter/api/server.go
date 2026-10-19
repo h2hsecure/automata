@@ -189,7 +189,6 @@ func NewServer(
 		api.POST("/context/forms", middleware.AuthMiddleware(authService), formHandler.Create)
 		api.PUT("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Update)
 		api.DELETE("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Delete)
-		api.POST("/context/forms/:id/submit", formHandler.SubmitForm)
 		api.GET("/context/forms/:id/submissions", middleware.AuthMiddleware(authService), formHandler.ListSubmissions)
 		api.GET("/context/forms/:id/submissions/:sid", middleware.AuthMiddleware(authService), formHandler.GetSubmission)
 	}

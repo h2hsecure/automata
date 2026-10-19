@@ -57,11 +57,6 @@ type UpdateFormInput struct {
 	Settings    map[string]interface{} `json:"settings"`
 }
 
-type SubmitFormInput struct {
-	Slug string                 `json:"slug" form:"slug" binding:"required"`
-	Data map[string]interface{} `json:"data" form:"data"`
-}
-
 type SubmitFormBody struct {
 	Data      map[string]interface{} `json:"data" form:"data"`
 	VisitorID string                 `json:"visitor_id"`
