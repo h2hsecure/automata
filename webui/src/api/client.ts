@@ -319,4 +319,55 @@ export async function deleteSetting(key: string): Promise<void> {
   await client.delete(`/admin/settings/${key}`)
 }
 
+// Context settings endpoints (admin only)
+export async function listContextSettings(contextId: string): Promise<Record<string, string>> {
+  const { data } = await client.get(`/admin/contexts/${contextId}/settings`)
+  return data.settings
+}
+
+export async function upsertContextSetting(contextId: string, key: string, value: string): Promise<void> {
+  await client.put(`/admin/contexts/${contextId}/settings`, { key, value })
+}
+
+export async function deleteContextSetting(contextId: string, key: string): Promise<void> {
+  await client.delete(`/admin/contexts/${contextId}/settings/${key}`)
+}
+
+// Email queue endpoints (admin only)
+export interface EmailQueueJob {
+  id: string
+  context_id: string
+  to: string[]
+  subject: string
+  attempts: number
+  max_retries: number
+  status: string
+  last_error: string
+  created_at: string
+  finished_at: string | null
+}
+
+export async function listEmailQueue(
+  contextId: string,
+  status: 'pending' | 'sent' | 'failed',
+  limit?: number
+): Promise<EmailQueueJob[]> {
+  const params: Record<string, string> = { status }
+  if (limit !== undefined) params.limit = String(limit)
+  const { data } = await client.get(`/admin/contexts/${contextId}/email-queue`, { params })
+  return data.jobs ?? []
+}
+
+export async function retryEmailJob(contextId: string, jobId: string): Promise<void> {
+  await client.post(`/admin/contexts/${contextId}/email-queue/${jobId}/retry`)
+}
+
+export async function cancelEmailJob(contextId: string, jobId: string): Promise<void> {
+  await client.delete(`/admin/contexts/${contextId}/email-queue/${jobId}`)
+}
+
+export async function sendTestEmail(contextId: string, to: string): Promise<void> {
+  await client.post(`/admin/contexts/${contextId}/email-queue/test`, { to })
+}
+
 export default client

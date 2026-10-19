@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Pencil, Trash2, Plus, Globe, Eye } from 'lucide-vue-next'
+import { Pencil, Trash2, Plus, Globe, Eye, Mail } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -12,6 +12,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
 import { listContexts, createContext, updateContext, deleteContext } from '@/api/client'
+import WebsiteEmailPanel from './WebsiteEmailPanel.vue'
 import type { Context } from '@/types/api'
 
 const router = useRouter()
@@ -27,6 +28,7 @@ const contextSlug = ref('')
 const contextDomain = ref('')
 const contextActive = ref(true)
 const formError = ref('')
+const emailContext = ref<Context | null>(null)
 
 const columns = [
   { key: 'Name', label: 'Name' },
@@ -168,6 +170,13 @@ onMounted(loadContexts)
           <div class="flex gap-1">
             <button
               class="p-1.5 rounded hover:bg-muted"
+              title="Email"
+              @click="emailContext = row"
+            >
+              <Mail class="h-4 w-4" />
+            </button>
+            <button
+              class="p-1.5 rounded hover:bg-muted"
               title="View"
               @click="viewContext(row)"
             >
@@ -217,6 +226,12 @@ onMounted(loadContexts)
         </div>
       </template>
     </Modal>
+
+    <WebsiteEmailPanel
+      :open="emailContext !== null"
+      :context="emailContext"
+      @close="emailContext = null"
+    />
 
     <ConfirmDialog />
   </div>
