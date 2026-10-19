@@ -18,6 +18,7 @@ const (
 	ActivityContactMerged    ActivityType = "contact_merged"
 	ActivityTagAdded         ActivityType = "tag_added"
 	ActivityTagRemoved       ActivityType = "tag_removed"
+	ActivityEmailSent        ActivityType = "email_sent"
 )
 
 // Activity represents a contact activity event.
@@ -86,6 +87,11 @@ func FormatActivityTitle(a Activity) string {
 			return fmt.Sprintf("Tag removed: %s", tn)
 		}
 		return "Tag removed"
+	case ActivityEmailSent:
+		if s, ok := a.Data["subject"].(string); ok && s != "" {
+			return fmt.Sprintf("Email sent: %s", s)
+		}
+		return "Email sent"
 	default:
 		return string(a.Type)
 	}
@@ -127,6 +133,11 @@ func FormatActivityDescription(a Activity) string {
 		return "Tag assigned"
 	case ActivityTagRemoved:
 		return "Tag removed"
+	case ActivityEmailSent:
+		if s, ok := a.Data["subject"].(string); ok && s != "" {
+			return s
+		}
+		return "Email sent"
 	default:
 		return string(a.Type)
 	}
