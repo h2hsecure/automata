@@ -40,25 +40,25 @@ var _ = Describe("SMTP settings merge", func() {
 			defer mock.Stop()
 			var got mailsmtp.Config
 			mailer := mailsmtp.NewMailerWithProvider(
-				func() mailsmtp.Config { return mailsmtp.Config{Host: "db", From: "db@x"} },
+				func(ctxID string) mailsmtp.Config { return mailsmtp.Config{Host: "db", From: "db@x"} },
 				base,
 				func(cfg mailsmtp.Config) mailsmtp.Dialer {
 					got = cfg
 					return &dialerAdapter{d: support.NewSMTPDialer(mock)}
 				},
 			)
-			Expect(mailer.Send([]string{"a@b.c"}, "s", "b", "")).To(Succeed())
+			Expect(mailer.Send("ctx-1", []string{"a@b.c"}, "s", "b", "")).To(Succeed())
 			Expect(got.From).To(Equal("db@x"))
 			Expect(got.Host).To(Equal("db"))
 		})
 
 		It("treats an unconfigured provider result as not configured", func() {
 			mailer := mailsmtp.NewMailerWithProvider(
-				func() mailsmtp.Config { return mailsmtp.Config{} },
+				func(ctxID string) mailsmtp.Config { return mailsmtp.Config{} },
 				base,
 				func(cfg mailsmtp.Config) mailsmtp.Dialer { return nil },
 			)
-			err := mailer.Send([]string{"a@b.c"}, "s", "b", "")
+			err := mailer.Send("ctx-1", []string{"a@b.c"}, "s", "b", "")
 			Expect(err).To(MatchError(ContainSubstring("not configured")))
 		})
 	})

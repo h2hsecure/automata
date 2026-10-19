@@ -17,10 +17,16 @@ type fakeClient struct {
 	dataErr error
 }
 
-func (f *fakeClient) Mail(from string) error   { f.calls = append(f.calls, "mail:"+from); return f.mailErr }
-func (f *fakeClient) Rcpt(to string) error     { f.calls = append(f.calls, "rcpt:"+to); return f.rcptErr }
-func (f *fakeClient) Data(data []byte) error   { f.calls = append(f.calls, fmt.Sprintf("data:%d", len(data))); return f.dataErr }
-func (f *fakeClient) Close() error             { f.calls = append(f.calls, "close"); return nil }
+func (f *fakeClient) Mail(from string) error {
+	f.calls = append(f.calls, "mail:"+from)
+	return f.mailErr
+}
+func (f *fakeClient) Rcpt(to string) error { f.calls = append(f.calls, "rcpt:"+to); return f.rcptErr }
+func (f *fakeClient) Data(data []byte) error {
+	f.calls = append(f.calls, fmt.Sprintf("data:%d", len(data)))
+	return f.dataErr
+}
+func (f *fakeClient) Close() error { f.calls = append(f.calls, "close"); return nil }
 
 type fakeDialer struct {
 	client Client
@@ -73,7 +79,7 @@ func TestBuildMessageSubjectSanitized(t *testing.T) {
 func TestSendUnconfigured(t *testing.T) {
 	d := &fakeDialer{}
 	m := NewMailerWithDialer(Config{}, d)
-	err := m.Send([]string{"a@x.com"}, "s", "b", "")
+	err := m.Send("ctx-1", []string{"a@x.com"}, "s", "b", "")
 	if err == nil || !strings.Contains(err.Error(), "not configured") {
 		t.Fatalf("expected 'not configured' error, got %v", err)
 	}
@@ -84,7 +90,7 @@ func TestSendUnconfigured(t *testing.T) {
 
 func TestSendNoRecipients(t *testing.T) {
 	m := NewMailerWithDialer(Config{Host: "h", From: "f@x.com"}, &fakeDialer{})
-	err := m.Send(nil, "s", "b", "")
+	err := m.Send("ctx-1", nil, "s", "b", "")
 	if err == nil || !strings.Contains(err.Error(), "no recipients") {
 		t.Fatalf("expected 'no recipients' error, got %v", err)
 	}
@@ -93,7 +99,7 @@ func TestSendNoRecipients(t *testing.T) {
 func TestSendHappyPath(t *testing.T) {
 	fc := &fakeClient{}
 	m := NewMailerWithDialer(Config{Host: "h", From: "from@x.com"}, &fakeDialer{client: fc})
-	err := m.Send([]string{"a@x.com", "b@x.com"}, "s", "b", "")
+	err := m.Send("ctx-1", []string{"a@x.com", "b@x.com"}, "s", "b", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -117,7 +123,7 @@ func TestSendHappyPath(t *testing.T) {
 func TestSendRcptFailure(t *testing.T) {
 	fc := &fakeClient{rcptErr: errors.New("rcpt failed")}
 	m := NewMailerWithDialer(Config{Host: "h", From: "from@x.com"}, &fakeDialer{client: fc})
-	err := m.Send([]string{"a@x.com"}, "s", "b", "")
+	err := m.Send("ctx-1", []string{"a@x.com"}, "s", "b", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -146,7 +152,7 @@ func TestSendRcptFailure(t *testing.T) {
 func TestSendDataFailure(t *testing.T) {
 	fc := &fakeClient{dataErr: errors.New("data failed")}
 	m := NewMailerWithDialer(Config{Host: "h", From: "from@x.com"}, &fakeDialer{client: fc})
-	err := m.Send([]string{"a@x.com"}, "s", "b", "")
+	err := m.Send("ctx-1", []string{"a@x.com"}, "s", "b", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -163,7 +169,7 @@ func TestSendDataFailure(t *testing.T) {
 
 func TestSendDialFailure(t *testing.T) {
 	m := NewMailerWithDialer(Config{Host: "h", From: "f@x.com"}, &fakeDialer{err: errors.New("dial failed")})
-	err := m.Send([]string{"a@x.com"}, "s", "b", "")
+	err := m.Send("ctx-1", []string{"a@x.com"}, "s", "b", "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

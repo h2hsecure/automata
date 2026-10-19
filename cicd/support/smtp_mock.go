@@ -9,6 +9,7 @@ import (
 
 // Email represents a captured email message.
 type Email struct {
+	ContextID string
 	To        []string
 	Subject   string
 	Body      string
@@ -18,16 +19,16 @@ type Email struct {
 
 // MockSMTP is an in-memory mock SMTP server for testing email delivery.
 type MockSMTP struct {
-	mu      sync.RWMutex
-	emails  []Email
+	mu       sync.RWMutex
+	emails   []Email
 	listener string
-	running bool
+	running  bool
 }
 
 // NewMockSMTP creates a new mock SMTP server.
 func NewMockSMTP() *MockSMTP {
 	return &MockSMTP{
-		emails: make([]Email, 0),
+		emails:   make([]Email, 0),
 		listener: "127.0.0.1:0",
 	}
 }
@@ -46,17 +47,18 @@ func (m *MockSMTP) Stop() {
 }
 
 // Send simulates sending an email and captures it in memory.
-func (m *MockSMTP) Send(to []string, subject, body, htmlBody string) error {
+func (m *MockSMTP) Send(contextID string, to []string, subject, body, htmlBody string) error {
 	if !m.running {
 		return fmt.Errorf("mock SMTP not running")
 	}
 
 	email := Email{
-		To:       to,
-		Subject:  subject,
-		Body:     body,
-		HTMLBody: htmlBody,
-		SentAt:   time.Now(),
+		ContextID: contextID,
+		To:        to,
+		Subject:   subject,
+		Body:      body,
+		HTMLBody:  htmlBody,
+		SentAt:    time.Now(),
 	}
 
 	m.mu.Lock()
@@ -191,7 +193,7 @@ func (c *SMTPClient) Data(body []byte) error {
 		}
 	}
 
-	_ = c.Mock.Send(to, subject, bodyText, "")
+	_ = c.Mock.Send("", to, subject, bodyText, "")
 	return nil
 }
 

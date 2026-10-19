@@ -13,7 +13,7 @@ import (
 // EmailJob represents a pending email to send.
 type EmailJob struct {
 	ID         string
-	ContextID   string
+	ContextID  string
 	To         []string
 	Subject    string
 	Body       string
@@ -24,9 +24,10 @@ type EmailJob struct {
 	CreatedAt  time.Time
 }
 
-// Mailer interface for sending emails.
+// Mailer interface for sending emails. The context ID lets the mailer
+// resolve per-context SMTP settings at send time.
 type Mailer interface {
-	Send(to []string, subject, body, htmlBody string) error
+	Send(contextID string, to []string, subject, body, htmlBody string) error
 }
 
 // Queue defines the email queue interface.

@@ -11,15 +11,15 @@ import (
 )
 
 type jobRow struct {
-	id           string
-	contextID    string
-	toStr        string
-	subject      string
-	body         string
-	htmlBody     string
-	attempts     int
-	maxRetries   int
-	createdAt    time.Time
+	id         string
+	contextID  string
+	toStr      string
+	subject    string
+	body       string
+	htmlBody   string
+	attempts   int
+	maxRetries int
+	createdAt  time.Time
 }
 
 // StartWorker polls for pending jobs and processes them.
@@ -108,7 +108,7 @@ func (q *emailQueue) sendJob(ctx context.Context, j jobRow, mailer Mailer) error
 	}
 
 	if mailer != nil {
-		if err := mailer.Send(to, j.subject, j.body, j.htmlBody); err != nil {
+		if err := mailer.Send(j.contextID, to, j.subject, j.body, j.htmlBody); err != nil {
 			return q.retryJob(ctx, j, err)
 		}
 	}

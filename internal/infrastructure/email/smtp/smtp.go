@@ -22,9 +22,10 @@ type Config struct {
 
 func (c Config) IsConfigured() bool { return c.Host != "" && c.From != "" }
 
-// ConfigProvider resolves the effective SMTP config at send time, e.g. by
-// merging yaml defaults with global settings stored in the database.
-type ConfigProvider func() Config
+// ConfigProvider resolves the effective SMTP config at send time for a given
+// context, e.g. by merging yaml defaults with global and per-context settings
+// stored in the database.
+type ConfigProvider func(contextID string) Config
 
 // MergeConfig applies non-empty smtp.* overrides from a key-value settings
 // map onto base. A non-numeric or non-positive smtp.port is ignored;
@@ -91,10 +92,10 @@ func NewMailerWithProvider(provider ConfigProvider, fallback Config, dialerFor f
 
 func (m *SMTPMailer) IsConfigured() bool { return m.cfg.IsConfigured() }
 
-func (m *SMTPMailer) Send(to []string, subject, body, htmlBody string) error {
+func (m *SMTPMailer) Send(contextID string, to []string, subject, body, htmlBody string) error {
 	cfg, dialer := m.cfg, m.dialer
 	if m.provider != nil {
-		cfg = m.provider()
+		cfg = m.provider(contextID)
 		dialer = m.dialerFor(cfg)
 	}
 	if !cfg.IsConfigured() {

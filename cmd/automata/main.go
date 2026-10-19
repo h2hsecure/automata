@@ -17,19 +17,19 @@ import (
 	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	banner_repo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
-	contact_repo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
-	"github.com/hekemen/automata/internal/infrastructure/config"
 	"github.com/hekemen/automata/internal/infrastructure/bootstrap"
+	"github.com/hekemen/automata/internal/infrastructure/config"
 	"github.com/hekemen/automata/internal/infrastructure/contact"
-	"github.com/hekemen/automata/internal/infrastructure/database"
+	contact_repo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
 	context_repo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	"github.com/hekemen/automata/internal/infrastructure/database"
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
 	mailsmtp "github.com/hekemen/automata/internal/infrastructure/email/smtp"
 	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
-	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
-	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
 	settings_repo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
+	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
+	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	"github.com/rs/zerolog/log"
 )
 
@@ -212,10 +212,12 @@ func main() {
 		StartTLS: config.Get("smtp.starttls") != "false",
 	}
 	settingsRepo := settings_repo.New(pool)
+	contextSettingsRepo := settings_repo.NewContext(pool)
 	mailer := mailsmtp.NewMailerWithProvider(
-		func() mailsmtp.Config {
+		func(ctxID string) mailsmtp.Config {
 			m, _ := settingsRepo.List()
-			return mailsmtp.MergeConfig(smtpCfg, m)
+			cm, _ := contextSettingsRepo.List(ctxID)
+			return mailsmtp.MergeConfig(mailsmtp.MergeConfig(smtpCfg, m), cm)
 		},
 		smtpCfg,
 		mailsmtp.DefaultDialer,
