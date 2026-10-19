@@ -1,12 +1,14 @@
 package contact
 
+import "time"
+
 // FilterOptions holds optional filters for contact list queries.
 type FilterOptions struct {
-	Tags         []string
-	Source       string
+	Tags           []string
+	Source         string
 	MinSubmissions int
-	Company      string
-	Search       string
+	Company        string
+	Search         string
 }
 
 // Repository defines the interface for contact data persistence.
@@ -22,4 +24,5 @@ type Repository interface {
 	GetActivity(contactID, contextID string, offset, limit int, activityType *string) ([]Activity, int64, error)
 	GetActivityCount(contactID string) (int64, error)
 	CountByContext(contextID string) (int64, error)
+	CountDistinctContactsByActivity(contextID, activityType string, since *time.Time) (int, error)
 }

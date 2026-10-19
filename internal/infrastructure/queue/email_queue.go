@@ -61,6 +61,8 @@ type Queue interface {
 	Retry(contextID, jobID string) error
 	Cancel(contextID, jobID string) error
 	PruneHistory(olderThan time.Time) (int64, error)
+	CountPending(contextID string) (int, error)
+	CountHistory(contextID, status string, since *time.Time) (int, error)
 }
 
 type emailQueue struct {
@@ -265,4 +267,37 @@ func (q *emailQueue) PruneHistory(olderThan time.Time) (int64, error) {
 		return 0, fmt.Errorf("prune history: %w", err)
 	}
 	return tag.RowsAffected(), nil
+}
+
+// CountPending returns the number of pending (not exhausted) jobs for a context.
+func (q *emailQueue) CountPending(contextID string) (int, error) {
+	var count int
+	err := q.pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM email_jobs WHERE context_id = $1 AND attempts < max_retries`, contextID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count pending jobs: %w", err)
+	}
+	return count, nil
+}
+
+// CountHistory returns the number of history rows for a context and status.
+// An empty status counts all statuses. since=nil counts all time, otherwise
+// only rows finished at or after since.
+func (q *emailQueue) CountHistory(contextID, status string, since *time.Time) (int, error) {
+	query := `SELECT COUNT(*) FROM email_history WHERE context_id = $1`
+	args := []interface{}{contextID}
+	if status != "" {
+		query += " AND status = $" + strconv.Itoa(len(args)+1)
+		args = append(args, status)
+	}
+	if since != nil {
+		query += " AND finished_at >= $" + strconv.Itoa(len(args)+1)
+		args = append(args, *since)
+	}
+	var count int
+	if err := q.pool.QueryRow(context.Background(), query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count history: %w", err)
+	}
+	return count, nil
 }

@@ -350,6 +350,25 @@ func (h *EmailHandler) MarkInboxRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+// GetEmailStats handles GET /api/context/email-stats — dashboard stats for the
+// resolved context.
+func (h *EmailHandler) GetEmailStats(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
+		return
+	}
+
+	stats, err := h.usecase.GetEmailStats(contextID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get email stats")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get email stats"})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
 // toTemplateResponse converts a domain model to API response.
 func toTemplateResponse(t *ewemail.EmailTemplate) *ewemail.TemplateResponse {
 	kind := t.Kind

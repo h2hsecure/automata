@@ -166,6 +166,7 @@ func NewServer(
 	{
 		contextEmailGroup.POST("/send", emailHandler.Send)
 	}
+	api.GET("/context/email-stats", middleware.AuthMiddleware(authService), emailHandler.GetEmailStats)
 
 	contactHandler := handler.NewContactHandler(contactRepo)
 	{

@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	ct "github.com/hekemen/automata/internal/domain/contact"
@@ -521,6 +523,31 @@ func (r *repo) CountByContext(contextID string) (int64, error) {
 	return count, nil
 }
 
+// CountDistinctContactsByActivity returns the number of distinct contacts
+// that have at least one activity of the given type. An empty activityType
+// counts all types. since=nil counts all time, otherwise only activities
+// created at or after since.
+func (r *repo) CountDistinctContactsByActivity(contextID, activityType string, since *time.Time) (int, error) {
+	ctx := context.Background()
+
+	query := "SELECT COUNT(DISTINCT contact_id) FROM contact_activities WHERE context_id = $1"
+	args := []interface{}{contextID}
+	if activityType != "" {
+		query += " AND type = $" + strconv.Itoa(len(args)+1)
+		args = append(args, activityType)
+	}
+	if since != nil {
+		query += " AND created_at >= $" + strconv.Itoa(len(args)+1)
+		args = append(args, *since)
+	}
+
+	var count int
+	if err := r.pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count distinct contacts by activity: %w", err)
+	}
+	return count, nil
+}
+
 // loadTags loads tags for a contact by joining with contact_tag_memberships and contact_tags.
 func (r *repo) loadTags(ctx context.Context, c *ct.Contact) error {
 	query := `
@@ -621,7 +648,8 @@ func (t *repoTagRepo) ApplyTags(contextID, contactID string, tagNames []string, 
 			ON CONFLICT (contact_id, tag_id) DO NOTHING
 		`
 		for _, tagID := range tagIDs {
-			_, err := t.pool.Exec(ctx, query, contactID, tagID); if err != nil {
+			_, err := t.pool.Exec(ctx, query, contactID, tagID)
+			if err != nil {
 				return fmt.Errorf("add membership: %w", err)
 			}
 		}

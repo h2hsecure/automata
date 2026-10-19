@@ -1561,3 +1561,106 @@ var _ = Describe("Email inbox", func() {
 		Expect(count).To(Equal(1))
 	})
 })
+
+var _ = Describe("Email stats", func() {
+	BeforeEach(func() {
+		mockSMTP = support.NewMockSMTP()
+		mockSMTP.Start()
+		pool = db.Pool
+
+		testContext = support.NewTestContext()
+		settingsJSON, _ := json.Marshal(testContext["settings"])
+		_, err := pool.Exec(ctx,
+			`INSERT INTO contexts (id, slug, name, domain, is_active, settings, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+			testContext["id"], testContext["slug"], testContext["name"],
+			testContext["domain"], testContext["is_active"], settingsJSON,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		testContextID = testContext["id"].(string)
+
+		emailRepo = repo.New(pool)
+		emailQueue = email_infra.NewEmailQueue(pool)
+		emailUsecase = emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, crepo.New(pool))
+		emailHandler = handler.NewEmailHandlerWithInbox(emailUsecase, repo.NewInboxRepo(pool))
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM email_jobs")
+		_, _ = pool.Exec(ctx, "DELETE FROM email_history")
+		_, _ = pool.Exec(ctx, "DELETE FROM contact_activities")
+		_, _ = pool.Exec(ctx, "DELETE FROM contacts")
+		_, _ = pool.Exec(ctx, "DELETE FROM contexts WHERE id = $1", testContextID)
+		mockSMTP.Clear()
+	})
+
+	seedPendingJob := func() {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO email_jobs (context_id, to_addresses, subject, body, attempts, max_retries, next_retry, created_at)
+			 VALUES ($1, '{t@example.com}', 's', 'b', 0, 3, NOW(), NOW())`,
+			testContextID,
+		)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	seedHistory := func(status string, ageHours int) {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO email_history (id, context_id, to_addresses, subject, body, attempts, status, created_at, finished_at)
+			 VALUES (gen_random_uuid(), $1, '{t@example.com}', 's', 'b', 1, $2,
+			         NOW() - make_interval(mins => $3 * 60), NOW() - make_interval(mins => $3 * 60))`,
+			testContextID, status, ageHours,
+		)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	seedContact := func(emailAddr, age string) {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO contacts (context_id, email, first_name) VALUES ($1, $2, 'C')`,
+			testContextID, emailAddr,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = pool.Exec(ctx,
+			`INSERT INTO contact_activities (contact_id, context_id, type, data, created_at)
+			 SELECT id, $1, 'email_sent', '{}', NOW() - `+age+` FROM contacts WHERE context_id = $1 AND email = $2`,
+			testContextID, emailAddr,
+		)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	It("returns queue, history, and reach stats for the context", func() {
+		// 2 pending jobs
+		seedPendingJob()
+		seedPendingJob()
+		// history: 2 sent within 24h, 1 sent older, 1 failed within 24h
+		seedHistory("sent", 1)
+		seedHistory("sent", 2)
+		seedHistory("sent", 48)
+		seedHistory("failed", 3)
+		// 2 distinct contacts with email_sent activities: 1 within 7d, 1 older
+		seedContact("c1@example.com", "interval '1 day'")
+		seedContact("c2@example.com", "interval '30 days'")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/context/email-stats", nil)
+		c.Set("context_id", testContextID)
+		emailHandler.GetEmailStats(c)
+
+		Expect(w.Code).To(Equal(http.StatusOK))
+		var resp struct {
+			Pending         int `json:"pending"`
+			Sent24h         int `json:"sent_24h"`
+			Failed24h       int `json:"failed_24h"`
+			EmailsSentTotal int `json:"emails_sent_total"`
+			ContactsReached int `json:"contacts_reached"`
+			Reached7d       int `json:"reached_7d"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.Pending).To(Equal(2))
+		Expect(resp.Sent24h).To(Equal(2))
+		Expect(resp.Failed24h).To(Equal(1))
+		Expect(resp.EmailsSentTotal).To(Equal(3))
+		Expect(resp.ContactsReached).To(Equal(2))
+		Expect(resp.Reached7d).To(Equal(1))
+	})
+})
