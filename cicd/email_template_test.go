@@ -1440,3 +1440,124 @@ var _ = Describe("Form-integrated template send", func() {
 		Expect(count).To(Equal(0))
 	})
 })
+
+var _ = Describe("Email inbox", func() {
+	var inboxRepo email.InboxRepository
+
+	BeforeEach(func() {
+		mockSMTP = support.NewMockSMTP()
+		mockSMTP.Start()
+		pool = db.Pool
+
+		testContext = support.NewTestContext()
+		settingsJSON, _ := json.Marshal(testContext["settings"])
+		_, err := pool.Exec(ctx,
+			`INSERT INTO contexts (id, slug, name, domain, is_active, settings, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+			testContext["id"], testContext["slug"], testContext["name"],
+			testContext["domain"], testContext["is_active"], settingsJSON,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		testContextID = testContext["id"].(string)
+
+		emailRepo = repo.New(pool)
+		emailQueue = email_infra.NewEmailQueue(pool)
+		emailUsecase = emailusecase.NewEmailUsecase(emailRepo, emailQueue)
+		inboxRepo = repo.NewInboxRepo(pool)
+		emailHandler = handler.NewEmailHandlerWithInbox(emailUsecase, inboxRepo)
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM email_inbox")
+		_, _ = pool.Exec(ctx, "DELETE FROM contexts WHERE id = $1", testContextID)
+		mockSMTP.Clear()
+	})
+
+	listInbox := func(limit string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		path := "/admin/contexts/" + testContextID + "/inbox"
+		if limit != "" {
+			path += "?limit=" + limit
+		}
+		c.Request = httptest.NewRequest("GET", path, nil)
+		c.Params = append(c.Params, gin.Param{Key: "id", Value: testContextID})
+		emailHandler.ListInbox(c)
+		return w
+	}
+
+	It("returns an empty inbox for a context with no messages", func() {
+		w := listInbox("")
+		Expect(w.Code).To(Equal(http.StatusOK))
+		var resp struct {
+			Messages []map[string]interface{} `json:"messages"`
+			Count    int                      `json:"count"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.Count).To(Equal(0))
+		Expect(resp.Messages).To(BeEmpty())
+	})
+
+	It("lists messages newest-first and respects limit", func() {
+		for i, subj := range []string{"m1", "m2", "m3"} {
+			_, err := pool.Exec(ctx,
+				`INSERT INTO email_inbox (context_id, uid, sender, recipient, subject, body_text, message_date)
+				 VALUES ($1, $2, 'a@example.com', 'b@example.com', $3, 'body', NOW() - make_interval(mins => $4))`,
+				testContextID, 100+i, subj, 3-i,
+			)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		w := listInbox("")
+		Expect(w.Code).To(Equal(http.StatusOK))
+		var resp struct {
+			Messages []map[string]interface{} `json:"messages"`
+			Count    int                      `json:"count"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.Count).To(Equal(3))
+		Expect(resp.Messages[0]["subject"]).To(Equal("m3"))
+		Expect(resp.Messages[2]["subject"]).To(Equal("m1"))
+
+		w = listInbox("2")
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		Expect(resp.Count).To(Equal(2))
+	})
+
+	It("marks a message as read", func() {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO email_inbox (context_id, uid, sender, recipient, subject, body_text)
+			 VALUES ($1, 1, 'a@x.com', 'b@x.com', 's', 'b')`,
+			testContextID,
+		)
+		Expect(err).NotTo(HaveOccurred())
+
+		var mid string
+		err = pool.QueryRow(ctx, "SELECT id FROM email_inbox WHERE context_id = $1", testContextID).Scan(&mid)
+		Expect(err).NotTo(HaveOccurred())
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/admin/contexts/"+testContextID+"/inbox/"+mid+"/read", nil)
+		c.Params = append(c.Params, gin.Param{Key: "id", Value: testContextID}, gin.Param{Key: "mid", Value: mid})
+		emailHandler.MarkInboxRead(c)
+		Expect(w.Code).To(Equal(http.StatusOK))
+
+		var isRead bool
+		err = pool.QueryRow(ctx, "SELECT is_read FROM email_inbox WHERE id = $1", mid).Scan(&isRead)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isRead).To(BeTrue())
+	})
+
+	It("dedupes upserts on (context_id, uid)", func() {
+		m := &email.InboxMessage{ContextID: testContextID, UID: 10, From: "a@x.com", To: "b@x.com", Subject: "s", BodyText: "b"}
+		Expect(inboxRepo.Upsert(m)).To(Succeed())
+		m.Subject = "s2"
+		Expect(inboxRepo.Upsert(m)).To(Succeed())
+
+		var count int
+		err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM email_inbox WHERE context_id = $1", testContextID).Scan(&count)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(count).To(Equal(1))
+	})
+})

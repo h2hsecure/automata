@@ -136,7 +136,7 @@ func NewServer(
 	emailRepo := email_repo.New(pool)
 	emailQueue := queue.NewEmailQueue(pool)
 	emailUsecase := emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
-	emailHandler := handler.NewEmailHandler(emailUsecase)
+	emailHandler := handler.NewEmailHandlerWithInbox(emailUsecase, email_repo.NewInboxRepo(pool))
 
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("", emailHandler.List)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("", emailHandler.Create)
@@ -145,6 +145,8 @@ func NewServer(
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).DELETE("/:id", emailHandler.Delete)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("/:id/test", emailHandler.TestSend)
 	admin.POST("/contexts/:id/email-templates/:tid/send", middleware.AuthMiddleware(authService), emailHandler.SendToContact)
+	admin.GET("/contexts/:id/inbox", middleware.AuthMiddleware(authService), emailHandler.ListInbox)
+	admin.POST("/contexts/:id/inbox/:mid/read", middleware.AuthMiddleware(authService), emailHandler.MarkInboxRead)
 
 	// Tracking visitor admin routes (already above)
 

@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -15,8 +17,9 @@ import (
 
 // EmailHandler handles HTTP requests for email templates and sending.
 type EmailHandler struct {
-	usecase *email.EmailUsecase
-	log     zerolog.Logger
+	usecase   *email.EmailUsecase
+	inboxRepo ewemail.InboxRepository
+	log       zerolog.Logger
 }
 
 // NewEmailHandler creates a new EmailHandler.
@@ -24,6 +27,15 @@ func NewEmailHandler(uc *email.EmailUsecase) *EmailHandler {
 	return &EmailHandler{
 		usecase: uc,
 		log:     log.With().Str("handler", "email").Logger(),
+	}
+}
+
+// NewEmailHandlerWithInbox creates a new EmailHandler with inbox access.
+func NewEmailHandlerWithInbox(uc *email.EmailUsecase, inboxRepo ewemail.InboxRepository) *EmailHandler {
+	return &EmailHandler{
+		usecase:   uc,
+		inboxRepo: inboxRepo,
+		log:       log.With().Str("handler", "email").Logger(),
 	}
 }
 
@@ -265,6 +277,77 @@ func (h *EmailHandler) SendToContact(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{"job_id": jobID})
+}
+
+// ListInbox handles GET /admin/contexts/:id/inbox — list inbox messages.
+func (h *EmailHandler) ListInbox(c *gin.Context) {
+	contextID := c.Param("id")
+	if _, err := uuid.Parse(contextID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid context id"})
+		return
+	}
+	if h.inboxRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "inbox not available"})
+		return
+	}
+
+	limit := 50
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+			if limit > 200 {
+				limit = 200
+			}
+		}
+	}
+
+	msgs, err := h.inboxRepo.List(contextID, limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list inbox")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list inbox"})
+		return
+	}
+
+	list := make([]map[string]interface{}, 0, len(msgs))
+	for _, m := range msgs {
+		list = append(list, map[string]interface{}{
+			"id":           m.ID,
+			"uid":          m.UID,
+			"from":         m.From,
+			"to":           m.To,
+			"subject":      m.Subject,
+			"body_text":    m.BodyText,
+			"message_date": m.MessageDate,
+			"is_read":      m.IsRead,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"messages": list, "count": len(msgs)})
+}
+
+// MarkInboxRead handles POST /admin/contexts/:id/inbox/:mid/read.
+func (h *EmailHandler) MarkInboxRead(c *gin.Context) {
+	mid := c.Param("mid")
+	if _, err := uuid.Parse(mid); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid message id"})
+		return
+	}
+	if h.inboxRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "inbox not available"})
+		return
+	}
+
+	if err := h.inboxRepo.MarkRead(mid); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
+			return
+		}
+		log.Error().Err(err).Msg("failed to mark inbox message read")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to mark message read"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // toTemplateResponse converts a domain model to API response.

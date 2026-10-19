@@ -23,6 +23,7 @@ import (
 	contact_repo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
 	context_repo "github.com/hekemen/automata/internal/infrastructure/context/repo"
 	"github.com/hekemen/automata/internal/infrastructure/database"
+	imap "github.com/hekemen/automata/internal/infrastructure/email/imap"
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
 	mailsmtp "github.com/hekemen/automata/internal/infrastructure/email/smtp"
 	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
@@ -219,15 +220,12 @@ func main() {
 	}
 	settingsRepo := settings_repo.New(pool)
 	contextSettingsRepo := settings_repo.NewContext(pool)
-	mailer := mailsmtp.NewMailerWithProvider(
-		func(ctxID string) mailsmtp.Config {
-			m, _ := settingsRepo.List()
-			cm, _ := contextSettingsRepo.List(ctxID)
-			return mailsmtp.MergeConfig(mailsmtp.MergeConfig(smtpCfg, m), cm)
-		},
-		smtpCfg,
-		mailsmtp.DefaultDialer,
-	)
+	configFor := func(ctxID string) mailsmtp.Config {
+		m, _ := settingsRepo.List()
+		cm, _ := contextSettingsRepo.List(ctxID)
+		return mailsmtp.MergeConfig(mailsmtp.MergeConfig(smtpCfg, m), cm)
+	}
+	mailer := mailsmtp.NewMailerWithProvider(configFor, smtpCfg, mailsmtp.DefaultDialer)
 	if !mailer.IsConfigured() {
 		log.Warn().Msg("smtp not configured: email jobs will be discarded after max retries")
 	}
@@ -235,6 +233,10 @@ func main() {
 		log.Warn().Msg("smtp: username set with starttls disabled; credentials will be sent in cleartext")
 	}
 	emailQueue.StartWorker(ctx, mailer)
+
+	// IMAP inbox poller (fetches new INBOX messages per context)
+	imapPoller := imap.NewPoller(email_repo.NewInboxRepo(pool), contextRepo, configFor)
+	go imapPoller.Start(ctx)
 
 	// Webhook delivery worker (API enqueues deliveries; worker POSTs them)
 	webhookQueue := queue.NewWebhookQueue(pool)

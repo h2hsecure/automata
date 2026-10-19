@@ -18,3 +18,21 @@ CREATE INDEX IF NOT EXISTS idx_email_templates_context ON email_templates(contex
 -- Template kind (standalone | form) and optional form binding
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'standalone';
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS form_id UUID;
+
+-- IMAP inbox (fetched per context by the poller)
+CREATE TABLE IF NOT EXISTS email_inbox (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    context_id   UUID NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
+    uid          BIGINT NOT NULL,
+    sender       TEXT NOT NULL DEFAULT '',
+    recipient    TEXT NOT NULL DEFAULT '',
+    subject      TEXT NOT NULL DEFAULT '',
+    body_text    TEXT NOT NULL DEFAULT '',
+    message_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+    is_read      BOOLEAN NOT NULL DEFAULT false,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_email_inbox_context_uid UNIQUE (context_id, uid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_inbox_context ON email_inbox(context_id);
