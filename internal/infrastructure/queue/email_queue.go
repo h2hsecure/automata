@@ -15,6 +15,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// ErrJobNotFound is returned by Retry and Cancel when the job does not
+// exist in the expected state for the given context.
+var ErrJobNotFound = errors.New("job not found")
+
 // EmailJob represents a pending email to send.
 type EmailJob struct {
 	ID         string
@@ -210,7 +214,7 @@ func (q *emailQueue) Retry(contextID, jobID string) error {
 	`, contextID, jobID).Scan(&toAddresses, &subject, &body, &htmlBody)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("retry: no failed job found: %s", jobID)
+			return fmt.Errorf("retry: %w: %s", ErrJobNotFound, jobID)
 		}
 		return fmt.Errorf("read failed job: %w", err)
 	}
@@ -248,7 +252,7 @@ func (q *emailQueue) Cancel(contextID, jobID string) error {
 		return fmt.Errorf("cancel job: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("cancel: no pending job found: %s", jobID)
+		return fmt.Errorf("cancel: %w: %s", ErrJobNotFound, jobID)
 	}
 	return nil
 }

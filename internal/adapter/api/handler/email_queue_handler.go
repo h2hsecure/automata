@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // emailQueueItem is the unified JSON shape for pending jobs and history rows.
@@ -26,11 +29,15 @@ type emailQueueItem struct {
 }
 
 type EmailQueueHandler struct {
-	q queue.Queue
+	q   queue.Queue
+	log zerolog.Logger
 }
 
 func NewEmailQueueHandler(q queue.Queue) *EmailQueueHandler {
-	return &EmailQueueHandler{q: q}
+	return &EmailQueueHandler{
+		q:   q,
+		log: log.With().Str("handler", "email_queue").Logger(),
+	}
 }
 
 // List handles GET /api/admin/contexts/:id/email-queue — returns pending
@@ -67,6 +74,7 @@ func (h *EmailQueueHandler) List(c *gin.Context) {
 	if status == "pending" {
 		jobs, err := h.q.ListPending(contextID, limit)
 		if err != nil {
+			h.log.Error().Err(err).Str("context_id", contextID).Msg("failed to list pending email jobs")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -85,6 +93,7 @@ func (h *EmailQueueHandler) List(c *gin.Context) {
 	} else {
 		history, err := h.q.ListHistory(contextID, status, limit)
 		if err != nil {
+			h.log.Error().Err(err).Str("context_id", contextID).Str("status", status).Msg("failed to list email history")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -115,8 +124,17 @@ func (h *EmailQueueHandler) Retry(c *gin.Context) {
 		return
 	}
 	jobID := c.Param("jobId")
+	if _, err := uuid.Parse(jobID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid job ID"})
+		return
+	}
 	if err := h.q.Retry(contextID, jobID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		if errors.Is(err, queue.ErrJobNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		h.log.Error().Err(err).Str("context_id", contextID).Str("job_id", jobID).Msg("failed to retry email job")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"id": jobID})
@@ -131,8 +149,17 @@ func (h *EmailQueueHandler) Cancel(c *gin.Context) {
 		return
 	}
 	jobID := c.Param("jobId")
+	if _, err := uuid.Parse(jobID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid job ID"})
+		return
+	}
 	if err := h.q.Cancel(contextID, jobID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		if errors.Is(err, queue.ErrJobNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		h.log.Error().Err(err).Str("context_id", contextID).Str("job_id", jobID).Msg("failed to cancel email job")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -166,6 +193,7 @@ func (h *EmailQueueHandler) TestSend(c *gin.Context) {
 		MaxRetries: 3,
 	}
 	if err := h.q.Enqueue(job); err != nil {
+		h.log.Error().Err(err).Str("context_id", contextID).Msg("failed to enqueue test email")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -8,14 +8,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/settings"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type ContextSettingsHandler struct {
 	repo settings.ContextRepository
+	log  zerolog.Logger
 }
 
 func NewContextSettingsHandler(repo settings.ContextRepository) *ContextSettingsHandler {
-	return &ContextSettingsHandler{repo: repo}
+	return &ContextSettingsHandler{
+		repo: repo,
+		log:  log.With().Str("handler", "context_settings").Logger(),
+	}
 }
 
 // List handles GET /api/admin/contexts/:id/settings — returns all settings for a context.
@@ -27,6 +33,7 @@ func (h *ContextSettingsHandler) List(c *gin.Context) {
 	}
 	m, err := h.repo.List(contextID)
 	if err != nil {
+		h.log.Error().Err(err).Str("context_id", contextID).Msg("failed to list context settings")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -55,6 +62,7 @@ func (h *ContextSettingsHandler) Upsert(c *gin.Context) {
 	}
 
 	if err := h.repo.Upsert(contextID, req.Key, req.Value); err != nil {
+		h.log.Error().Err(err).Str("context_id", contextID).Str("key", req.Key).Msg("failed to upsert context setting")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -75,6 +83,7 @@ func (h *ContextSettingsHandler) Delete(c *gin.Context) {
 			c.Status(http.StatusNotFound)
 			return
 		}
+		h.log.Error().Err(err).Str("context_id", contextID).Str("key", key).Msg("failed to delete context setting")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

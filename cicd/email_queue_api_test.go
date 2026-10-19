@@ -215,10 +215,19 @@ var _ = Describe("Email Queue API", func() {
 		Expect(resp.Jobs[0].Status).To(Equal("pending"))
 	})
 
-	It("returns 404 when retrying a missing job", func() {
+	It("returns 400 when retrying a job with a malformed ID", func() {
 		contextID := support.NewTestContextID()
 		req := httptest.NewRequest("POST",
 			fmt.Sprintf("/api/admin/contexts/%s/email-queue/nope/retry", contextID), nil)
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusBadRequest))
+	})
+
+	It("returns 404 when retrying a missing job", func() {
+		contextID := support.NewTestContextID()
+		missingID := support.NewTestUUID()
+		req := httptest.NewRequest("POST",
+			fmt.Sprintf("/api/admin/contexts/%s/email-queue/%s/retry", contextID, missingID), nil)
 		engine.ServeHTTP(w, req)
 		Expect(w.Code).To(Equal(http.StatusNotFound))
 	})
@@ -242,10 +251,19 @@ var _ = Describe("Email Queue API", func() {
 		Expect(resp.Count).To(BeZero())
 	})
 
-	It("returns 404 when cancelling a missing job", func() {
+	It("returns 400 when cancelling a job with a malformed ID", func() {
 		contextID := support.NewTestContextID()
 		req := httptest.NewRequest("DELETE",
 			fmt.Sprintf("/api/admin/contexts/%s/email-queue/nope", contextID), nil)
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusBadRequest))
+	})
+
+	It("returns 404 when cancelling a missing job", func() {
+		contextID := support.NewTestContextID()
+		missingID := support.NewTestUUID()
+		req := httptest.NewRequest("DELETE",
+			fmt.Sprintf("/api/admin/contexts/%s/email-queue/%s", contextID, missingID), nil)
 		engine.ServeHTTP(w, req)
 		Expect(w.Code).To(Equal(http.StatusNotFound))
 	})
