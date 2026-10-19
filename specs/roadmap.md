@@ -29,7 +29,7 @@ JavaScript snippet for website embedding, page view and event tracking, visitor 
 Banner CRUD, placement rules, A/B testing, impression and click tracking. **Done.**
 
 ### 6. Email System
-Email queue, template management, and notification integration with forms and webhooks. **Done** (2026-09-25). SMTP delivery: **Done** (2026-10-14, [plan](../docs/superpowers/plans/2026-10-14-email-delivery.md)).
+Email queue, template management, and notification integration with forms and webhooks. **Done** (2026-09-25). SMTP delivery: **Done** (2026-10-14, [plan](../docs/superpowers/plans/2026-10-14-email-delivery.md)). Per-website email templates (standalone + form-integrated) with contact/form placeholders, IMAP inbox poller, email reach stats, and Email UI: **Done** (2026-10-19, [plan](../docs/superpowers/plans/2026-10-19-email-templates-inbox.md)).
 
 ### 7. Webhook Management
 Per-context webhook CRUD, queue, delivery, and retry. **Done** (2026-09-25; delivery worker wired into the main API process and retry pickup fixed 2026-10-14, [plan](../docs/superpowers/plans/2026-10-14-webhook-delivery-wiring.md)).
