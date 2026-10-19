@@ -12,6 +12,8 @@ import {
   Monitor,
   Smartphone,
   BarChart3,
+  Mail,
+  Send,
 } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
@@ -24,10 +26,11 @@ import {
   getDashboardStats,
   getTrackingEvents,
   listVisitors,
+  getEmailStats,
 } from '@/api/client'
 import { usePagination } from '@/composables/usePagination'
 import { useAuthStore } from '@/stores/auth'
-import type { TrackingEvent, Visitor } from '@/types/api'
+import type { TrackingEvent, Visitor, EmailStats } from '@/types/api'
 
 const authStore = useAuthStore()
 const tab = ref<'overview' | 'events' | 'visitors'>('overview')
@@ -46,6 +49,10 @@ const stats = ref({
   totalForms: 0,
   totalBanners: 0,
 })
+
+// Email stats (queue status + reach) — cards hide if the call fails
+const emailStats = ref<EmailStats | null>(null)
+const emailStatsLoaded = ref(false)
 
 // Real page view data (top pages by view count)
 const pageViewsChart = ref<Array<{ label: string; count: number }>>([])
@@ -128,6 +135,16 @@ async function loadOverview() {
 
     const banners = await listBanners(authStore.currentContextId)
     stats.value.totalBanners = banners.length
+
+    // Non-blocking: hide email cards on failure
+    getEmailStats()
+      .then((s) => {
+        emailStats.value = s
+        emailStatsLoaded.value = true
+      })
+      .catch(() => {
+        emailStatsLoaded.value = false
+      })
   } finally {
     loading.value = false
   }
@@ -278,6 +295,38 @@ watch(
           </div>
           <div class="mt-2 text-sm text-muted-foreground">
             Active banners
+          </div>
+        </Card>
+
+        <!-- Email Queue -->
+        <Card v-if="emailStatsLoaded && emailStats">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-muted-foreground">Email Queue</p>
+              <p class="text-2xl font-bold">{{ emailStats.pending }}</p>
+            </div>
+            <div class="rounded-lg bg-rose-100 dark:bg-rose-900/30 p-3">
+              <Mail class="h-6 w-6 text-rose-600 dark:text-rose-400" />
+            </div>
+          </div>
+          <div class="mt-2 text-sm text-muted-foreground">
+            pending · {{ emailStats.sent_24h }} sent, {{ emailStats.failed_24h }} failed (24h)
+          </div>
+        </Card>
+
+        <!-- Email Reach -->
+        <Card v-if="emailStatsLoaded && emailStats">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-muted-foreground">Email Reach</p>
+              <p class="text-2xl font-bold">{{ emailStats.contacts_reached }}</p>
+            </div>
+            <div class="rounded-lg bg-teal-100 dark:bg-teal-900/30 p-3">
+              <Send class="h-6 w-6 text-teal-600 dark:text-teal-400" />
+            </div>
+          </div>
+          <div class="mt-2 text-sm text-muted-foreground">
+            contacts reached · {{ emailStats.reached_7d }} in 7d · {{ emailStats.emails_sent_total }} emails total
           </div>
         </Card>
       </div>

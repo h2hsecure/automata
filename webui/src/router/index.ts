@@ -35,6 +35,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/FormsView.vue'),
       },
       {
+        path: 'email',
+        name: 'Email',
+        component: () => import('@/views/EmailView.vue'),
+        meta: { requiresAdmin: true },
+      },
+      {
         path: 'api-keys',
         redirect: '/settings?tab=api-keys',
       },

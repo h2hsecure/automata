@@ -17,6 +17,10 @@ import type {
   Campaign,
   Placement,
   ContextUser,
+  EmailTemplate,
+  EmailTemplateInput,
+  InboxMessage,
+  EmailStats,
 } from '@/types/api'
 
 const client: AxiosInstance = axios.create({
@@ -368,6 +372,60 @@ export async function cancelEmailJob(contextId: string, jobId: string): Promise<
 
 export async function sendTestEmail(contextId: string, to: string): Promise<void> {
   await client.post(`/admin/contexts/${contextId}/email-queue/test`, { to })
+}
+
+// Email template endpoints (admin only)
+export async function listEmailTemplates(contextId = ''): Promise<EmailTemplate[]> {
+  const params: Record<string, string> = {}
+  if (contextId) params.context_id = contextId
+  const { data } = await client.get('/admin/email-templates', { params })
+  return data.templates ?? []
+}
+
+export async function createEmailTemplate(data: EmailTemplateInput): Promise<EmailTemplate> {
+  const { data: d } = await client.post('/admin/email-templates', data)
+  return d
+}
+
+export async function updateEmailTemplate(id: string, data: Partial<EmailTemplateInput>): Promise<EmailTemplate> {
+  const { data: d } = await client.put(`/admin/email-templates/${id}`, data)
+  return d
+}
+
+export async function deleteEmailTemplate(id: string): Promise<void> {
+  await client.delete(`/admin/email-templates/${id}`)
+}
+
+export async function sendTemplateToContact(
+  contextId: string,
+  templateId: string,
+  contactId: string
+): Promise<{ job_id: string }> {
+  const { data } = await client.post(`/admin/contexts/${contextId}/email-templates/${templateId}/send`, {
+    contact_id: contactId,
+  })
+  return data
+}
+
+// Inbox endpoints (admin only)
+export async function listInbox(
+  contextId: string,
+  limit = 50
+): Promise<{ messages: InboxMessage[]; count: number }> {
+  const { data } = await client.get(`/admin/contexts/${contextId}/inbox`, {
+    params: { limit: String(limit) },
+  })
+  return { messages: data.messages ?? [], count: data.count ?? 0 }
+}
+
+export async function markInboxRead(contextId: string, messageId: string): Promise<void> {
+  await client.post(`/admin/contexts/${contextId}/inbox/${messageId}/read`)
+}
+
+// Email stats (context-resolved)
+export async function getEmailStats(): Promise<EmailStats> {
+  const { data } = await client.get('/context/email-stats')
+  return data
 }
 
 export default client

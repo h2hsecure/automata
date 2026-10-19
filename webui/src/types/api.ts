@@ -221,3 +221,48 @@ export interface ContextUser {
   ContextID: string;
   Role: string;
 }
+
+export interface EmailTemplate {
+  id: string;
+  context_id: string;
+  key: string;
+  subject: string;
+  body_text: string;
+  body_html: string;
+  is_default: boolean;
+  kind: 'standalone' | 'form';
+  form_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailTemplateInput {
+  context_id?: string;
+  key?: string;
+  subject: string;
+  body_text?: string;
+  body_html?: string;
+  is_default?: boolean;
+  kind?: string;
+  form_id?: string | null;
+}
+
+export interface InboxMessage {
+  id: string;
+  uid: number;
+  from: string;
+  to: string;
+  subject: string;
+  body_text: string;
+  message_date: string;
+  is_read: boolean;
+}
+
+export interface EmailStats {
+  pending: number;
+  sent_24h: number;
+  failed_24h: number;
+  emails_sent_total: number;
+  contacts_reached: number;
+  reached_7d: number;
+}
