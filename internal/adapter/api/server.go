@@ -11,19 +11,19 @@ import (
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
 	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
-	formRepo "github.com/hekemen/automata/internal/infrastructure/form/repo"
-	bannerRepo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
-	trackingRepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
-	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
+	bannerRepo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
 	config_repo "github.com/hekemen/automata/internal/infrastructure/config/repo"
 	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
-	settingsrepo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
+	formRepo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
+	settingsrepo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
+	trackingRepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	webhook_svc "github.com/hekemen/automata/internal/infrastructure/webhook"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
+	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -115,6 +115,13 @@ func NewServer(
 		admin.GET("/contexts/:id/settings", contextSettingsHandler.List)
 		admin.PUT("/contexts/:id/settings", contextSettingsHandler.Upsert)
 		admin.DELETE("/contexts/:id/settings/:key", contextSettingsHandler.Delete)
+
+		// Per-context email queue routes
+		emailQueueHandler := handler.NewEmailQueueHandler(queue.NewEmailQueue(pool))
+		admin.GET("/contexts/:id/email-queue", emailQueueHandler.List)
+		admin.POST("/contexts/:id/email-queue/:jobId/retry", emailQueueHandler.Retry)
+		admin.DELETE("/contexts/:id/email-queue/:jobId", emailQueueHandler.Cancel)
+		admin.POST("/contexts/:id/email-queue/test", emailQueueHandler.TestSend)
 
 		// Tracking visitor routes
 		trackingRepo := trackingRepo.New(pool)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -83,7 +84,7 @@ func (q *emailQueue) Enqueue(job *EmailJob) error {
 		job.To = []string{}
 	}
 
-	toStr := "{" + fmt.Sprint(job.To) + "}"
+	toStr := "{" + strings.Join(job.To, ",") + "}"
 
 	query := `
 		INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)

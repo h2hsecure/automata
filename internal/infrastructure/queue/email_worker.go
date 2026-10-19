@@ -144,12 +144,9 @@ func (q *emailQueue) sendJob(ctx context.Context, j jobRow, mailer Mailer) error
 }
 
 // toArray builds a pgtype.Array for a string slice. pgx encodes arrays
-// from their dimensions, so Dims must be set for non-empty slices or the
-// value is encoded as NULL.
+// from their dimensions, so Dims must be set for both empty and non-empty
+// slices or the value is encoded as NULL.
 func toArray(elements []string) pgtype.Array[string] {
-	if len(elements) == 0 {
-		return pgtype.Array[string]{}
-	}
 	return pgtype.Array[string]{
 		Elements: elements,
 		Dims:     []pgtype.ArrayDimension{{Length: int32(len(elements)), LowerBound: 1}},
