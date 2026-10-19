@@ -137,6 +137,43 @@ func (r *emailRepo) List(contextID string) ([]*email.EmailTemplate, error) {
 	return templates, nil
 }
 
+// ListByForm retrieves all form-integrated templates for a context and form,
+// ordered by key ASC.
+func (r *emailRepo) ListByForm(contextID, formID string) ([]*email.EmailTemplate, error) {
+	ctx := context.Background()
+	query := `
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
+		FROM email_templates
+		WHERE context_id = $1 AND kind = $2 AND form_id = $3
+		ORDER BY key ASC
+	`
+
+	rows, err := r.pool.Query(ctx, query, contextID, email.TemplateKindForm, formID)
+	if err != nil {
+		return nil, fmt.Errorf("list form email templates: %w", err)
+	}
+	defer rows.Close()
+
+	templates := make([]*email.EmailTemplate, 0)
+	for rows.Next() {
+		t := &email.EmailTemplate{}
+		err := rows.Scan(
+			&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
+			&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan email template: %w", err)
+		}
+		templates = append(templates, t)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate email templates: %w", err)
+	}
+
+	return templates, nil
+}
+
 // Update modifies an existing template, only updating non-empty fields.
 func (r *emailRepo) Update(t *email.EmailTemplate) error {
 	ctx := context.Background()

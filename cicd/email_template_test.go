@@ -1,6 +1,7 @@
 package cicd_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,11 +13,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/hekemen/automata/cicd/support"
 	"github.com/hekemen/automata/internal/adapter/api/handler"
+	ttracking "github.com/hekemen/automata/internal/adapter/tracking"
 	cd "github.com/hekemen/automata/internal/domain/contact"
 	"github.com/hekemen/automata/internal/domain/email"
+	domainform "github.com/hekemen/automata/internal/domain/form"
 	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
 	"github.com/hekemen/automata/internal/infrastructure/email/repo"
+	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	email_infra "github.com/hekemen/automata/internal/infrastructure/queue"
+	trepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1273,5 +1278,165 @@ var _ = Describe("Standalone template send", func() {
 
 		emailHandler.SendToContact(c)
 		Expect(w.Code).To(Equal(http.StatusNotFound))
+	})
+})
+
+var _ = Describe("Form-integrated template send", func() {
+	var (
+		fRepo     domainform.Repository
+		fHandler  *handler.FormHandler
+		engine    *gin.Engine
+		formID    string
+		contactID string
+	)
+
+	BeforeEach(func() {
+		mockSMTP = support.NewMockSMTP()
+		mockSMTP.Start()
+		pool = db.Pool
+
+		testContext = support.NewTestContext()
+		settingsJSON, _ := json.Marshal(testContext["settings"])
+		_, err := pool.Exec(ctx,
+			`INSERT INTO contexts (id, slug, name, domain, is_active, settings, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+			testContext["id"], testContext["slug"], testContext["name"],
+			testContext["domain"], testContext["is_active"], settingsJSON,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		testContextID = testContext["id"].(string)
+
+		fRepo = form_repo.New(pool)
+		contactRepo := crepo.New(pool)
+		emailRepo = repo.New(pool)
+		emailQueue = email_infra.NewEmailQueue(pool)
+		emailUsecase = emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
+		fHandler = handler.NewFormHandlerWithEmail(fRepo, contactRepo, trepo.New(pool), emailUsecase)
+
+		engine = gin.New()
+		forms := engine.Group("/form")
+		forms.Use(ttracking.ContextMiddleware())
+		forms.POST("/submit/:slug", fHandler.SubmitForm)
+
+		// Form with an optional email field and a text field
+		formID = uuid.New().String()
+		err = fRepo.Create(&domainform.Form{
+			ID:        formID,
+			ContextID: testContextID,
+			Slug:      "contact-us",
+			Name:      "Contact Us",
+			Fields: []domainform.FormField{
+				{Slug: "email", Type: "email", Label: "Email", Required: false},
+				{Slug: "message", Type: "text", Label: "Message", Required: false},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Contact matching the submitter's email
+		contactEmail := "submitter@example.com"
+		contactID = uuid.New().String()
+		err = contactRepo.Create(&cd.Contact{
+			ID:        contactID,
+			ContextID: testContextID,
+			Email:     &contactEmail,
+			FirstName: "Ada",
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM email_jobs")
+		_, _ = pool.Exec(ctx, "DELETE FROM email_templates")
+		_, _ = pool.Exec(ctx, "DELETE FROM form_submissions WHERE context_id = $1", testContextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM forms WHERE id = $1", formID)
+		_, _ = pool.Exec(ctx, "DELETE FROM contact_activities WHERE context_id = $1", testContextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM contacts WHERE id = $1", contactID)
+		_, _ = pool.Exec(ctx, "DELETE FROM contexts WHERE id = $1", testContextID)
+		mockSMTP.Clear()
+	})
+
+	submit := func(data map[string]interface{}) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		body, _ := json.Marshal(map[string]interface{}{"data": data})
+		req := httptest.NewRequest("POST", "/form/submit/contact-us", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Context-ID", testContextID)
+		engine.ServeHTTP(w, req)
+		return w
+	}
+
+	It("sends a form-integrated template to the submitter and records activity", func() {
+		formIDPtr := formID
+		emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       "form_reply",
+			Subject:   "Re: {{ .form.message }}",
+			BodyText:  "Hi {{ .first_name }}, you said: {{ .form.message }} (via {{ .form_name }})",
+			Kind:      email.TemplateKindForm,
+			FormID:    &formIDPtr,
+		})
+
+		w := submit(map[string]interface{}{"email": "submitter@example.com", "message": "Hello"})
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		var to, subject, body string
+		err := pool.QueryRow(ctx,
+			"SELECT to_addresses[1], subject, body FROM email_jobs WHERE context_id = $1", testContextID,
+		).Scan(&to, &subject, &body)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(to).To(Equal("submitter@example.com"))
+		Expect(subject).To(Equal("Re: Hello"))
+		Expect(body).To(Equal("Hi Ada, you said: Hello (via Contact Us)"))
+
+		var count int
+		err = pool.QueryRow(ctx,
+			"SELECT COUNT(*) FROM contact_activities WHERE contact_id = $1 AND type = 'email_sent'", contactID,
+		).Scan(&count)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(count).To(Equal(1))
+	})
+
+	It("skips sending when the submission has no email value", func() {
+		formIDPtr := formID
+		emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       "form_reply_no_email",
+			Subject:   "Re",
+			BodyText:  "Body",
+			Kind:      email.TemplateKindForm,
+			FormID:    &formIDPtr,
+		})
+
+		w := submit(map[string]interface{}{"message": "no email here"})
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		var count int
+		err := pool.QueryRow(ctx,
+			"SELECT COUNT(*) FROM email_jobs WHERE context_id = $1", testContextID,
+		).Scan(&count)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(count).To(Equal(0))
+	})
+
+	It("keeps the submission succeeding when the template has broken syntax", func() {
+		formIDPtr := formID
+		emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       "broken_form",
+			Subject:   "Re: {{ .form.",
+			BodyText:  "Body",
+			Kind:      email.TemplateKindForm,
+			FormID:    &formIDPtr,
+		})
+
+		w := submit(map[string]interface{}{"email": "submitter@example.com", "message": "Hello"})
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		var count int
+		err := pool.QueryRow(ctx,
+			"SELECT COUNT(*) FROM email_jobs WHERE context_id = $1", testContextID,
+		).Scan(&count)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(count).To(Equal(0))
 	})
 })

@@ -179,7 +179,7 @@ func NewServer(
 	// Form routes (context-resolved)
 	formRepo := formRepo.New(pool)
 	trackingRepo := trackingRepo.New(pool)
-	formHandler := handler.NewFormHandlerWithIdentifiers(formRepo, contactRepo, trackingRepo)
+	formHandler := handler.NewFormHandlerWithEmail(formRepo, contactRepo, trackingRepo, emailUsecase)
 	{
 		api.GET("/context/forms", middleware.AuthMiddleware(authService), formHandler.List)
 		api.GET("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Get)

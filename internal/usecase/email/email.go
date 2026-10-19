@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	cd "github.com/hekemen/automata/internal/domain/contact"
 	"github.com/hekemen/automata/internal/domain/email"
+	fwform "github.com/hekemen/automata/internal/domain/form"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -236,6 +237,90 @@ func (u *EmailUsecase) SendToContact(contextID, templateID, contactID string) (s
 
 	log.Info().Str("to", *contact.Email).Str("template", tmpl.Key).Msg("standalone email enqueued")
 	return job.ID, nil
+}
+
+// SendForSubmission sends all form-integrated templates for the form to the
+// submitter's email address, recorded from the first email-type field in the
+// submission. All failures are logged, never returned: form submission must
+// not fail because of email.
+func (u *EmailUsecase) SendForSubmission(f *fwform.Form, s *fwform.Submission) {
+	templates, err := u.repo.ListByForm(f.ContextID, f.ID)
+	if err != nil {
+		log.Error().Err(err).Str("form_id", f.ID).Msg("list form email templates")
+		return
+	}
+	if len(templates) == 0 {
+		return
+	}
+
+	to := submissionEmail(f, s)
+	if to == "" {
+		return
+	}
+
+	var contact *cd.Contact
+	if u.contactRepo != nil {
+		if c, err := u.contactRepo.FindByEmail(f.ContextID, to); err == nil {
+			contact = c
+		}
+	}
+
+	vars := BuildFormVariables(f, s, contact)
+	for _, tmpl := range templates {
+		subject, body, htmlBody, err := u.renderByID(tmpl, vars)
+		if err != nil {
+			log.Error().Err(err).Str("template", tmpl.Key).Msg("render form email template")
+			continue
+		}
+
+		job := &queue.EmailJob{
+			ContextID:  f.ContextID,
+			To:         []string{to},
+			Subject:    subject,
+			Body:       body,
+			HTMLBody:   htmlBody,
+			MaxRetries: 3,
+		}
+		if err := u.queue.Enqueue(job); err != nil {
+			log.Error().Err(err).Str("template", tmpl.Key).Msg("enqueue form email")
+			continue
+		}
+
+		if contact != nil {
+			activity := &cd.Activity{
+				ID:        uuid.New().String(),
+				ContactID: contact.ID,
+				ContextID: f.ContextID,
+				Type:      cd.ActivityEmailSent,
+				Data: map[string]interface{}{
+					"subject":       subject,
+					"template_name": tmpl.Key,
+				},
+			}
+			if err := u.contactRepo.CreateActivity(activity); err != nil {
+				log.Error().Err(err).Str("contact_id", contact.ID).Msg("failed to record email_sent activity")
+			}
+		}
+
+		log.Info().Str("to", to).Str("template", tmpl.Key).Msg("form email enqueued")
+	}
+}
+
+// submissionEmail returns the value of the first email-type field in the
+// submission data, or "" when the submission carries no email.
+func submissionEmail(f *fwform.Form, s *fwform.Submission) string {
+	if s == nil || s.Data == nil {
+		return ""
+	}
+	for _, field := range f.Fields {
+		if field.Type != "email" {
+			continue
+		}
+		if v, ok := s.Data[field.Slug].(string); ok && strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // renderByID renders a template entity (subject, body, html) with the given variables.

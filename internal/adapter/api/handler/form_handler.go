@@ -8,6 +8,7 @@ import (
 	"github.com/hekemen/automata/internal/domain/form"
 	"github.com/hekemen/automata/internal/domain/tracking"
 	contactuc "github.com/hekemen/automata/internal/usecase/contact"
+	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	uc "github.com/hekemen/automata/internal/usecase/form"
 	"github.com/rs/zerolog/log"
 )
@@ -16,6 +17,7 @@ type FormHandler struct {
 	repo         form.Repository
 	contactRepo  contactuc.Repository
 	trackingRepo tracking.Repository
+	emailUC      *emailusecase.EmailUsecase
 }
 
 func NewFormHandler(repo form.Repository) *FormHandler {
@@ -26,6 +28,12 @@ func NewFormHandler(repo form.Repository) *FormHandler {
 // the submitting visitor as a contact on form submission.
 func NewFormHandlerWithIdentifiers(repo form.Repository, contactRepo contactuc.Repository, trackingRepo tracking.Repository) *FormHandler {
 	return &FormHandler{repo: repo, contactRepo: contactRepo, trackingRepo: trackingRepo}
+}
+
+// NewFormHandlerWithEmail builds a form handler that additionally sends
+// form-integrated email templates to the submitter on form submission.
+func NewFormHandlerWithEmail(repo form.Repository, contactRepo contactuc.Repository, trackingRepo tracking.Repository, emailUC *emailusecase.EmailUsecase) *FormHandler {
+	return &FormHandler{repo: repo, contactRepo: contactRepo, trackingRepo: trackingRepo, emailUC: emailUC}
 }
 
 // Repo exposes the form repository for adapters that need direct access.
@@ -50,7 +58,7 @@ type UpdateFormInput struct {
 }
 
 type SubmitFormInput struct {
-	Slug string `json:"slug" form:"slug" binding:"required"`
+	Slug string                 `json:"slug" form:"slug" binding:"required"`
 	Data map[string]interface{} `json:"data" form:"data"`
 }
 
@@ -220,6 +228,14 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 	if body.VisitorID != "" && h.contactRepo != nil && h.trackingRepo != nil {
 		if _, err := uc.IdentifyVisitor(h.contactRepo, h.trackingRepo, contextID, slug, body.VisitorID, data); err != nil {
 			log.Warn().Err(err).Msg("identify visitor from form submission")
+		}
+	}
+
+	if h.emailUC != nil {
+		if f, err := h.repo.GetBySlug(contextID, slug); err == nil {
+			h.emailUC.SendForSubmission(f, sub)
+		} else {
+			log.Warn().Err(err).Msg("load form for email send")
 		}
 	}
 

@@ -13,6 +13,7 @@ type Repository interface {
 	GetByID(id string) (*EmailTemplate, error)
 	GetByKey(contextID, key string) (*EmailTemplate, error)
 	List(contextID string) ([]*EmailTemplate, error)
+	ListByForm(contextID, formID string) ([]*EmailTemplate, error)
 	Update(t *EmailTemplate) error
 	Delete(id string) error
 	SeedDefaults(contextID string) error

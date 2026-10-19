@@ -30,6 +30,7 @@ import (
 	settings_repo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
+	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	"github.com/rs/zerolog/log"
 )
 
@@ -125,8 +126,13 @@ func main() {
 	// Initialize auth service
 	authService := infraauth.NewService(userRepo)
 
+	// Email templates + queue (shared by admin API and form-submission hook)
+	emailRepo := email_repo.New(pool)
+	emailQueue := queue.NewEmailQueue(pool)
+	emailUsecase := emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
+
 	// Create handlers for tracking server
-	formHandler := handler.NewFormHandlerWithIdentifiers(formRepo, contactRepo, trackingRepo)
+	formHandler := handler.NewFormHandlerWithEmail(formRepo, contactRepo, trackingRepo, emailUsecase)
 	bannerHandler := handler.NewBannerHandler(bannerRepo)
 	placementHandler := handler.NewPlacementHandler(bannerRepo)
 	campaignHandler := handler.NewCampaignHandler(bannerRepo)
@@ -228,7 +234,6 @@ func main() {
 	if smtpCfg.Username != "" && !smtpCfg.StartTLS {
 		log.Warn().Msg("smtp: username set with starttls disabled; credentials will be sent in cleartext")
 	}
-	emailQueue := queue.NewEmailQueue(pool)
 	emailQueue.StartWorker(ctx, mailer)
 
 	// Webhook delivery worker (API enqueues deliveries; worker POSTs them)
