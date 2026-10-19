@@ -293,7 +293,7 @@ var _ = Describe("Template Rendering", func() {
 			BodyHTML:  "<p>Dear <strong>{{ .Name }}</strong>, welcome to {{ .Company }}!</p>",
 		})
 
-		variables := map[string]string{
+		variables := map[string]interface{}{
 			"Name":    "Alice",
 			"Company": "Acme Corp",
 		}
@@ -314,7 +314,7 @@ var _ = Describe("Template Rendering", func() {
 			BodyHTML:  "<p>Body</p>",
 		})
 
-		variables := map[string]string{
+		variables := map[string]interface{}{
 			"Other": "value",
 		}
 
@@ -335,7 +335,7 @@ var _ = Describe("Template Rendering", func() {
 			BodyHTML:  "<h1>HTML body for {{ .Name }}</h1>",
 		})
 
-		variables := map[string]string{"Name": "Bob"}
+		variables := map[string]interface{}{"Name": "Bob"}
 		subject, body, htmlBody, err := emailUsecase.RenderTemplate(testContextID, "html_test", variables)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(subject).To(Equal("HTML Test Bob"))
@@ -664,7 +664,7 @@ var _ = Describe("Default Template Seeding", func() {
 		})
 
 		// Render with conditional fields present
-		variables := map[string]string{
+		variables := map[string]interface{}{
 			"Name":     "Alice",
 			"LastName": "Smith",
 		}
@@ -675,7 +675,7 @@ var _ = Describe("Default Template Seeding", func() {
 		Expect(htmlBody).To(ContainSubstring("Smith"))
 
 		// Render without conditional fields
-		variables2 := map[string]string{
+		variables2 := map[string]interface{}{
 			"Name": "Bob",
 		}
 		_, body2, htmlBody2, err := emailUsecase.RenderTemplate(testContextID, "conditional_test", variables2)
@@ -684,6 +684,28 @@ var _ = Describe("Default Template Seeding", func() {
 		Expect(body2).To(Equal("Hello Bob!"))
 		Expect(htmlBody2).To(ContainSubstring("Bob"))
 		Expect(htmlBody2).ToNot(ContainSubstring("Smith"))
+	})
+
+	It("renders nested variables via dot access", func() {
+		emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       "nested_test",
+			Subject:   "Hi {{ .first_name }}",
+			BodyText:  "Plan: {{ .custom.plan }}; from {{ .form.name }}",
+			BodyHTML:  "<p>Plan: {{ .custom.plan }}</p>",
+		})
+
+		variables := map[string]interface{}{
+			"first_name": "Ada",
+			"custom":     map[string]interface{}{"plan": "pro"},
+			"form":       map[string]interface{}{"name": "Web"},
+		}
+
+		subject, body, htmlBody, err := emailUsecase.RenderTemplate(testContextID, "nested_test", variables)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(subject).To(Equal("Hi Ada"))
+		Expect(body).To(Equal("Plan: pro; from Web"))
+		Expect(htmlBody).To(Equal("<p>Plan: pro</p>"))
 	})
 })
 

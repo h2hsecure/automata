@@ -29,7 +29,8 @@ func NewEmailUsecase(repo email.Repository, q queue.Queue) *EmailUsecase {
 }
 
 // RenderTemplate resolves a template by key and renders it with the given variables.
-func (u *EmailUsecase) RenderTemplate(contextID, templateKey string, variables map[string]string) (subject, body, htmlBody string, err error) {
+// Variables may contain nested maps (e.g. "custom", "form") for template dot-access.
+func (u *EmailUsecase) RenderTemplate(contextID, templateKey string, variables map[string]interface{}) (subject, body, htmlBody string, err error) {
 	tmpl, err := u.repo.GetByKey(contextID, templateKey)
 	if err != nil {
 		return "", "", "", fmt.Errorf("template %q not found: %w", templateKey, err)
@@ -84,7 +85,7 @@ func (u *EmailUsecase) SendEmail(contextID string, req email.SendEmailRequest) (
 	}
 
 	// Render template
-	renderedSubject, renderedBody, renderedHTML, err := u.RenderTemplate(contextID, req.Template, req.Variables)
+	renderedSubject, renderedBody, renderedHTML, err := u.RenderTemplate(contextID, req.Template, toInterfaceVars(req.Variables))
 	if err != nil {
 		return "", fmt.Errorf("render template: %w", err)
 	}
@@ -123,7 +124,7 @@ func (u *EmailUsecase) SendEmail(contextID string, req email.SendEmailRequest) (
 // TestSend renders a template with the given variables and enqueues a test delivery.
 func (u *EmailUsecase) TestSend(contextID string, req email.TestSendRequest) (jobID, renderedSubject, preview string, err error) {
 	// Render template
-	subject, body, _, err := u.RenderTemplate(contextID, req.Template, req.Variables)
+	subject, body, _, err := u.RenderTemplate(contextID, req.Template, toInterfaceVars(req.Variables))
 	if err != nil {
 		return "", "", "", fmt.Errorf("render template: %w", err)
 	}
@@ -165,4 +166,14 @@ func normalizeRecipients(to string, toArray []string) []string {
 		return toArray
 	}
 	return nil
+}
+
+// toInterfaceVars converts a flat string map to interface values so it can be
+// passed to RenderTemplate, which accepts nested interface values.
+func toInterfaceVars(vars map[string]string) map[string]interface{} {
+	out := make(map[string]interface{}, len(vars))
+	for k, v := range vars {
+		out[k] = v
+	}
+	return out
 }
