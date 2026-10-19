@@ -53,11 +53,17 @@ function setFieldChecked(field: SettingField, checked: boolean) {
   values.value[field.key] = checked ? 'true' : 'false'
 }
 
+// Generation counter so a late response from a previous open/context
+// cannot overwrite data loaded for the current one.
+let loadGen = 0
+
 async function loadSettings() {
   if (!props.context) return
+  const gen = ++loadGen
   loading.value = true
   try {
     const data = await listContextSettings(props.context.ID)
+    if (gen !== loadGen) return
     const next: Record<string, string> = {}
     for (const field of smtpGroup.fields) {
       next[field.key] = data[field.key] ?? ''
@@ -65,7 +71,7 @@ async function loadSettings() {
     values.value = next
     original.value = { ...next }
   } finally {
-    loading.value = false
+    if (gen === loadGen) loading.value = false
   }
 }
 
@@ -129,6 +135,7 @@ const busyId = ref('')
 
 async function loadQueue() {
   if (!props.context) return
+  const gen = ++loadGen
   queueLoading.value = true
   try {
     const [pending, sent, failed] = await Promise.all([
@@ -136,9 +143,10 @@ async function loadQueue() {
       listEmailQueue(props.context.ID, 'sent', 500),
       listEmailQueue(props.context.ID, 'failed', 500),
     ])
+    if (gen !== loadGen) return
     queue.value = { pending, sent, failed }
   } finally {
-    queueLoading.value = false
+    if (gen === loadGen) queueLoading.value = false
   }
 }
 
@@ -195,6 +203,8 @@ watch(
       saveError.value = ''
       testResult.value = ''
       testError.value = ''
+      testEmail.value = ''
+      activeStatus.value = 'pending'
       loadSettings()
       loadQueue()
     }
