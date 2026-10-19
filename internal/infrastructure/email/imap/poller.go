@@ -94,6 +94,8 @@ func (p *Poller) pollContext(ctx context.Context, ctxID string) {
 		return
 	}
 	defer c.Logout()
+	// Bound IMAP command I/O so a stalled server cannot wedge the poller loop.
+	c.Timeout = 30 * time.Second
 
 	if err := c.Login(cfg.Username, cfg.Password); err != nil {
 		log.Warn().Err(err).Str("context_id", ctxID).Msg("inbox poll: login")
@@ -115,39 +117,47 @@ func (p *Poller) pollContext(ctx context.Context, ctxID string) {
 		return
 	}
 
-	ch := make(chan *imap.Message)
-	if err := c.UidFetch(seqset, []imap.FetchItem{imap.FetchUid, imap.FetchEnvelope, textSection}, ch); err != nil {
-		log.Warn().Err(err).Str("context_id", ctxID).Msg("inbox poll: fetch")
-		return
-	}
-
 	section, _ := imap.ParseBodySectionName(textSection)
 	var msgs []*email.InboxMessage
-	for msg := range ch {
-		env := msg.Envelope
-		if env == nil {
-			continue
-		}
-		var body string
-		if lit := msg.GetBody(section); lit != nil {
-			if b, err := io.ReadAll(lit); err == nil {
-				body = string(b)
+	// go-imap delivers messages to the channel while UidFetch is in flight, so
+	// consume it concurrently; an unbuffered channel read after the call
+	// deadlocks.
+	ch := make(chan *imap.Message)
+	consumed := make(chan struct{})
+	go func() {
+		defer close(consumed)
+		for msg := range ch {
+			env := msg.Envelope
+			if env == nil {
+				continue
 			}
+			var body string
+			if lit := msg.GetBody(section); lit != nil {
+				if b, err := io.ReadAll(lit); err == nil {
+					body = string(b)
+				}
+			}
+			date := env.Date
+			if date.IsZero() {
+				date = time.Now()
+			}
+			msgs = append(msgs, &email.InboxMessage{
+				ContextID:   ctxID,
+				UID:         int64(msg.Uid),
+				From:        addressesToString(env.From),
+				To:          addressesToString(env.To),
+				Subject:     env.Subject,
+				BodyText:    body,
+				MessageDate: date,
+			})
 		}
-		date := env.Date
-		if date.IsZero() {
-			date = time.Now()
-		}
-		msgs = append(msgs, &email.InboxMessage{
-			ContextID:   ctxID,
-			UID:         int64(msg.Uid),
-			From:        addressesToString(env.From),
-			To:          addressesToString(env.To),
-			Subject:     env.Subject,
-			BodyText:    body,
-			MessageDate: date,
-		})
+	}()
+	if err := c.UidFetch(seqset, []imap.FetchItem{imap.FetchUid, imap.FetchEnvelope, textSection}, ch); err != nil {
+		log.Warn().Err(err).Str("context_id", ctxID).Msg("inbox poll: fetch")
+		<-consumed
+		return
 	}
+	<-consumed
 
 	// First run: keep only the most recent messages.
 	if last == 0 && len(msgs) > firstRunCap {
