@@ -67,7 +67,15 @@ var _ = Describe("HTTP Integration Tests - Tracking", func() {
 			req.Header.Set("X-Context-ID", contextID)
 			engine.ServeHTTP(w, req)
 
-			Expect(w.Code).To(Equal(http.StatusNoContent))
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Accepted int `json:"accepted"`
+				Rejected int `json:"rejected"`
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Accepted).To(Equal(3))
+			Expect(resp.Rejected).To(Equal(0))
 
 			var count int
 			err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM tracking_events WHERE context_id = $1", contextID).Scan(&count)
@@ -75,7 +83,7 @@ var _ = Describe("HTTP Integration Tests - Tracking", func() {
 			Expect(count).To(Equal(3))
 		})
 
-		It("should return 204 for invalid batch payload", func() {
+		It("should return zero counts for a batch payload without events", func() {
 			body := `{"invalid": "payload"}`
 
 			req := httptest.NewRequest("POST", "/track/batch", bytes.NewBufferString(body))
@@ -83,17 +91,33 @@ var _ = Describe("HTTP Integration Tests - Tracking", func() {
 			req.Header.Set("X-Context-ID", support.NewTestContextID())
 			engine.ServeHTTP(w, req)
 
-			Expect(w.Code).To(Equal(http.StatusNoContent))
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Accepted int `json:"accepted"`
+				Rejected int `json:"rejected"`
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Accepted).To(Equal(0))
+			Expect(resp.Rejected).To(Equal(0))
 		})
 
-		It("should return 204 when X-Context-ID header is missing", func() {
+		It("should return zero counts when X-Context-ID header is missing and events are empty", func() {
 			body := `{"events":[]}`
 
 			req := httptest.NewRequest("POST", "/track/batch", bytes.NewBufferString(body))
 			req.Header.Set("Content-Type", "application/json")
 			engine.ServeHTTP(w, req)
 
-			Expect(w.Code).To(Equal(http.StatusNoContent))
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Accepted int `json:"accepted"`
+				Rejected int `json:"rejected"`
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Accepted).To(Equal(0))
+			Expect(resp.Rejected).To(Equal(0))
 		})
 
 		It("should handle empty events array", func() {
@@ -104,7 +128,47 @@ var _ = Describe("HTTP Integration Tests - Tracking", func() {
 			req.Header.Set("X-Context-ID", support.NewTestContextID())
 			engine.ServeHTTP(w, req)
 
-			Expect(w.Code).To(Equal(http.StatusNoContent))
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Accepted int `json:"accepted"`
+				Rejected int `json:"rejected"`
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Accepted).To(Equal(0))
+			Expect(resp.Rejected).To(Equal(0))
+		})
+
+		It("should normalize page_view to pageview and reject events with empty type", func() {
+			contextID := support.NewTestContextID()
+			body := `{"events":[
+				{"type":"page_view","url":"/home","title":"Home"},
+				{"url":"/about","title":"About"},
+				{"type":"click","url":"/about","title":"About"}
+			]}`
+
+			req := httptest.NewRequest("POST", "/track/batch", bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Context-ID", contextID)
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Accepted int `json:"accepted"`
+				Rejected int `json:"rejected"`
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Accepted).To(Equal(2))
+			Expect(resp.Rejected).To(Equal(1))
+
+			var pageviewCount, clickCount int
+			err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM tracking_events WHERE context_id = $1 AND type = 'pageview'", contextID).Scan(&pageviewCount)
+			Expect(err).NotTo(HaveOccurred())
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM tracking_events WHERE context_id = $1 AND type = 'click'", contextID).Scan(&clickCount)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pageviewCount).To(Equal(1))
+			Expect(clickCount).To(Equal(1))
 		})
 	})
 

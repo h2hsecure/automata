@@ -63,7 +63,7 @@ func NewServer(
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(authService))
 	{
-		contextHandler := handler.NewContextHandler(contextRepo)
+		contextHandler := handler.NewContextHandler(contextRepo, userRepo)
 		userHandler := handler.NewUserHandler(userRepo, contextRepo)
 		contextUserHandler := handler.NewContextUserHandler(userRepo, contextRepo)
 

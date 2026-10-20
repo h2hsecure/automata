@@ -6,18 +6,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	ct "github.com/hekemen/automata/internal/domain/contact"
 	"github.com/hekemen/automata/internal/domain/tracking"
 	trackingUsecase "github.com/hekemen/automata/internal/usecase/tracking"
+	"github.com/rs/zerolog/log"
 )
 
 // TrackHandler handles event tracking endpoints.
 type TrackHandler struct {
-	repo Repository
+	repo        Repository
+	contactRepo ContactRepository
 }
 
 // Repository is the interface for tracking event persistence.
 type Repository interface {
 	tracking.Repository
+}
+
+// ContactRepository is the interface for contact persistence used by tracking
+// (hidden visitor contacts + page_visit activities).
+type ContactRepository interface {
+	ct.Repository
 }
 
 // Track handles POST /track — single event tracking.
@@ -67,7 +76,7 @@ func (h *TrackHandler) Track(c *gin.Context) {
 		CreatedAt:   time.Now(),
 	}
 
-	if err := trackingUsecase.TrackEvent(h.repo, contextID, event); err != nil {
+	if err := trackingUsecase.TrackEvent(h.contactRepo, h.repo, contextID, event); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -75,7 +84,10 @@ func (h *TrackHandler) Track(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// TrackBatch handles POST /track/batch — batch event tracking.
+// TrackBatch handles POST /track/batch — batch event tracking. Each event is
+// routed through TrackEvent, so pageviews also produce hidden visitor
+// contacts and page_visit activities. Events with an empty type (after the
+// page_view→pageview normalization) are rejected.
 func (h *TrackHandler) TrackBatch(c *gin.Context) {
 	var req struct {
 		Events []map[string]interface{} `json:"events"`
@@ -91,7 +103,7 @@ func (h *TrackHandler) TrackBatch(c *gin.Context) {
 	var fallbackContextID string
 	fallbackResolved := false
 
-	events := make([]*tracking.Event, 0, len(req.Events))
+	accepted, rejected := 0, 0
 	for _, e := range req.Events {
 		contextID := ""
 		if v, ok := e["contextId"].(string); ok {
@@ -138,13 +150,18 @@ func (h *TrackHandler) TrackBatch(c *gin.Context) {
 			event.Properties = v
 		}
 
-		events = append(events, event)
+		if event.Type == "" {
+			rejected++
+			continue
+		}
+
+		if err := trackingUsecase.TrackEvent(h.contactRepo, h.repo, contextID, event); err != nil {
+			log.Warn().Err(err).Str("context_id", contextID).Msg("track batch: event failed")
+			rejected++
+			continue
+		}
+		accepted++
 	}
 
-	if err := h.repo.CreateEventsBatch(events); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, gin.H{"accepted": accepted, "rejected": rejected})
 }

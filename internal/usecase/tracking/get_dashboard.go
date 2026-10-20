@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hekemen/automata/internal/domain/tracking"
+	"github.com/hekemen/automata/pkg/ua"
 )
 
 // GetDashboardOptions holds options for the GetDashboard use case.
@@ -53,24 +54,28 @@ func GetDashboard(repo tracking.Repository, contextID string, opts GetDashboardO
 		return nil, fmt.Errorf("get top referrers: %w", err)
 	}
 
-	metrics.DeviceBreakdown, err = repo.GetDeviceBreakdown(contextID, dateRange)
-	if err != nil {
-		return nil, fmt.Errorf("get device breakdown: %w", err)
-	}
-
-	metrics.BrowserBreakdown, err = repo.GetBrowserBreakdown(contextID, dateRange)
-	if err != nil {
-		return nil, fmt.Errorf("get browser breakdown: %w", err)
-	}
-
 	metrics.ActiveVisitors, err = repo.GetActiveVisitors(contextID, opts.ActiveMin)
 	if err != nil {
 		return nil, fmt.Errorf("get active visitors: %w", err)
 	}
 
-	metrics, err = repo.GetDashboardMetrics(contextID, dateRange)
+	dash, err := repo.GetDashboardMetrics(contextID, dateRange)
 	if err != nil {
 		return nil, fmt.Errorf("get dashboard metrics: %w", err)
+	}
+	metrics.TotalVisitors = dash.TotalVisitors
+	metrics.PageViews = dash.PageViews
+
+	metrics.DeviceBreakdown = make(map[string]int)
+	metrics.BrowserBreakdown = make(map[string]int)
+	groups, err := repo.GetUAGroups(contextID, dateRange)
+	if err != nil {
+		return nil, fmt.Errorf("get ua groups: %w", err)
+	}
+	for _, g := range groups {
+		device, browser := ua.Parse(g.UserAgent)
+		metrics.DeviceBreakdown[string(device)] += int(g.Count)
+		metrics.BrowserBreakdown[string(browser)] += int(g.Count)
 	}
 
 	return metrics, nil

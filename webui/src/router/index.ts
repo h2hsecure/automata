@@ -9,6 +9,12 @@ const routes: RouteRecordRaw[] = [
     meta: { guest: true },
   },
   {
+    path: '/onboarding',
+    name: 'Onboarding',
+    component: () => import('@/views/OnboardingView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/',
     component: () => import('@/components/AppLayout.vue'),
     meta: { requiresAuth: true },
@@ -83,11 +89,46 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.meta.requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.meta.guest && token) {
-    next({ name: 'Dashboard' })
-  } else {
-    next()
+    return
   }
+  if (to.meta.guest && token) {
+    next({ name: 'Dashboard' })
+    return
+  }
+
+  // Onboarding: an authenticated user with no contexts must create a first
+  // context before reaching any app route.
+  if (token && to.meta.requiresAuth && to.name !== 'Onboarding') {
+    try {
+      const { useAuthStore } = await import('@/stores/auth')
+      const authStore = useAuthStore()
+      if (authStore.user) {
+        // Store already initialized in this session (SPA navigation).
+        if (authStore.contexts.length === 0) {
+          next({ name: 'Onboarding' })
+          return
+        }
+      } else {
+        // Fresh page load: verify against the API before the layout's init().
+        const { listContexts } = await import('@/api/client')
+        const list = await listContexts()
+        if (list.length === 0) {
+          next({ name: 'Onboarding' })
+          return
+        }
+        authStore.contexts = list.map((c) => ({ id: c.ID, slug: c.Slug, name: c.Name }))
+        localStorage.setItem('contexts', JSON.stringify(authStore.contexts))
+        if (!authStore.contexts.some((c) => c.id === authStore.currentContextId)) {
+          authStore.currentContextId = list[0].ID
+          localStorage.setItem('context_id', list[0].ID)
+        }
+      }
+    } catch {
+      // API unreachable: fall through to normal navigation.
+    }
+  }
+
+  next()
 })
 
 export default router

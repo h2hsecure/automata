@@ -51,8 +51,7 @@ func cleanupBootstrap() {
 
 var _ = Describe("Admin Bootstrap", func() {
 	var (
-		userRepo    ctxdomain.UserRepository
-		contextRepo ctxdomain.Repository
+		userRepo ctxdomain.UserRepository
 	)
 
 	BeforeEach(func() {
@@ -60,7 +59,6 @@ var _ = Describe("Admin Bootstrap", func() {
 		cleanupBootstrap()
 
 		userRepo = ctxrepo.NewUserPostgresRepo(pool)
-		contextRepo = ctxrepo.NewPostgresRepo(pool)
 	})
 
 	AfterEach(func() {
@@ -71,7 +69,7 @@ var _ = Describe("Admin Bootstrap", func() {
 	})
 
 	It("should create admin user on empty database", func() {
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify admin user was created
@@ -100,7 +98,7 @@ var _ = Describe("Admin Bootstrap", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Run bootstrap - should return nil without creating anything
-		err = bootstrap.Run(pool, userRepo, contextRepo)
+		err = bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify only the original user exists
@@ -116,31 +114,23 @@ var _ = Describe("Admin Bootstrap", func() {
 		Expect(email).To(Equal("existing@example.com"))
 	})
 
-	It("should create a default context if none exist", func() {
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+	It("should not create a default context", func() {
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify default context was created
+		// Bootstrap no longer creates contexts: the first context is created
+		// by the user through the onboarding flow.
 		var count int
 		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM contexts").Scan(&count)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(count).To(Equal(1))
-
-		// Verify context properties
-		var slug, name string
-		var isActive bool
-		err = pool.QueryRow(ctx, "SELECT slug, name, is_active FROM contexts LIMIT 1").Scan(&slug, &name, &isActive)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(slug).To(Equal("default"))
-		Expect(name).To(Equal("Default Context"))
-		Expect(isActive).To(BeTrue())
+		Expect(count).To(Equal(0))
 	})
 
 	It("should use ADMIN_EMAIL env var for admin email", func() {
 		customEmail := "custom@example.com"
 		os.Setenv("AUTOMATA_ADMIN_EMAIL", customEmail)
 
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify admin user was created with custom email
@@ -153,7 +143,7 @@ var _ = Describe("Admin Bootstrap", func() {
 	})
 
 	It("should generate a password that can be verified", func() {
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Get the password hash from the database
@@ -177,21 +167,16 @@ var _ = Describe("Admin Bootstrap", func() {
 		Expect(storedHash).To(Equal(passwordHash))
 	})
 
-	It("should create a membership for admin user", func() {
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+	It("should not create a membership for admin user", func() {
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify membership was created
+		// Bootstrap no longer creates memberships: ownership is granted to
+		// the context creator via the onboarding flow.
 		var count int
 		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM user_contexts").Scan(&count)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(count).To(Equal(1))
-
-		// Verify membership role is "owner"
-		var role string
-		err = pool.QueryRow(ctx, "SELECT role FROM user_contexts LIMIT 1").Scan(&role)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(role).To(Equal("owner"))
+		Expect(count).To(Equal(0))
 	})
 
 	It("should write .admin_initialized marker file", func() {
@@ -201,7 +186,7 @@ var _ = Describe("Admin Bootstrap", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(count).To(Equal(0))
 
-		err = bootstrap.Run(pool, userRepo, contextRepo)
+		err = bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify user was created (proves bootstrap ran the creation path)
@@ -235,7 +220,7 @@ var _ = Describe("Admin Bootstrap", func() {
 		`, contextID, "existing-context", "Existing Context", true, "{}")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = bootstrap.Run(pool, userRepo, contextRepo)
+		err = bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify only one context exists (the original one, not a new default)
@@ -260,12 +245,12 @@ var _ = Describe("Admin Bootstrap", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Bootstrap should return nil since user already exists
-		err = bootstrap.Run(pool, userRepo, contextRepo)
+		err = bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should create admin with is_admin=true flag", func() {
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify the user has is_admin=true
@@ -279,7 +264,7 @@ var _ = Describe("Admin Bootstrap", func() {
 		// Unset any existing env var
 		os.Unsetenv("AUTOMATA_ADMIN_EMAIL")
 
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify default email is used
@@ -305,7 +290,7 @@ var _ = Describe("Admin Bootstrap", func() {
 		`, contextID, "legacy@example.com", "$2a$10$testhash1testhash1testhash1t", true)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = bootstrap.Run(pool, userRepo, contextRepo)
+		err = bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify no new user was created in the users table
@@ -320,7 +305,7 @@ var _ = Describe("Admin Bootstrap", func() {
 	// For this test, we verify the hash format and that the user exists with a valid bcrypt hash.
 	var _ = Describe("Password verification", func() {
 		It("should store a valid bcrypt hash", func() {
-			err := bootstrap.Run(pool, userRepo, contextRepo)
+			err := bootstrap.Run(pool, userRepo)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get the password hash from the database
@@ -338,14 +323,12 @@ var _ = Describe("Admin Bootstrap", func() {
 // Additional standalone test for bcrypt verification with a known password
 var _ = Describe("Bootstrap password generation", func() {
 	var (
-		userRepo    ctxdomain.UserRepository
-		contextRepo ctxdomain.Repository
+		userRepo ctxdomain.UserRepository
 	)
 
 	BeforeEach(func() {
 		cleanupBootstrap()
 		userRepo = ctxrepo.NewUserPostgresRepo(pool)
-		contextRepo = ctxrepo.NewPostgresRepo(pool)
 	})
 
 	AfterEach(func() {
@@ -376,7 +359,7 @@ var _ = Describe("Bootstrap password generation", func() {
 	})
 
 	It("bootstrap password should be usable with bcrypt", func() {
-		err := bootstrap.Run(pool, userRepo, contextRepo)
+		err := bootstrap.Run(pool, userRepo)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Get the stored hash

@@ -18,7 +18,8 @@ func setupContextEngine() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	contextRepo := ctxrepo.NewPostgresRepo(pool)
-	contextHandler := bhandler.NewContextHandler(contextRepo)
+	userRepo := ctxrepo.NewUserPostgresRepo(pool)
+	contextHandler := bhandler.NewContextHandler(contextRepo, userRepo)
 
 	contexts := engine.Group("/api/admin/contexts")
 	{

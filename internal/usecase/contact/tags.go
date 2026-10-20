@@ -26,6 +26,11 @@ type Repository interface {
 	GetActivity(contactID, contextID string, offset, limit int, activityType *string) ([]ct.Activity, int64, error)
 	GetActivityCount(contactID string) (int64, error)
 	CountByContext(contextID string) (int64, error)
+	// FindBySourceID returns the contact for (source, source_id) in a
+	// context, or (nil, nil) when absent.
+	FindBySourceID(contextID, source, sourceID string) (*ct.Contact, error)
+	// Count returns the number of contacts matching the filters.
+	Count(contextID string, filters ct.FilterOptions) (int64, error)
 }
 
 // ActivityCloser is the interface for creating activities.

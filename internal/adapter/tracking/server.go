@@ -8,10 +8,15 @@ import (
 )
 
 // NewServer creates a new tracking server with public-facing endpoints.
-func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHandler, placementHandler *handler.PlacementHandler, campaignHandler *handler.CampaignHandler, trackingRepo Repository) *gin.Engine {
+// The optional contactRepo enables hidden visitor contacts and page_visit
+// activity logging; servers built without it (e.g. test harnesses) skip them.
+func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHandler, placementHandler *handler.PlacementHandler, campaignHandler *handler.CampaignHandler, trackingRepo Repository, contactRepo ...ContactRepository) *gin.Engine {
 	r := gin.Default()
 
 	trackHandler := &TrackHandler{repo: trackingRepo}
+	if len(contactRepo) > 0 && contactRepo[0] != nil {
+		trackHandler.contactRepo = contactRepo[0]
+	}
 	snippetHandler := &SnippetHandler{}
 
 	// Tracking endpoints

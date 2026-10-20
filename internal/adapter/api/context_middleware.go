@@ -106,7 +106,7 @@ func ContextResolver(contextRepo context.Repository) gin.HandlerFunc {
 		t, err = contextRepo.GetDefaultContext()
 		if err != nil {
 			log.Warn().Err(err).Msg("GetDefaultContext failed")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "context not found (debug: " + err.Error() + ")"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no context available"})
 			c.Abort()
 			return
 		}

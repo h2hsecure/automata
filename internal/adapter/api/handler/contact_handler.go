@@ -65,6 +65,15 @@ func (h *ContactHandler) List(c *gin.Context) {
 	company := c.Query("company")
 	search := c.Query("search")
 
+	var hidden *bool
+	if h := c.Query("hidden"); h == "true" {
+		b := true
+		hidden = &b
+	} else if h == "false" {
+		b := false
+		hidden = &b
+	}
+
 	page := 1
 	if p := c.Query("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
@@ -88,10 +97,11 @@ func (h *ContactHandler) List(c *gin.Context) {
 		Offset: offset,
 		Limit:  limit,
 		Filters: contact.FilterOptions{
-			Tags:     tags,
-			Source:   source,
-			Company:  company,
-			Search:   search,
+			Tags:   tags,
+			Source: source,
+			Company: company,
+			Search: search,
+			Hidden: hidden,
 		},
 	}
 

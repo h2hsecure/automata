@@ -112,7 +112,7 @@ func main() {
 	contactRepo := contact_repo.New(pool)
 
 	// Admin bootstrap: create admin user on first startup
-	if err := bootstrap.Run(pool, userRepo, contextRepo); err != nil {
+	if err := bootstrap.Run(pool, userRepo); err != nil {
 		log.Warn().Err(err).Msg("admin bootstrap failed (continuing anyway)")
 	}
 
@@ -183,7 +183,7 @@ func main() {
 	}()
 
 	// Tracking server (port 8081)
-	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo)
+	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, contactRepo)
 
 	trackingPort := config.Get("server.tracking_port")
 	if trackingPort == "" {

@@ -27,8 +27,7 @@ type Repository interface {
 	GetEvents(contextID string, opts EventFilter) ([]*Event, int64, error)
 	GetTopPages(contextID string, dateRange DateRange, limit int) ([]PageViewCount, error)
 	GetTopReferrers(contextID string, dateRange DateRange, limit int) ([]ReferrerCount, error)
-	GetDeviceBreakdown(contextID string, dateRange DateRange) (map[string]int, error)
-	GetBrowserBreakdown(contextID string, dateRange DateRange) (map[string]int, error)
+	GetUAGroups(contextID string, dateRange DateRange) ([]UACount, error)
 	GetActiveVisitors(contextID string, minutes int) (int64, error)
 	PurgeOldEvents(contextID string, retentionDays int) (int64, error)
 
@@ -46,4 +45,8 @@ type Repository interface {
 	// cookie). It only sets the link when the visitor is not already
 	// identified, so an upsert can never un-identify a visitor.
 	SetVisitorContactID(ctx context.Context, contextID, visitorID, contactID string) error
+
+	// ReassignVisitorContactID unconditionally repoints every visitor linked
+	// to oldContactID to newContactID. 0 affected rows is not an error.
+	ReassignVisitorContactID(contextID, oldContactID, newContactID string) error
 }

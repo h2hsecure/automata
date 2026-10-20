@@ -19,3 +19,8 @@ type ReferrerCount struct {
 	Referrer string
 	Count    int64
 }
+
+type UACount struct {
+	UserAgent string
+	Count     int64
+}

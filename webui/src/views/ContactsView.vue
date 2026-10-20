@@ -23,6 +23,7 @@ const { page, limit, total, goToPage, setTotal } = usePagination()
 const contacts = ref<Contact[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
+const showHidden = ref(false)
 const searchDebounce = ref<ReturnType<typeof setTimeout> | null>(null)
 
 // Modal state
@@ -51,7 +52,7 @@ const columns = [
 async function loadContacts() {
   loading.value = true
   try {
-    const response = await listContacts(page.value, limit.value, searchQuery.value, authStore.currentContextId)
+    const response = await listContacts(page.value, limit.value, searchQuery.value, authStore.currentContextId, !showHidden.value)
     contacts.value = response.data || []
     setTotal(response.total || 0)
   } finally {
@@ -68,6 +69,12 @@ watch(
 )
 
 function handleSearch() {
+  page.value = 1
+  loadContacts()
+}
+
+function toggleHidden() {
+  showHidden.value = !showHidden.value
   page.value = 1
   loadContacts()
 }
@@ -136,7 +143,7 @@ onMounted(loadContacts)
     </div>
 
     <!-- Search -->
-    <div class="flex gap-4">
+    <div class="flex flex-wrap items-center gap-4">
       <div class="w-full max-w-md">
         <SearchBar
           v-model="searchQuery"
@@ -144,6 +151,14 @@ onMounted(loadContacts)
           @search="handleSearch"
         />
       </div>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm rounded-md border transition-colors"
+        :class="showHidden ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-input hover:text-foreground'"
+        @click="toggleHidden"
+      >
+        {{ showHidden ? 'Showing hidden visitors' : 'Show hidden visitors' }}
+      </button>
     </div>
 
     <!-- Table -->

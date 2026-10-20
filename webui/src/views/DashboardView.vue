@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import {
   Users,
   FileText,
@@ -25,19 +24,17 @@ import {
   listBanners,
   getDashboardStats,
   getTrackingEvents,
-  listVisitors,
   getEmailStats,
 } from '@/api/client'
 import { usePagination } from '@/composables/usePagination'
 import { useAuthStore } from '@/stores/auth'
-import type { TrackingEvent, Visitor, EmailStats } from '@/types/api'
+import type { TrackingEvent, EmailStats } from '@/types/api'
 
 const authStore = useAuthStore()
-const tab = ref<'overview' | 'events' | 'visitors'>('overview')
+const tab = ref<'overview' | 'events'>('overview')
 const tabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'events', label: 'Events' },
-  { id: 'visitors', label: 'Visitors' },
 ] as const
 
 const loading = ref(true)
@@ -83,27 +80,6 @@ const eventColumns = [
   { key: 'CreatedAt', label: 'Time' },
 ]
 
-// Visitors tab
-const visitors = ref<Visitor[]>([])
-const visitorsLoading = ref(false)
-const visitorsPagination = usePagination()
-const {
-  page: visitorsPage,
-  limit: visitorsLimit,
-  total: visitorsTotal,
-  goToPage: visitorsGoToPage,
-  setTotal: setVisitorsTotal,
-} = visitorsPagination
-
-const visitorColumns = [
-  { key: 'ID', label: 'ID' },
-  { key: 'FirstSeen', label: 'First Seen' },
-  { key: 'LastSeen', label: 'Last Seen' },
-  { key: 'PageViews', label: 'Page Views' },
-  { key: 'LastIP', label: 'Last IP' },
-  { key: 'ContactID', label: 'Identified' },
-]
-
 async function loadOverview() {
   loading.value = true
   try {
@@ -127,7 +103,7 @@ async function loadOverview() {
       count: r.Count,
     }))
 
-    const contacts = await listContacts(1, 1, '', authStore.currentContextId)
+    const contacts = await listContacts(1, 1, '', authStore.currentContextId, false)
     stats.value.totalContacts = contacts.total || 0
 
     const forms = await listForms(authStore.currentContextId)
@@ -161,21 +137,9 @@ async function loadEvents() {
   }
 }
 
-async function loadVisitors() {
-  visitorsLoading.value = true
-  try {
-    const response = await listVisitors(visitorsPage.value, visitorsLimit.value)
-    visitors.value = response.data || []
-    setVisitorsTotal(response.total || 0)
-  } finally {
-    visitorsLoading.value = false
-  }
-}
-
 function loadActiveTab() {
   if (tab.value === 'overview') loadOverview()
-  else if (tab.value === 'events') loadEvents()
-  else loadVisitors()
+  else loadEvents()
 }
 
 onMounted(loadActiveTab)
@@ -186,7 +150,6 @@ watch(
   () => authStore.currentContextId,
   () => {
     eventsPagination.reset()
-    visitorsPagination.reset()
     loadActiveTab()
   }
 )
@@ -477,55 +440,6 @@ watch(
             Previous
           </Button>
           <Button variant="outline" size="sm" :disabled="eventsPage >= Math.ceil(eventsTotal / eventsLimit)" @click="eventsGoToPage(eventsPage + 1)">
-            Next
-          </Button>
-        </div>
-      </div>
-    </Card>
-
-    <!-- Visitors tab -->
-    <Card v-else title="Visitors" description="Tracked visitors">
-      <DataTable
-        :columns="visitorColumns"
-        :data="visitors"
-        :loading="visitorsLoading"
-        empty-text="No visitors found."
-      >
-        <template #ID="{ row }: { row: Visitor }">
-          <span class="font-mono text-xs" :title="row.ID">{{ row.ID.slice(0, 8) }}</span>
-        </template>
-        <template #FirstSeen="{ row }: { row: Visitor }">
-          {{ new Date(row.FirstSeen).toLocaleString() }}
-        </template>
-        <template #LastSeen="{ row }: { row: Visitor }">
-          {{ new Date(row.LastSeen).toLocaleString() }}
-        </template>
-        <template #PageViews="{ row }: { row: Visitor }">
-          {{ row.PageViews }}
-        </template>
-        <template #LastIP="{ row }: { row: Visitor }">
-          {{ row.LastIP || '-' }}
-        </template>
-        <template #ContactID="{ row }: { row: Visitor }">
-          <RouterLink v-if="row.ContactID" to="/contacts" class="hover:opacity-80 transition-opacity">
-            <Badge variant="success">Identified</Badge>
-          </RouterLink>
-          <Badge v-else variant="default">Anonymous</Badge>
-        </template>
-      </DataTable>
-
-      <div
-        v-if="visitorsTotal > 0"
-        class="flex items-center justify-between border-t px-4 py-3"
-      >
-        <p class="text-sm text-muted-foreground">
-          Showing {{ (visitorsPage - 1) * visitorsLimit + 1 }}-{{ Math.min(visitorsPage * visitorsLimit, visitorsTotal) }} of {{ visitorsTotal }}
-        </p>
-        <div class="flex gap-1">
-          <Button variant="outline" size="sm" :disabled="visitorsPage <= 1" @click="visitorsGoToPage(visitorsPage - 1)">
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" :disabled="visitorsPage >= Math.ceil(visitorsTotal / visitorsLimit)" @click="visitorsGoToPage(visitorsPage + 1)">
             Next
           </Button>
         </div>

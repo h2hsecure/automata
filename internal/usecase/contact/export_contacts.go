@@ -18,6 +18,7 @@ func ExportContacts(repo Repository, contextID string, filters contact.FilterOpt
 	}
 
 	// Fetch all contacts (no pagination — export everything)
+	filters.ContextID = contextID
 	contacts, err := repo.List(0, 100000, filters)
 	if err != nil {
 		return nil, fmt.Errorf("list contacts: %w", err)

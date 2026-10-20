@@ -18,6 +18,7 @@ type Contact struct {
 	CustomFields map[string]interface{}
 	Source       string
 	SourceID     string
+	Hidden       bool
 	Tags         []Tag
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

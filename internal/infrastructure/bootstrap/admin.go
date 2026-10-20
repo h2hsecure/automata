@@ -13,10 +13,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Run creates an admin user on first startup if no users exist.
-// It creates a default context if none exists, assigns admin to it with owner role,
-// and writes credentials to stdout. Returns nil if users already exist.
-func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository, contextRepo ctxdomain.Repository) error {
+// Run creates an admin user on first startup if no users exist and writes
+// credentials to stdout. It does not create contexts: the first context is
+// created by the user through the onboarding flow, which grants the creator
+// an owner membership. Returns nil if users already exist.
+func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository) error {
 	// Check if any users exist in the users table
 	exists, err := userRepo.ExistsAnyUser()
 	if err != nil {
@@ -46,41 +47,11 @@ func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository, contextRepo ctxd
 	if err != nil {
 		return fmt.Errorf("generate password: %w", err)
 	}
-	if err != nil {
-		return fmt.Errorf("generate password: %w", err)
-	}
 
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
-	}
-
-	// Create default context if none exists
-	var contextsCount int
-	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM contexts").Scan(&contextsCount); err != nil {
-		contextsCount = 0
-	}
-
-	var contextID string
-	if contextsCount == 0 {
-		ctx := &ctxdomain.Context{
-			ID:       uuid.New().String(),
-			Slug:     "default",
-			Name:     "Default Context",
-			IsActive: true,
-			Settings: make(map[string]interface{}),
-		}
-		if err := contextRepo.Create(ctx); err != nil {
-			return fmt.Errorf("create default context: %w", err)
-		}
-		contextID = ctx.ID
-	} else {
-		// Get first context
-		row := pool.QueryRow(context.Background(), "SELECT id FROM contexts LIMIT 1")
-		if err := row.Scan(&contextID); err != nil {
-			return fmt.Errorf("get first context: %w", err)
-		}
 	}
 
 	// Create admin user
@@ -92,16 +63,6 @@ func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository, contextRepo ctxd
 	}
 	if err := userRepo.Create(adminUser); err != nil {
 		return fmt.Errorf("create admin user: %w", err)
-	}
-
-	// Create membership
-	membership := &ctxdomain.UserContext{
-		UserID:    adminUser.ID,
-		ContextID: contextID,
-		Role:      "owner",
-	}
-	if err := userRepo.CreateMembership(membership); err != nil {
-		log.Warn().Err(err).Msg("failed to create admin membership (user created)")
 	}
 
 	// Write marker file

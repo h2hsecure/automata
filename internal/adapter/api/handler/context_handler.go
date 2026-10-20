@@ -7,14 +7,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/domain/context"
+	"github.com/rs/zerolog/log"
 )
 
 type ContextHandler struct {
 	contextRepo context.Repository
+	userRepo    context.UserRepository
 }
 
-func NewContextHandler(contextRepo context.Repository) *ContextHandler {
-	return &ContextHandler{contextRepo: contextRepo}
+func NewContextHandler(contextRepo context.Repository, userRepo context.UserRepository) *ContextHandler {
+	return &ContextHandler{contextRepo: contextRepo, userRepo: userRepo}
 }
 
 func (h *ContextHandler) List(c *gin.Context) {
@@ -64,6 +66,21 @@ func (h *ContextHandler) Create(c *gin.Context) {
 	if err := h.contextRepo.Create(t); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Grant the creator an owner membership so the new context appears in
+	// their context list (this is how onboarding gets the first context).
+	if userID := c.GetString("user_id"); userID != "" {
+		membership := &context.UserContext{
+			UserID:    userID,
+			ContextID: t.ID,
+			Role:      "owner",
+		}
+		if err := h.userRepo.CreateMembership(membership); err != nil {
+			log.Warn().Err(err).Str("context_id", t.ID).Str("user_id", userID).Msg("failed to grant creator owner membership")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "context created but membership grant failed"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusCreated, t)

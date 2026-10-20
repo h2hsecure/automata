@@ -20,12 +20,14 @@ func ListContacts(repo Repository, contextID string, opts ListOptions) (*contact
 		return nil, fmt.Errorf("context_id is required")
 	}
 
+	opts.Filters.ContextID = contextID
+
 	contacts, err := repo.List(opts.Offset, opts.Limit, opts.Filters)
 	if err != nil {
 		return nil, fmt.Errorf("list contacts: %w", err)
 	}
 
-	total, err := repo.CountByContext(contextID)
+	total, err := repo.Count(contextID, opts.Filters)
 	if err != nil {
 		return nil, fmt.Errorf("count contacts: %w", err)
 	}

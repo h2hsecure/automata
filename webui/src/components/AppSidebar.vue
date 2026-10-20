@@ -10,7 +10,6 @@ import {
   X,
   Zap,
   Mail,
-  Settings,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -34,7 +33,6 @@ const navItems: NavItem[] = [
   { name: 'Forms', path: '/forms', icon: FileText },
   { name: 'Banners', path: '/banners', icon: Image },
   { name: 'Email', path: '/email', icon: Mail, adminOnly: true },
-  { name: 'Settings', path: '/settings', icon: Settings, adminOnly: true },
 ]
 
 const filteredItems = computed(() =>

@@ -2,6 +2,7 @@ package cicd_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 
@@ -95,7 +96,15 @@ var _ = Describe("Tracking context resolution and snippet host", func() {
 			req.Header.Set("Host", "pweb.home.arpa")
 			engine.ServeHTTP(w, req)
 
-			Expect(w.Code).To(Equal(http.StatusNoContent))
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var resp struct {
+				Accepted int `json:"accepted"`
+				Rejected int `json:"rejected"`
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Accepted).To(Equal(1))
+			Expect(resp.Rejected).To(Equal(0))
 
 			var count int
 			err := pool.QueryRow(ctx, "SELECT count(*) FROM tracking_events WHERE context_id=$1", contextID).Scan(&count)

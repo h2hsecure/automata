@@ -12,6 +12,7 @@ func SegmentContacts(repo Repository, contextID string, filters contact.FilterOp
 		return nil, fmt.Errorf("context_id is required")
 	}
 
+	filters.ContextID = contextID
 	contacts, err := repo.List(0, 0, filters)
 	if err != nil {
 		return nil, fmt.Errorf("segment contacts: %w", err)

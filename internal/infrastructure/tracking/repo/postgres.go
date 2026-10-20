@@ -261,58 +261,33 @@ func (r *repo) GetTopReferrers(contextID string, dateRange tracking.DateRange, l
 	return referrers, nil
 }
 
-func (r *repo) GetDeviceBreakdown(contextID string, dateRange tracking.DateRange) (map[string]int, error) {
+// GetUAGroups returns raw user-agent groups for pageview events in the
+// date range. Bucketing into device/browser classes happens in the usecase
+// via pkg/ua.
+func (r *repo) GetUAGroups(contextID string, dateRange tracking.DateRange) ([]tracking.UACount, error) {
 	ctx := context.Background()
 	query := `
 		SELECT user_agent, COUNT(*) as count
 		FROM tracking_events
-		WHERE context_id = $1 AND created_at BETWEEN $2 AND $3
+		WHERE context_id = $1 AND type = 'pageview' AND user_agent != '' AND created_at BETWEEN $2 AND $3
 		GROUP BY user_agent ORDER BY count DESC
 	`
 	rows, err := r.pool.Query(ctx, query, contextID, dateRange.Start, dateRange.End)
 	if err != nil {
-		return nil, fmt.Errorf("get device breakdown: %w", err)
+		return nil, fmt.Errorf("get ua groups: %w", err)
 	}
 	defer rows.Close()
 
-	breakdown := make(map[string]int)
+	var groups []tracking.UACount
 	for rows.Next() {
-		var ua string
-		var count int
-		err := rows.Scan(&ua, &count)
+		var g tracking.UACount
+		err := rows.Scan(&g.UserAgent, &g.Count)
 		if err != nil {
-			return nil, fmt.Errorf("scan device: %w", err)
+			return nil, fmt.Errorf("scan ua group: %w", err)
 		}
-		breakdown[ua] = count
+		groups = append(groups, g)
 	}
-	return breakdown, nil
-}
-
-func (r *repo) GetBrowserBreakdown(contextID string, dateRange tracking.DateRange) (map[string]int, error) {
-	ctx := context.Background()
-	query := `
-		SELECT user_agent, COUNT(*) as count
-		FROM tracking_events
-		WHERE context_id = $1 AND created_at BETWEEN $2 AND $3
-		GROUP BY user_agent ORDER BY count DESC
-	`
-	rows, err := r.pool.Query(ctx, query, contextID, dateRange.Start, dateRange.End)
-	if err != nil {
-		return nil, fmt.Errorf("get browser breakdown: %w", err)
-	}
-	defer rows.Close()
-
-	breakdown := make(map[string]int)
-	for rows.Next() {
-		var ua string
-		var count int
-		err := rows.Scan(&ua, &count)
-		if err != nil {
-			return nil, fmt.Errorf("scan browser: %w", err)
-		}
-		breakdown[ua] = count
-	}
-	return breakdown, nil
+	return groups, nil
 }
 
 func (r *repo) GetActiveVisitors(contextID string, minutes int) (int64, error) {
@@ -511,6 +486,20 @@ func (r *repo) SetVisitorContactID(ctx context.Context, contextID, visitorID, co
 		contextID, visitorID, contactID)
 	if err != nil {
 		return fmt.Errorf("set visitor contact: %w", err)
+	}
+	return nil
+}
+
+// ReassignVisitorContactID unconditionally repoints every visitor linked to
+// oldContactID to newContactID. Used when a hidden visitor contact is merged
+// into an existing contact. 0 affected rows is not an error.
+func (r *repo) ReassignVisitorContactID(contextID, oldContactID, newContactID string) error {
+	_, err := r.pool.Exec(context.Background(),
+		`UPDATE tracking_visitors SET contact_id = $3
+		 WHERE context_id = $1 AND contact_id = $2`,
+		contextID, oldContactID, newContactID)
+	if err != nil {
+		return fmt.Errorf("reassign visitor contact: %w", err)
 	}
 	return nil
 }

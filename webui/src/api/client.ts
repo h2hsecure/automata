@@ -86,11 +86,13 @@ export async function listContacts(
   page = 1,
   limit = 20,
   search = '',
-  contextId = ''
+  contextId = '',
+  hidden?: boolean
 ): Promise<PaginatedResponse<Contact>> {
   const params: Record<string, string> = { page: String(page), limit: String(limit) }
   if (search) params.search = search
   if (contextId) params.context_id = contextId
+  if (hidden !== undefined) params.hidden = String(hidden)
   const response = await client.get('/context/contacts', { params })
   const d = response.data
   return {

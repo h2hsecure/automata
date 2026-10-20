@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Bell, LogOut, Menu, Moon, Sun, ChevronDown } from 'lucide-vue-next'
+import { Bell, LogOut, Menu, Moon, Sun, ChevronDown, Settings } from 'lucide-vue-next'
 import { ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const emit = defineEmits<{ 'toggle-sidebar': [] }>()
@@ -58,6 +59,16 @@ async function handleLogout() {
         <Moon v-if="authStore.theme === 'light'" class="h-5 w-5" />
         <Sun v-else class="h-5 w-5" />
       </button>
+
+      <!-- Settings (admin only) -->
+      <RouterLink
+        v-if="authStore.isAdmin"
+        to="/settings"
+        class="p-2 hover:bg-muted rounded"
+        title="Settings"
+      >
+        <Settings class="h-5 w-5" />
+      </RouterLink>
 
       <!-- User dropdown -->
       <div class="relative">

@@ -32,8 +32,8 @@ func (r *repo) Create(c *ct.Contact) error {
 	ctx := context.Background()
 
 	query := `
-		INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+		INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, hidden, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
 	`
 
 	customFieldsJSON, err := json.Marshal(c.CustomFields)
@@ -52,6 +52,7 @@ func (r *repo) Create(c *ct.Contact) error {
 		customFieldsJSON,
 		c.Source,
 		c.SourceID,
+		c.Hidden,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -68,7 +69,7 @@ func (r *repo) GetByID(id string) (*ct.Contact, error) {
 	ctx := context.Background()
 
 	query := `
-		SELECT id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
 		FROM contacts
 		WHERE id = $1
 	`
@@ -87,6 +88,7 @@ func (r *repo) GetByID(id string) (*ct.Contact, error) {
 		&customFieldsJSON,
 		&c.Source,
 		&c.SourceID,
+		&c.Hidden,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 	)
@@ -111,61 +113,17 @@ func (r *repo) GetByID(id string) (*ct.Contact, error) {
 }
 
 // List retrieves contacts with optional filters, ordered by created_at DESC.
-// Note: context scoping is not available via this interface — callers must scope at the handler level.
+// Context scoping is applied via filters.ContextID (empty = no scope).
 func (r *repo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact, error) {
 	ctx := context.Background()
 
-	whereClauses := []string{"1=1"}
-	args := []interface{}{}
-	argIndex := 1
-
-	// Build WHERE clauses
-	if filters.Source != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("source = $%d", argIndex))
-		args = append(args, filters.Source)
-		argIndex++
+	whereClause, args, argIndex, err := buildListWhere(filters)
+	if err != nil {
+		return nil, fmt.Errorf("build list filters: %w", err)
 	}
-
-	if filters.Company != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("company ILIKE $%d", argIndex))
-		args = append(args, "%"+filters.Company+"%")
-		argIndex++
-	}
-
-	if filters.Search != "" {
-		searchTerm := "%" + strings.ToLower(filters.Search) + "%"
-		whereClauses = append(whereClauses, fmt.Sprintf(
-			"(LOWER(first_name) LIKE $%d OR LOWER(last_name) LIKE $%d OR LOWER(email) LIKE $%d)",
-			argIndex, argIndex+1, argIndex+2,
-		))
-		args = append(args, searchTerm, searchTerm, searchTerm)
-		argIndex += 3
-	}
-
-	if len(filters.Tags) > 0 {
-		placeholders := make([]string, len(filters.Tags))
-		tagArgs := make([]interface{}, len(filters.Tags))
-		for i, tag := range filters.Tags {
-			placeholders[i] = fmt.Sprintf("$%d", argIndex)
-			tagArgs[i] = tag
-			argIndex++
-		}
-		whereClauses = append(whereClauses, fmt.Sprintf(
-			"contact_id IN (SELECT contact_id FROM contact_tag_memberships WHERE tag_id IN (SELECT id FROM contact_tags WHERE context_id = $1 AND name IN (%s)))",
-			strings.Join(placeholders, ", "),
-		))
-		allTagArgs := make([]interface{}, 0, len(filters.Tags)+1)
-		allTagArgs = append(allTagArgs, filters.Tags[0])
-		for _, tag := range filters.Tags {
-			allTagArgs = append(allTagArgs, tag)
-		}
-		args = append(allTagArgs, tagArgs...)
-	}
-
-	whereClause := strings.Join(whereClauses, " AND ")
 
 	listQuery := fmt.Sprintf(`
-		SELECT id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
 		FROM contacts
 		WHERE %s
 		ORDER BY created_at DESC
@@ -198,6 +156,7 @@ func (r *repo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact,
 			&customFieldsJSON,
 			&c.Source,
 			&c.SourceID,
+			&c.Hidden,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		)
@@ -225,6 +184,69 @@ func (r *repo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact,
 	return contacts, nil
 }
 
+// buildListWhere assembles the WHERE clause, bound arguments, and next
+// argument index for List/Count queries from the filter options.
+func buildListWhere(filters ct.FilterOptions) (string, []interface{}, int, error) {
+	whereClauses := []string{"1=1"}
+	args := []interface{}{}
+	argIndex := 1
+
+	if filters.ContextID != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("context_id = $%d", argIndex))
+		args = append(args, filters.ContextID)
+		argIndex++
+	}
+
+	if filters.Source != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("source = $%d", argIndex))
+		args = append(args, filters.Source)
+		argIndex++
+	}
+
+	if filters.Company != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("company ILIKE $%d", argIndex))
+		args = append(args, "%"+filters.Company+"%")
+		argIndex++
+	}
+
+	if filters.Search != "" {
+		searchTerm := "%" + strings.ToLower(filters.Search) + "%"
+		whereClauses = append(whereClauses, fmt.Sprintf(
+			"(LOWER(first_name) LIKE $%d OR LOWER(last_name) LIKE $%d OR LOWER(email) LIKE $%d)",
+			argIndex, argIndex+1, argIndex+2,
+		))
+		args = append(args, searchTerm, searchTerm, searchTerm)
+		argIndex += 3
+	}
+
+	if filters.Hidden != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("hidden = $%d", argIndex))
+		args = append(args, *filters.Hidden)
+		argIndex++
+	}
+
+	if len(filters.Tags) > 0 {
+		if filters.ContextID == "" {
+			return "", nil, 0, fmt.Errorf("tag filter requires a context scope")
+		}
+		placeholders := make([]string, len(filters.Tags))
+		for i := range filters.Tags {
+			placeholders[i] = fmt.Sprintf("$%d", argIndex+i+1)
+		}
+		whereClauses = append(whereClauses, fmt.Sprintf(
+			"contact_id IN (SELECT contact_id FROM contact_tag_memberships WHERE tag_id IN (SELECT id FROM contact_tags WHERE context_id = $%d AND name IN (%s)))",
+			argIndex, strings.Join(placeholders, ", "),
+		))
+		args = append(args, filters.ContextID)
+		for _, tag := range filters.Tags {
+			args = append(args, tag)
+		}
+		argIndex += len(filters.Tags) + 1
+	}
+
+	return strings.Join(whereClauses, " AND "), args, argIndex, nil
+}
+
 // Update modifies an existing ct.
 func (r *repo) Update(c *ct.Contact) error {
 	ctx := context.Background()
@@ -237,7 +259,7 @@ func (r *repo) Update(c *ct.Contact) error {
 	query := `
 		UPDATE contacts
 		SET email = $2, first_name = $3, last_name = $4, phone = $5, company = $6,
-			custom_fields = $7, source = $8, source_id = $9, updated_at = NOW()
+			custom_fields = $7, source = $8, source_id = $9, hidden = $10, updated_at = NOW()
 		WHERE id = $1
 	`
 
@@ -251,6 +273,7 @@ func (r *repo) Update(c *ct.Contact) error {
 		customFieldsJSON,
 		c.Source,
 		c.SourceID,
+		c.Hidden,
 	)
 	if err != nil {
 		return fmt.Errorf("update contact: %w", err)
@@ -277,7 +300,7 @@ func (r *repo) FindByEmail(contextID, email string) (*ct.Contact, error) {
 	ctx := context.Background()
 
 	query := `
-		SELECT id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, created_at, updated_at
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
 		FROM contacts
 		WHERE context_id = $1 AND email = $2
 	`
@@ -298,6 +321,7 @@ func (r *repo) FindByEmail(contextID, email string) (*ct.Contact, error) {
 		&customFieldsJSON,
 		&c.Source,
 		&c.SourceID,
+		&c.Hidden,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 	)
@@ -306,6 +330,57 @@ func (r *repo) FindByEmail(contextID, email string) (*ct.Contact, error) {
 			return nil, fmt.Errorf("contact not found: %w", err)
 		}
 		return nil, fmt.Errorf("find contact by email: %w", err)
+	}
+
+	if len(customFieldsJSON) > 0 && string(customFieldsJSON) != "null" {
+		if err := json.Unmarshal(customFieldsJSON, &c.CustomFields); err != nil {
+			return nil, fmt.Errorf("unmarshal custom fields: %w", err)
+		}
+	}
+
+	if err := r.loadTags(ctx, c); err != nil {
+		return nil, fmt.Errorf("load tags: %w", err)
+	}
+
+	return c, nil
+}
+
+// FindBySourceID retrieves a contact by context, source, and source ID.
+// Returns (nil, nil) when no contact matches.
+func (r *repo) FindBySourceID(contextID, source, sourceID string) (*ct.Contact, error) {
+	ctx := context.Background()
+
+	query := `
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
+		FROM contacts
+		WHERE context_id = $1 AND source = $2 AND source_id = $3
+	`
+
+	c := &ct.Contact{
+		CustomFields: make(map[string]interface{}),
+	}
+	var customFieldsJSON []byte
+
+	err := r.pool.QueryRow(ctx, query, contextID, source, sourceID).Scan(
+		&c.ID,
+		&c.ContextID,
+		&c.Email,
+		&c.FirstName,
+		&c.LastName,
+		&c.Phone,
+		&c.Company,
+		&customFieldsJSON,
+		&c.Source,
+		&c.SourceID,
+		&c.Hidden,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find contact by source id: %w", err)
 	}
 
 	if len(customFieldsJSON) > 0 && string(customFieldsJSON) != "null" {
@@ -516,6 +591,30 @@ func (r *repo) CountByContext(contextID string) (int64, error) {
 	var count int64
 
 	err := r.pool.QueryRow(ctx, query, contextID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count contacts: %w", err)
+	}
+
+	return count, nil
+}
+
+// Count returns the number of contacts matching the filters.
+func (r *repo) Count(contextID string, filters ct.FilterOptions) (int64, error) {
+	ctx := context.Background()
+
+	if filters.ContextID == "" {
+		filters.ContextID = contextID
+	}
+
+	whereClause, args, _, err := buildListWhere(filters)
+	if err != nil {
+		return 0, fmt.Errorf("build count filters: %w", err)
+	}
+
+	query := fmt.Sprintf("SELECT COUNT(*) FROM contacts WHERE %s", whereClause)
+	var count int64
+
+	err = r.pool.QueryRow(ctx, query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count contacts: %w", err)
 	}

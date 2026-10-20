@@ -20,6 +20,10 @@ CREATE INDEX IF NOT EXISTS idx_contacts_context_created
     ON contacts(context_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_contacts_context_source
     ON contacts(context_id, source);
+-- Hidden flag: contacts that represent anonymous page visitors only
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS idx_contacts_context_source_id
+    ON contacts(context_id, source, source_id);
 
 -- Tags table
 CREATE TABLE IF NOT EXISTS contact_tags (

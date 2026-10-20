@@ -90,10 +90,9 @@ func main() {
 
 	// Initialize repositories
 	userRepo := ctx_repo.NewUserPostgresRepo(dbPool)
-	contextRepo := ctx_repo.NewPostgresRepo(dbPool)
 
 	// Admin bootstrap
-	bootstrap.Run(dbPool, userRepo, contextRepo)
+	bootstrap.Run(dbPool, userRepo)
 
 	// Initialize services
 	authService := auth.NewService(userRepo)
