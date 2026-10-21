@@ -52,7 +52,7 @@ const columns = [
 async function loadContacts() {
   loading.value = true
   try {
-    const response = await listContacts(page.value, limit.value, searchQuery.value, authStore.currentContextId, !showHidden.value)
+    const response = await listContacts(page.value, limit.value, searchQuery.value, authStore.currentContextId, showHidden.value ? undefined : false)
     contacts.value = response.data || []
     setTotal(response.total || 0)
   } finally {
