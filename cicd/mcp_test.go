@@ -235,6 +235,12 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 			"contacts_delete", "contacts_merge", "contacts_activity",
 			"forms_list", "forms_get", "forms_create", "forms_update",
 			"forms_delete", "forms_submit", "form_submissions_list", "form_submissions_get",
+			"banners_list", "banners_get", "banners_create", "banners_update",
+			"banners_delete",
+			"placements_list", "placements_get", "placements_create", "placements_update",
+			"placements_delete",
+			"campaigns_list", "campaigns_get", "campaigns_create", "campaigns_update",
+			"campaigns_delete",
 		))
 	})
 })
@@ -538,5 +544,117 @@ var _ = Describe("MCP forms tools", func() {
 		w = mcpTool(engine, apiKey, 3, "form_submissions_get", map[string]any{"submission_id": sub.ID})
 		Expect(w.Code).To(Equal(http.StatusOK))
 		Expect(mcpToolText(w)).To(ContainSubstring(sub.ID))
+	})
+})
+
+var _ = Describe("MCP banner/placement/campaign tools", func() {
+	var (
+		engine    *gin.Engine
+		apiKey    string
+		contextID string
+	)
+
+	BeforeEach(func() {
+		engine, apiKey, contextID, _ = setupMCPEngine()
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	It("banners create/update/list/delete", func() {
+		// campaign first (banners can reference it)
+		w := mcpTool(engine, apiKey, 1, "campaigns_create", map[string]any{"name": "MCP Camp"})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var camp struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &camp)).To(Succeed())
+		Expect(camp.ID).NotTo(BeEmpty())
+
+		w = mcpTool(engine, apiKey, 2, "campaigns_list", map[string]any{})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring("MCP Camp"))
+
+		w = mcpTool(engine, apiKey, 3, "banners_create", map[string]any{
+			"name":        "MCP Banner",
+			"type":        "image",
+			"campaign_id": camp.ID,
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var ban struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &ban)).To(Succeed())
+		Expect(ban.ID).NotTo(BeEmpty())
+
+		w = mcpTool(engine, apiKey, 4, "banners_list", map[string]any{"limit": 100})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		text := mcpToolText(w)
+		Expect(text).To(ContainSubstring("MCP Banner"))
+		Expect(text).To(ContainSubstring(`"total":1`))
+
+		w = mcpTool(engine, apiKey, 5, "banners_update", map[string]any{"banner_id": ban.ID, "name": "Renamed Banner"})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		w = mcpTool(engine, apiKey, 6, "banners_get", map[string]any{"banner_id": ban.ID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring("Renamed Banner"))
+
+		w = mcpTool(engine, apiKey, 7, "banners_delete", map[string]any{"banner_id": ban.ID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+
+		_, text = mcpToolResult(mcpTool(engine, apiKey, 8, "banners_get", map[string]any{"banner_id": ban.ID}))
+		Expect(text).NotTo(ContainSubstring(ban.ID))
+	})
+
+	It("placements create/list/delete", func() {
+		w := mcpTool(engine, apiKey, 1, "placements_create", map[string]any{
+			"name":         "P1",
+			"css_selector": ".slot",
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var pl struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &pl)).To(Succeed())
+		Expect(pl.ID).NotTo(BeEmpty())
+
+		w = mcpTool(engine, apiKey, 2, "placements_list", map[string]any{})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring("P1"))
+
+		w = mcpTool(engine, apiKey, 3, "placements_delete", map[string]any{"placement_id": pl.ID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+
+		w = mcpTool(engine, apiKey, 4, "placements_list", map[string]any{})
+		Expect(mcpToolText(w)).NotTo(ContainSubstring("P1"))
+	})
+
+	It("campaigns get/update/delete", func() {
+		w := mcpTool(engine, apiKey, 1, "campaigns_create", map[string]any{"name": "MCP Camp2"})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var camp struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &camp)).To(Succeed())
+
+		w = mcpTool(engine, apiKey, 2, "campaigns_get", map[string]any{"campaign_id": camp.ID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring("MCP Camp2"))
+
+		w = mcpTool(engine, apiKey, 3, "campaigns_update", map[string]any{"campaign_id": camp.ID, "name": "MCP Camp2 Renamed"})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		w = mcpTool(engine, apiKey, 4, "campaigns_get", map[string]any{"campaign_id": camp.ID})
+		Expect(mcpToolText(w)).To(ContainSubstring("MCP Camp2 Renamed"))
+
+		w = mcpTool(engine, apiKey, 5, "campaigns_delete", map[string]any{"campaign_id": camp.ID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+
+		_, text := mcpToolResult(mcpTool(engine, apiKey, 6, "campaigns_get", map[string]any{"campaign_id": camp.ID}))
+		Expect(text).NotTo(ContainSubstring(camp.ID))
 	})
 })
