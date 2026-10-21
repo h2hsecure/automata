@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Pencil, Trash2, Plus, Users, Search } from 'lucide-vue-next'
+import { Pencil, Trash2, Plus, Users, Search, Eye } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
@@ -177,6 +177,7 @@ onMounted(loadContacts)
             <div>
               <p class="font-medium">{{ row.FirstName }} {{ row.LastName }}</p>
             </div>
+            <Badge v-if="row.Hidden" variant="warning">Hidden</Badge>
           </div>
         </template>
         <template #email="{ row }: { row: Contact }">
@@ -201,6 +202,13 @@ onMounted(loadContacts)
         </template>
         <template #actions="{ row }: { row: Contact }">
           <div class="flex gap-1">
+            <button
+              class="p-1.5 rounded hover:bg-muted"
+              title="View details"
+              @click="router.push(`/contacts/${row.ID}`)"
+            >
+              <Eye class="h-4 w-4" />
+            </button>
             <button
               class="p-1.5 rounded hover:bg-muted"
               title="Edit"

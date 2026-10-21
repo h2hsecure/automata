@@ -21,6 +21,7 @@ import type {
   EmailTemplateInput,
   InboxMessage,
   EmailStats,
+  Activity,
 } from '@/types/api'
 
 const client: AxiosInstance = axios.create({
@@ -127,9 +128,19 @@ export async function mergeContacts(id: string, mergeWith: string): Promise<{ me
   return response.data
 }
 
-export async function getContactActivity(id: string, page = 1, limit = 20) {
-  const response = await client.get(`/context/contacts/${id}/activity`, { params: { page, limit } })
-  return response.data
+export async function getContactActivity(
+  id: string,
+  offset = 0,
+  limit = 50,
+  type?: string
+): Promise<{ activities: Activity[]; total: number }> {
+  const params: Record<string, string> = { offset: String(offset), limit: String(limit) }
+  if (type) params.type = type
+  const response = await client.get(`/context/contacts/${id}/activity`, { params })
+  return {
+    activities: response.data.activities ?? [],
+    total: response.data.total ?? 0,
+  }
 }
 
 // Form endpoints

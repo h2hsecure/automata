@@ -20,9 +20,20 @@ export interface Contact {
   CustomFields: Record<string, string>;
   Source: string;
   SourceID: string;
+  Hidden?: boolean;
   Tags: Tag[];
   CreatedAt: string;
   UpdatedAt: string;
+}
+
+// Matches the backend ActivityDetail json tags (snake_case).
+export interface Activity {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  data: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface ContactInput {
