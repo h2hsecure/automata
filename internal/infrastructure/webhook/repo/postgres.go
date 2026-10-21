@@ -31,15 +31,16 @@ func (r *webhookRepo) Create(e *webhook.WebhookEndpoint) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 	`
 
+	id := uuid.New().String()
 	_, err := r.pool.Exec(ctx, query,
-		uuid.New().String(), e.ContextID, e.Name, e.URL, eventsStr,
+		id, e.ContextID, e.Name, e.URL, eventsStr,
 		e.SecretHash, e.SigningSecret, e.Active,
 	)
 	if err != nil {
 		return fmt.Errorf("create webhook endpoint: %w", err)
 	}
 
-	e.ID = uuid.New().String()
+	e.ID = id
 	return nil
 }
 

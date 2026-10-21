@@ -12,6 +12,7 @@ import (
 	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
 	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
 	ctxrepo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	webhookrepo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	"golang.org/x/crypto/bcrypt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -246,6 +247,8 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 			"email_templates_list", "email_templates_get", "email_templates_create",
 			"email_templates_update", "email_templates_delete", "email_send",
 			"email_send_to_contact", "email_test_send",
+			"webhooks_list", "webhooks_get", "webhooks_create",
+			"webhooks_update", "webhooks_delete", "webhooks_test",
 		))
 	})
 })
@@ -833,5 +836,86 @@ var _ = Describe("MCP email tools", func() {
 		Expect(text).To(ContainSubstring(`"subject"`))
 		Expect(text).To(ContainSubstring(`"preview"`))
 		Expect(text).To(ContainSubstring("Hi World"))
+	})
+})
+
+var _ = Describe("MCP webhook tools", func() {
+	var (
+		engine    *gin.Engine
+		apiKey    string
+		contextID string
+	)
+
+	BeforeEach(func() {
+		// The shared suite runs only the core DB migrations; the webhook
+		// endpoints table has its own runner (idempotent).
+		Expect(webhookrepo.RunMigrations(pool)).To(Succeed())
+		engine, apiKey, contextID, _ = setupMCPEngine()
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM webhook_deliveries WHERE context_id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM webhook_endpoints WHERE context_id = $1`, contextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	It("webhooks create/list/get/update/delete", func() {
+		w := mcpTool(engine, apiKey, 1, "webhooks_create", map[string]any{
+			"name": "MCP Hook", "url": "http://127.0.0.1:9/collect",
+			"events": []string{"form.submitted"}, "secret": "s3cret00",
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		text := mcpToolText(w)
+		Expect(text).To(ContainSubstring("MCP Hook"))
+		// WebhookResponse has json tags → "id".
+		var out struct {
+			ID string `json:"id"`
+		}
+		Expect(json.Unmarshal([]byte(text), &out)).To(Succeed())
+		Expect(out.ID).NotTo(BeEmpty())
+
+		w = mcpTool(engine, apiKey, 2, "webhooks_list", nil)
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring("MCP Hook"))
+
+		w = mcpTool(engine, apiKey, 3, "webhooks_get", map[string]any{"webhook_id": out.ID})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring(`"secret_set":true`))
+
+		w = mcpTool(engine, apiKey, 4, "webhooks_update", map[string]any{
+			"webhook_id": out.ID, "name": "Renamed Hook",
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring("Renamed Hook"))
+
+		w = mcpTool(engine, apiKey, 5, "webhooks_delete", map[string]any{"webhook_id": out.ID})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		w = mcpTool(engine, apiKey, 6, "webhooks_get", map[string]any{"webhook_id": out.ID})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+	})
+
+	It("webhooks_test returns a JSON-RPC result, never a 500", func() {
+		w := mcpTool(engine, apiKey, 1, "webhooks_create", map[string]any{
+			"name": "Dead Hook", "url": "http://127.0.0.1:9/collect",
+			"events": []string{"form.submitted"},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var out struct {
+			ID string `json:"id"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &out)).To(Succeed())
+
+		w = mcpTool(engine, apiKey, 2, "webhooks_test", map[string]any{"webhook_id": out.ID})
+		// Delivery to a dead URL may fail, but the call must be a JSON-RPC
+		// result (success text or isError), never a 500.
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		isErr, text := mcpToolResult(w)
+		if !isErr {
+			Expect(text).To(ContainSubstring(`"message"`))
+		}
 	})
 })
