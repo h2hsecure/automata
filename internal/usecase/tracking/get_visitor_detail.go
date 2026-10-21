@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hekemen/automata/internal/domain/tracking"
@@ -27,13 +28,13 @@ func GetVisitorDetail(repo tracking.Repository, contextID, visitorID string, lim
 		limit = 50
 	}
 
-	visitor, err := repo.GetVisitorByID(nil, contextID, visitorID)
+	visitor, err := repo.GetVisitorByID(context.Background(), contextID, visitorID)
 	if err != nil {
 		return nil, fmt.Errorf("get visitor: %w", err)
 	}
 
 	// Fetch recent events (events store the cookie value, not the UUID PK)
-	events, _, err := repo.GetVisitorEvents(nil, contextID, visitor.CookieValue, tracking.GetVisitorEventsOpts{
+	events, _, err := repo.GetVisitorEvents(context.Background(), contextID, visitor.CookieValue, tracking.GetVisitorEventsOpts{
 		Limit: limit,
 	})
 	if err != nil {

@@ -241,6 +241,8 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 			"placements_delete",
 			"campaigns_list", "campaigns_get", "campaigns_create", "campaigns_update",
 			"campaigns_delete",
+			"tracking_dashboard", "tracking_events", "tracking_visitors",
+			"tracking_visitor_events", "tracking_visitor_get",
 		))
 	})
 })
@@ -656,5 +658,95 @@ var _ = Describe("MCP banner/placement/campaign tools", func() {
 
 		_, text := mcpToolResult(mcpTool(engine, apiKey, 6, "campaigns_get", map[string]any{"campaign_id": camp.ID}))
 		Expect(text).NotTo(ContainSubstring(camp.ID))
+	})
+})
+
+var _ = Describe("MCP tracking tools", func() {
+	var (
+		engine    *gin.Engine
+		apiKey    string
+		contextID string
+	)
+
+	seedVisitor := func() string {
+		v := support.NewTestVisitor(contextID)
+		_, err := pool.Exec(ctx, `
+			INSERT INTO tracking_visitors (id, context_id, cookie_value, fingerprint, first_seen, last_seen, page_views)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			v["id"], v["context_id"], v["cookie_value"], v["fingerprint"], v["first_seen"], v["last_seen"], v["page_views"])
+		Expect(err).NotTo(HaveOccurred())
+		return v["id"].(string)
+	}
+
+	cookieOf := func(visitorID string) string {
+		var cookie string
+		Expect(pool.QueryRow(ctx, "SELECT cookie_value FROM tracking_visitors WHERE id = $1", visitorID).Scan(&cookie)).To(Succeed())
+		return cookie
+	}
+
+	// tracking_events.visitor_id stores the cookie value, not the visitor UUID.
+	seedEvent := func(cookieValue string) {
+		e := support.NewTestEvent(contextID, cookieValue)
+		_, err := pool.Exec(ctx, `
+			INSERT INTO tracking_events (id, context_id, visitor_id, type, url, title, referrer, event_name, properties, user_agent, ip_hash, utm_source, utm_medium, utm_campaign, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '{}'::jsonb, $9, $10, $11, $12, $13, NOW())`,
+			e["id"], e["context_id"], cookieValue, e["type"], e["url"], e["title"], e["referrer"], e["event_name"], e["user_agent"], e["ip_hash"], e["utm_source"], e["utm_medium"], e["utm_campaign"])
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	BeforeEach(func() {
+		engine, apiKey, contextID, _ = setupMCPEngine()
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM tracking_events WHERE context_id = $1", contextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM tracking_visitors WHERE context_id = $1", contextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	It("tracking_dashboard returns metrics", func() {
+		vid := seedVisitor()
+		seedEvent(cookieOf(vid))
+
+		w := mcpTool(engine, apiKey, 1, "tracking_dashboard", map[string]any{"top_n": 5})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		text := mcpToolText(w)
+		Expect(text).To(ContainSubstring(`"PageViews"`))
+		Expect(text).To(ContainSubstring(`"TotalVisitors"`))
+	})
+
+	It("tracking_events and tracking_visitors are paged", func() {
+		vid := seedVisitor()
+		cookie := cookieOf(vid)
+		seedEvent(cookie)
+		seedEvent(cookie)
+		seedEvent(cookie)
+
+		w := mcpTool(engine, apiKey, 1, "tracking_events", map[string]any{"limit": 2})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		text := mcpToolText(w)
+		Expect(text).To(ContainSubstring(`"total":3`))
+		Expect(text).To(ContainSubstring(`"has_more":true`))
+
+		w = mcpTool(engine, apiKey, 2, "tracking_visitors", map[string]any{"limit": 10})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring(vid))
+	})
+
+	It("tracking_visitor_events and tracking_visitor_get", func() {
+		vid := seedVisitor()
+		cookie := cookieOf(vid)
+		seedEvent(cookie)
+		seedEvent(cookie)
+
+		w := mcpTool(engine, apiKey, 1, "tracking_visitor_events", map[string]any{"visitor_id": vid, "limit": 10})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring(`"total":2`))
+
+		w = mcpTool(engine, apiKey, 2, "tracking_visitor_get", map[string]any{"visitor_id": vid})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring(vid))
 	})
 })
