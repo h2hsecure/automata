@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Key, Copy, Plus, Trash2 } from 'lucide-vue-next'
+import { Key, Copy, Plus, Trash2, FileText } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -9,7 +9,7 @@ import Modal from '@/components/Modal.vue'
 import Input from '@/components/Input.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
-import { listApiKeys, createApiKey, revokeApiKey } from '@/api/client'
+import { listApiKeys, createApiKey, revokeApiKey, fetchApiDocs } from '@/api/client'
 import type { ApiKey } from '@/types/api'
 
 const { show } = useConfirm()
@@ -90,6 +90,21 @@ function dismissKey() {
   modalOpen.value = false
 }
 
+const docsLoading = ref<'swagger' | 'swagger-public' | null>(null)
+
+async function openApiDocs(which: 'swagger' | 'swagger-public') {
+  docsLoading.value = which
+  try {
+    const text = await fetchApiDocs(which)
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/yaml' }))
+    window.open(url, '_blank', 'noopener')
+  } catch {
+    // 401 is handled by the client interceptor (redirects to login)
+  } finally {
+    docsLoading.value = null
+  }
+}
+
 async function handleRevoke(key: ApiKey) {
   const confirmed = await show({
     title: 'Revoke API Key',
@@ -156,6 +171,37 @@ onMounted(loadKeys)
           </button>
         </template>
       </DataTable>
+    </Card>
+
+    <Card>
+      <div class="space-y-3">
+        <div>
+          <h2 class="font-semibold">API Documentation</h2>
+          <p class="text-sm text-muted-foreground">
+            Open the OpenAPI (Swagger) specs in a new tab, using your current session.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            :loading="docsLoading === 'swagger'"
+            @click="openApiDocs('swagger')"
+          >
+            <FileText class="mr-2 h-4 w-4" />
+            Main API spec
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            :loading="docsLoading === 'swagger-public'"
+            @click="openApiDocs('swagger-public')"
+          >
+            <FileText class="mr-2 h-4 w-4" />
+            Public tracking spec
+          </Button>
+        </div>
+      </div>
     </Card>
 
     <!-- Create Key Modal -->

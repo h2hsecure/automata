@@ -277,6 +277,12 @@ export async function revokeApiKey(id: string): Promise<void> {
   await client.delete(`/admin/api-keys/${id}`)
 }
 
+// API docs (auth required — plain links would 401 without a Bearer header)
+export async function fetchApiDocs(which: 'swagger' | 'swagger-public'): Promise<string> {
+  const response = await client.get(`/${which}.yaml`, { responseType: 'text' })
+  return response.data as string
+}
+
 // User endpoints (admin only)
 export async function listUsers(): Promise<User[]> {
   const response = await client.get('/admin/users')
