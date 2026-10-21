@@ -14,13 +14,26 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// apiKeyLookup is the subset of the API key repository needed for
+// validation (satisfied by repo.ApiKeyRepository).
+type apiKeyLookup interface {
+	ListAll() ([]*domainauth.APIKey, error)
+}
+
 type service struct {
-	userRepo context.UserRepository
+	userRepo    context.UserRepository
+	apiKeyStore apiKeyLookup
 }
 
 // NewService creates a new auth service.
 func NewService(userRepo context.UserRepository) domainauth.AuthService {
 	return &service{userRepo: userRepo}
+}
+
+// NewServiceWithAPIKeys creates a new auth service that can also validate
+// API keys against the database.
+func NewServiceWithAPIKeys(userRepo context.UserRepository, apiKeyStore apiKeyLookup) domainauth.AuthService {
+	return &service{userRepo: userRepo, apiKeyStore: apiKeyStore}
 }
 
 // HashPassword hashes a password using bcrypt.
@@ -191,10 +204,29 @@ func (s *service) CreateAPIKey(userID, contextID, name, plaintextKey string, exp
 	}, nil
 }
 
-// ValidateAPIKey compares a plaintext API key against stored hashes.
+// ValidateAPIKey compares a plaintext API key against stored bcrypt hashes.
+// Bcrypt hashes are salted (non-deterministic), so the candidate key is
+// bcrypt-compared against each stored key. API keys are few in number, so a
+// linear scan is acceptable.
 func (s *service) ValidateAPIKey(key string) (*domainauth.APIKey, error) {
-	// This is a stub - actual implementation will query the database
-	return nil, fmt.Errorf("validate api key requires database repository")
+	if s.apiKeyStore == nil {
+		return nil, fmt.Errorf("api key validation not configured")
+	}
+
+	keys, err := s.apiKeyStore.ListAll()
+	if err != nil {
+		return nil, fmt.Errorf("list api keys: %w", err)
+	}
+
+	for _, k := range keys {
+		if bcrypt.CompareHashAndPassword([]byte(k.KeyHash), []byte(key)) == nil {
+			if k.ExpiresAt != nil && k.ExpiresAt.Before(time.Now()) {
+				return nil, fmt.Errorf("api key expired")
+			}
+			return k, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid api key")
 }
 
 // GetCurrentUser returns the platform user for the given context.

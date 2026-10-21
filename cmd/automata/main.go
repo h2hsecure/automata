@@ -124,8 +124,8 @@ func main() {
 		}
 	}
 
-	// Initialize auth service
-	authService := infraauth.NewService(userRepo)
+	// Initialize auth service (with API key validation backed by the DB)
+	authService := infraauth.NewServiceWithAPIKeys(userRepo, apiKeyRepo)
 
 	// Email templates + queue (shared by admin API and form-submission hook)
 	emailRepo := email_repo.New(pool)

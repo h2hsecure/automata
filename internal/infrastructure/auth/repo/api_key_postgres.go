@@ -22,6 +22,7 @@ func NewApiKeyPostgresRepo(pool *pgxpool.Pool) ApiKeyRepository {
 type ApiKeyRepository interface {
 	Create(key *auth.APIKey) error
 	ListByContext(contextID string) ([]*auth.APIKey, error)
+	ListAll() ([]*auth.APIKey, error)
 	Delete(id string) error
 	GetByHash(hash string) (*auth.APIKey, error)
 	GetByPrefix(prefix string, contextID string) (*auth.APIKey, error)
@@ -94,6 +95,33 @@ func (r *apiKeyPostgresRepo) ListByContext(contextID string) ([]*auth.APIKey, er
 	`
 
 	rows, err := r.pool.Query(context.Background(), query, contextID)
+	if err != nil {
+		return nil, fmt.Errorf("list api keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []*auth.APIKey
+	for rows.Next() {
+		key := &auth.APIKey{}
+		err := rows.Scan(
+			&key.ID, &key.ContextID, &key.UserID, &key.KeyHash,
+			&key.Name, &key.ExpiresAt, &key.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan api key: %w", err)
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
+}
+
+func (r *apiKeyPostgresRepo) ListAll() ([]*auth.APIKey, error) {
+	query := `
+		SELECT id, context_id, user_id, key_hash, name, expires_at, created_at
+		FROM api_keys ORDER BY created_at DESC
+	`
+
+	rows, err := r.pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("list api keys: %w", err)
 	}

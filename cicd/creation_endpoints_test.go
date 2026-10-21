@@ -23,8 +23,8 @@ func setupCreationServer() *gin.Engine {
 	engine := gin.New()
 	contextRepo := ctxrepo.NewPostgresRepo(pool)
 	userRepo := ctxrepo.NewUserPostgresRepo(pool)
-	authService := infraauth.NewService(userRepo)
 	apiKeyRepo := auth_repo.NewApiKeyPostgresRepo(pool)
+	authService := infraauth.NewServiceWithAPIKeys(userRepo, apiKeyRepo)
 	return api.NewServer(engine, pool, contextRepo, userRepo, authService, apiKeyRepo, "/api")
 }
 

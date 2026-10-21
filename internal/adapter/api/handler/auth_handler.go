@@ -191,7 +191,19 @@ func (h *AuthHandler) CreateAPIKey(c *gin.Context) {
 		expiresAt = &exp
 	}
 
-	apiKey, err := h.authService.CreateAPIKey(userID, c.GetString("context_id"), req.Name, plaintextKey, expiresAt)
+	// Context for the new key: resolved context (non-admin routes) or the
+	// X-Context-ID header sent by the WebUI on every request. Admin routes
+	// skip the ContextResolver middleware, so the header is the source there.
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		contextID = c.GetHeader("X-Context-ID")
+	}
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context_id is required (send the X-Context-ID header)"})
+		return
+	}
+
+	apiKey, err := h.authService.CreateAPIKey(userID, contextID, req.Name, plaintextKey, expiresAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

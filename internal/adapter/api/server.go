@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/adapter/api/handler"
 	"github.com/hekemen/automata/internal/adapter/api/middleware"
+	"github.com/hekemen/automata/internal/adapter/api/swagger"
 	"github.com/hekemen/automata/internal/adapter/proxy"
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
@@ -48,6 +49,17 @@ func NewServer(
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// OpenAPI docs (hand-written, embedded; auth: JWT or API key).
+	// Registered before ContextResolver (below) so no context is required.
+	{
+		api.GET("/swagger.yaml", middleware.AuthMiddleware(authService), func(c *gin.Context) {
+			c.Data(http.StatusOK, "application/yaml", swagger.OpenAPIMain)
+		})
+		api.GET("/swagger-public.yaml", middleware.AuthMiddleware(authService), func(c *gin.Context) {
+			c.Data(http.StatusOK, "application/yaml", swagger.OpenAPIPublic)
+		})
+	}
 
 	cookieMgr := cookie.New(infraauth.GetCookieSecret())
 	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo, cookieMgr)

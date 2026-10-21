@@ -1,0 +1,264 @@
+openapi: 3.1.0
+info:
+  title: Automata Public Tracking API
+  version: "1.0"
+  description: |
+    Public, unauthenticated endpoints served by the tracking server (port 8081,
+    exposed at the tracking domain/subdomain). These are called by the
+    on-page JavaScript snippet and by banner/form widgets — they require
+    **no authentication**.
+
+    ## Snippet usage
+
+    Install the tracking snippet on your site (serve it from the Web UI, or
+    fetch `GET /snippet/:id.js`):
+
+    ```html
+    <script src="https://<tracking-domain>/snippet/<snippet-id>.js"></script>
+    ```
+
+    The snippet sends `pageview` events automatically and exposes
+    `window.automata.track(eventName, properties)` for custom events.
+    Events are buffered and flushed via `POST /track/batch`.
+
+    Forms: `GET /form/snippet/:contextID/:slug` returns a self-rendering form
+    snippet; `GET /form/definition/:contextID/:slug` returns the raw form
+    definition JSON.
+
+    Banners: the banner widget fetches `GET /track/banner/list` (placement
+    context), then `GET /track/banner/:id`, `GET /track/placement/:id`, and
+    `GET /track/campaign/:id` for the active creative.
+
+    ## Context resolution
+
+    Events are attributed to a context by, in order:
+
+    1. **Per-event `contextId`** (UUID) in the event body — sent by the snippet.
+    2. **`X-Context-ID` request header** — used by form/banner endpoints and as
+       the batch fallback.
+    3. **Subdomain/domain match** against each context's configured tracking
+       domain.
+
+    If no context can be resolved the request is rejected silently.
+
+    ## Batch contract
+
+    `POST /track/batch` accepts `{"events": [ ... ]}` where each event uses the
+    same fields as `POST /track`. Every event is processed independently; the
+    response is always `200` with:
+
+    ```json
+    { "accepted": 2, "rejected": 1 }
+    ```
+
+    `rejected` counts events with an empty/invalid `type` (after the
+    `page_view` → `pageview` normalization).
+servers:
+  - url: /
+    description: Tracking server (separate port/domain, no auth)
+security: []
+tags:
+  - name: track
+  - name: forms
+  - name: banners
+  - name: snippet
+  - name: health
+paths:
+  /track:
+    post:
+      tags: [track]
+      operationId: track
+      summary: Track a single event
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrackingEvent" }
+      responses:
+        "204": { description: Event recorded }
+        "400": { description: Invalid body }
+        "500": { description: Internal error }
+  /track/batch:
+    post:
+      tags: [track]
+      operationId: trackBatch
+      summary: Track a batch of events
+      description: |
+        Each event is routed independently with its own `contextId`
+        (falling back to `X-Context-ID` / subdomain resolution). Events with
+        an empty type after normalization are rejected and counted in
+        `rejected`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items: { $ref: "#/components/schemas/TrackingEvent" }
+      responses:
+        "200":
+          description: Batch result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: integer, example: 2 }
+                  rejected: { type: integer, example: 1 }
+        "400": { description: Invalid body }
+  /snippet/{id}.js:
+    get:
+      tags: [snippet]
+      operationId: serveSnippet
+      summary: Tracking snippet (JavaScript)
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: JavaScript snippet, content: { text/javascript: { schema: { type: string } } } }
+        "404": { description: Unknown snippet }
+  /track/banner/list:
+    get:
+      tags: [banners]
+      operationId: listBanners
+      summary: Active banners for the placement context
+      security: []
+      parameters:
+        - { name: X-Context-ID, in: header, required: false, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Banner list }
+        "404": { description: Context not resolved }
+  /track/banner/{id}:
+    get:
+      tags: [banners]
+      operationId: getBanner
+      summary: One banner (creative payload)
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Banner }
+        "404": { description: Not found }
+  /track/placement/{id}:
+    get:
+      tags: [banners]
+      operationId: getPlacement
+      summary: One placement
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Placement }
+        "404": { description: Not found }
+  /track/campaign/{id}:
+    get:
+      tags: [banners]
+      operationId: getCampaign
+      summary: One campaign
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Campaign }
+        "404": { description: Not found }
+  /form/list:
+    get:
+      tags: [forms]
+      operationId: listForms
+      summary: List forms for the context
+      security: []
+      parameters:
+        - { name: X-Context-ID, in: header, required: false, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Forms }
+        "404": { description: Context not resolved }
+  /form/{id}:
+    get:
+      tags: [forms]
+      operationId: getForm
+      summary: One form definition
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Form }
+        "404": { description: Not found }
+  /form/submit/{slug}:
+    post:
+      tags: [forms]
+      operationId: submitForm
+      summary: Submit a form by slug (creates/updates a contact)
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+        - { name: X-Context-ID, in: header, required: false, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Submitted }
+        "404": { description: Form or context not found }
+  /form/{id}/submissions:
+    get:
+      tags: [forms]
+      operationId: listSubmissions
+      summary: List submissions for a form
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Submissions }
+        "404": { description: Not found }
+  /form/definition/{contextID}/{slug}:
+    get:
+      tags: [forms]
+      operationId: getFormDefinition
+      summary: Public form definition (context in path, no auth)
+      security: []
+      parameters:
+        - { name: contextID, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Form definition JSON }
+        "404": { description: Not found }
+  /form/snippet/{contextID}/{slug}:
+    get:
+      tags: [forms]
+      operationId: serveFormSnippet
+      summary: Self-rendering form snippet (HTML/JS)
+      security: []
+      parameters:
+        - { name: contextID, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Form snippet, content: { text/html: { schema: { type: string } } } }
+        "404": { description: Not found }
+  /health:
+    get:
+      tags: [health]
+      operationId: health
+      summary: Health check
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok } } } } } }
+components:
+  schemas:
+    TrackingEvent:
+      type: object
+      properties:
+        contextId: { type: string, format: uuid, description: Per-event context override (takes priority over X-Context-ID / subdomain) }
+        type: { type: string, description: "Event type: pageview, event, form_submit, ... (page_view is normalized to pageview)" }
+        url: { type: string }
+        title: { type: string }
+        referrer: { type: string }
+        event_name: { type: string, description: "Custom event name (type: event)" }
+        properties: { type: object, additionalProperties: true }
+        visitor_id: { type: string, description: Stable anonymous visitor ID (cookie/localStorage) }

@@ -1,0 +1,1315 @@
+openapi: 3.1.0
+info:
+  title: Automata Main API
+  version: "1.0"
+  description: |
+    Marketing automation API: contacts, forms, banners, campaigns, placements,
+    email, webhooks, tracking analytics, contexts, users, and API keys.
+
+    ## Authentication
+
+    All routes (except `POST /api/auth/login`) require the `Authorization: Bearer <token>` header.
+    Two token types are accepted interchangeably:
+
+    1. **JWT** — obtained from `POST /api/auth/login` (Web UI session).
+    2. **Context API key** — created via `POST /api/admin/api-keys` (see the
+       `x-automata-api-keys` extension below). Keys are prefixed `ak_` and are
+       scoped to a single context: authenticated requests automatically run
+       against that context.
+
+    ## Context resolution
+
+    Context-scoped routes (`/api/context/...`) resolve the target context from,
+    in order: a valid `X-Context-ID` header, the API key's context, or the
+    account's single active context. Admin routes (`/api/admin/...`) operate
+    on the resources themselves.
+
+    ## Docs
+
+    - Main API (this document): `GET /api/swagger.yaml`
+    - Public tracking endpoints (no auth, used by on-page snippets):
+      `GET /api/swagger-public.yaml`
+servers:
+  - url: /api
+    description: Same-origin (served by the main API / BFF host)
+x-automata-api-keys:
+  summary: Context API keys — reference
+  description: |
+    API keys are context-scoped bearer tokens for programmatic access to the
+    API without a Web UI session. They are accepted anywhere a JWT is, via the
+    standard `Authorization: Bearer ak_...` header.
+
+    ## Endpoints
+
+    | Operation | Route |
+    |---|---|
+    | Create | `POST /api/admin/api-keys` |
+    | List (current context) | `GET /api/admin/api-keys` |
+    | Revoke | `DELETE /api/admin/api-keys/:id` |
+
+    ## Create
+
+    ```
+    curl -X POST https://automata.home.arpa/api/admin/api-keys \
+      -H "Authorization: Bearer <JWT>" \
+      -H "X-Context-ID: <context-uuid>" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "ci-deploy", "expires_in": 90}'
+    ```
+
+    Response `201`:
+
+    ```json
+    { "id": "uuid", "name": "ci-deploy", "key": "ak_...", "expires_at": "..." }
+    ```
+
+    The plaintext `key` is returned **only once**; only its bcrypt hash is stored.
+
+    ## Context scoping
+
+    - The key is bound to the context resolved at creation time (`X-Context-ID`
+      header, or the account's single active context).
+    - Any request authenticated with the key automatically targets that context —
+      `X-Context-ID` is not needed (and cannot override it).
+    - Revoking a key (`DELETE /api/admin/api-keys/:id`) invalidates it immediately.
+
+    ## Example: list contacts with an API key
+
+    ```
+    curl https://automata.home.arpa/api/context/contacts \
+      -H "Authorization: Bearer ak_..."
+    ```
+  usage:
+    - header: "Authorization: Bearer ak_..."
+    - key_format: "ak_ + base36 timestamps"
+    - storage: "bcrypt hash only; plaintext shown once at creation"
+security:
+  - bearerAuth: []
+securitySchemes:
+  bearerAuth:
+    type: http
+    scheme: bearer
+    bearerFormat: JWT or context API key (ak_...)
+    description: JWT from /api/auth/login, or a context API key created via POST /api/admin/api-keys.
+tags:
+  - name: health
+  - name: auth
+  - name: contexts
+  - name: users
+  - name: api-keys
+  - name: configs
+  - name: settings
+  - name: contacts
+  - name: forms
+  - name: banners
+  - name: placements
+  - name: campaigns
+  - name: tracking
+  - name: email
+  - name: webhooks
+  - name: docs
+paths:
+  # --------------------------------------------------------------- health
+  /health:
+    get:
+      tags: [health]
+      operationId: health
+      summary: Health check
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok } } } } } }
+  # --------------------------------------------------------------- docs
+  /swagger.yaml:
+    get:
+      tags: [docs]
+      operationId: getSwaggerDoc
+      summary: This OpenAPI document (main API)
+      responses:
+        "200": { description: OpenAPI 3.1 YAML, content: { application/yaml: { schema: { type: string } } } }
+  /swagger-public.yaml:
+    get:
+      tags: [docs]
+      operationId: getSwaggerPublicDoc
+      summary: OpenAPI document for the public tracking endpoints
+      responses:
+        "200": { description: OpenAPI 3.1 YAML, content: { application/yaml: { schema: { type: string } } } }
+  # --------------------------------------------------------------- auth
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Log in, returns a JWT (and sets a refresh cookie)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user_id: { type: string }
+                  contexts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ContextInfo"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Invalidate the refresh cookie
+      security: []
+      responses:
+        "200": { description: Logged out }
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshToken
+      summary: Rotate the refresh token, returns a new access token
+      security: []
+      responses:
+        "200": { description: New token pair }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      summary: Current user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  email: { type: string }
+                  is_admin: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/profile:
+    put:
+      tags: [auth]
+      operationId: updateProfile
+      summary: Update profile fields
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/password:
+    post:
+      tags: [auth]
+      operationId: changePassword
+      summary: Change password (revokes other sessions)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { type: string }
+      responses:
+        "200": { description: Changed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout-all:
+    post:
+      tags: [auth]
+      operationId: logoutAll
+      summary: Revoke all sessions for the user
+      responses:
+        "200": { description: Logged out everywhere }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- contexts
+  /admin/contexts:
+    get:
+      tags: [contexts]
+      operationId: listContexts
+      summary: List all contexts
+      responses:
+        "200":
+          description: Context list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contexts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Context" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [contexts]
+      operationId: createContext
+      summary: Create a context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContextInput" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Context" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [contexts]
+      operationId: getContext
+      summary: Get one context
+      responses:
+        "200": { description: Context, content: { application/json: { schema: { $ref: "#/components/schemas/Context" } } } }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [contexts]
+      operationId: updateContext
+      summary: Update a context
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContextInput" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/Context" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [contexts]
+      operationId: deleteContext
+      summary: Delete a context
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/users:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [users]
+      operationId: listContextUsers
+      summary: List users of a context
+      responses:
+        "200": { description: Users, content: { application/json: { schema: { type: object, properties: { users: { type: array, items: { type: object } } } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [users]
+      operationId: addContextUser
+      summary: Add a user to a context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string }
+                role: { type: string, enum: [owner, admin, member] }
+      responses:
+        "201": { description: Added }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/users/{userId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [users]
+      operationId: removeContextUser
+      summary: Remove a user from a context
+      responses:
+        "200": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: List platform users
+      responses:
+        "200": { description: Users }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Create a platform user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+                is_admin: { type: boolean }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: Get a user
+      responses:
+        "200": { description: User }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [users]
+      operationId: updateUser
+      summary: Update a user
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      summary: Delete a user
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- api-keys
+  /admin/api-keys:
+    post:
+      tags: [api-keys]
+      operationId: createAPIKey
+      summary: Create a context API key (plaintext returned once)
+      description: See the `x-automata-api-keys` extension for the full reference, scoping rules, and curl examples.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, description: Human-readable label }
+                expires_in: { type: integer, description: Lifetime in days; omit for no expiry }
+      responses:
+        "201":
+          description: Key created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/APIKeyCreated" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    get:
+      tags: [api-keys]
+      operationId: listAPIKeys
+      summary: List API keys for the current context
+      responses:
+        "200":
+          description: Keys (hashes only, never plaintext)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items: { $ref: "#/components/schemas/APIKey" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/api-keys/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [api-keys]
+      operationId: revokeAPIKey
+      summary: Revoke an API key (immediate)
+      responses:
+        "200": { description: Revoked }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- configs
+  /admin/configs/{contextId}:
+    parameters:
+      - { name: contextId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [configs]
+      operationId: getConfig
+      summary: Get context config (CORS, domain, display)
+      responses:
+        "200": { description: Config }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/configs/{contextId}/cors:
+    parameters:
+      - { name: contextId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [configs]
+      operationId: updateCORS
+      summary: Update allowed CORS origins
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origins: { type: array, items: { type: string } }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/configs/{contextId}/domain:
+    parameters:
+      - { name: contextId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [configs]
+      operationId: updateDomain
+      summary: Update the tracking domain
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                domain: { type: string }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/configs/{contextId}/display:
+    parameters:
+      - { name: contextId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [configs]
+      operationId: updateDisplay
+      summary: Update display settings
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- settings
+  /admin/settings:
+    get:
+      tags: [settings]
+      operationId: listSettings
+      summary: List global settings
+      responses:
+        "200": { description: Settings }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [settings]
+      operationId: upsertSettings
+      summary: Upsert global settings (bulk)
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Saved }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/settings/{key}:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [settings]
+      operationId: deleteSetting
+      summary: Delete a global setting
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/settings:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [settings]
+      operationId: listContextSettings
+      summary: List per-context settings
+      responses:
+        "200": { description: Settings }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [settings]
+      operationId: upsertContextSettings
+      summary: Upsert per-context settings (bulk)
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Saved }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/settings/{key}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: key, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [settings]
+      operationId: deleteContextSetting
+      summary: Delete a per-context setting
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- email queue
+  /admin/contexts/{id}/email-queue:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [email]
+      operationId: listEmailQueue
+      summary: List queued email jobs
+      responses:
+        "200": { description: Jobs }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/email-queue/{jobId}/retry:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [email]
+      operationId: retryEmailJob
+      summary: Retry a failed job
+      responses:
+        "200": { description: Retried }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/email-queue/{jobId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [email]
+      operationId: cancelEmailJob
+      summary: Cancel a queued job
+      responses:
+        "200": { description: Cancelled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/email-queue/test:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [email]
+      operationId: testEmailSend
+      summary: Send a test email through the configured SMTP
+      responses:
+        "200": { description: Sent }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- email templates
+  /admin/email-templates:
+    get:
+      tags: [email]
+      operationId: listEmailTemplates
+      summary: List email templates
+      responses:
+        "200": { description: Templates }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [email]
+      operationId: createEmailTemplate
+      summary: Create an email template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                subject: { type: string }
+                body: { type: string }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/email-templates/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [email]
+      operationId: getEmailTemplate
+      summary: Get a template
+      responses:
+        "200": { description: Template }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [email]
+      operationId: updateEmailTemplate
+      summary: Update a template
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [email]
+      operationId: deleteEmailTemplate
+      summary: Delete a template
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/email-templates/{id}/test:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [email]
+      operationId: testEmailTemplate
+      summary: Render + send a template test
+      responses:
+        "200": { description: Sent }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/email-templates/{tid}/send:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [email]
+      operationId: sendTemplateToContact
+      summary: Send a template to a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact_id: { type: string, format: uuid }
+      responses:
+        "200": { description: Queued }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/inbox:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [email]
+      operationId: listInbox
+      summary: List polled inbox messages (IMAP)
+      responses:
+        "200": { description: Messages }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/contexts/{id}/inbox/{mid}/read:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: mid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [email]
+      operationId: markInboxRead
+      summary: Mark an inbox message as read
+      responses:
+        "200": { description: Marked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/{slug}/email/send:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [email]
+      operationId: sendEmail
+      summary: Send an email to a contact in the context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact_id: { type: string, format: uuid }
+                subject: { type: string }
+                body: { type: string }
+      responses:
+        "200": { description: Queued }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/email-stats:
+    get:
+      tags: [email]
+      operationId: getEmailStats
+      summary: Email queue statistics
+      responses:
+        "200": { description: Stats }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- webhooks
+  /admin/webhooks:
+    get:
+      tags: [webhooks]
+      operationId: listWebhooks
+      summary: List webhooks
+      responses:
+        "200": { description: Webhooks }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [webhooks]
+      operationId: createWebhook
+      summary: Create a webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url: { type: string, format: uri }
+                events: { type: array, items: { type: string } }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/webhooks/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [webhooks]
+      operationId: getWebhook
+      summary: Get a webhook
+      responses:
+        "200": { description: Webhook }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [webhooks]
+      operationId: updateWebhook
+      summary: Update a webhook
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [webhooks]
+      operationId: deleteWebhook
+      summary: Delete a webhook
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/webhooks/{id}/test:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [webhooks]
+      operationId: testWebhook
+      summary: Deliver a test payload
+      responses:
+        "200": { description: Delivered }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- contacts
+  /context/contacts:
+    get:
+      tags: [contacts]
+      operationId: listContacts
+      summary: List contacts (paginated)
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: hidden, in: query, description: Filter by hidden state (e.g. "true"), schema: { type: string } }
+      responses:
+        "200":
+          description: Paginated contacts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contacts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contact" }
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [contacts]
+      operationId: createContact
+      summary: Create a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contact" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/contacts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [contacts]
+      operationId: getContact
+      summary: Get a contact
+      responses:
+        "200": { description: Contact, content: { application/json: { schema: { $ref: "#/components/schemas/Contact" } } } }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [contacts]
+      operationId: updateContact
+      summary: Update a contact
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactInput" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/Contact" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [contacts]
+      operationId: deleteContact
+      summary: Delete a contact
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/contacts/{id}/merge:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [contacts]
+      operationId: mergeContact
+      summary: Merge another contact into this one
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_id]
+              properties:
+                source_id: { type: string, format: uuid }
+      responses:
+        "200": { description: Merged, content: { application/json: { schema: { $ref: "#/components/schemas/Contact" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/contacts/{id}/activity:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [contacts]
+      operationId: getContactActivity
+      summary: Contact activity timeline (page visits, form submissions, emails)
+      responses:
+        "200": { description: Activity items }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- forms
+  /context/forms:
+    get:
+      tags: [forms]
+      operationId: listForms
+      summary: List forms
+      responses:
+        "200": { description: Forms }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [forms]
+      operationId: createForm
+      summary: Create a form
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FormInput" }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/forms/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [forms]
+      operationId: getForm
+      summary: Get a form
+      responses:
+        "200": { description: Form }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [forms]
+      operationId: updateForm
+      summary: Update a form
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FormInput" }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [forms]
+      operationId: deleteForm
+      summary: Delete a form
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/forms/{id}/submissions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [forms]
+      operationId: listSubmissions
+      summary: List form submissions
+      responses:
+        "200": { description: Submissions }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/forms/{id}/submissions/{sid}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: sid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [forms]
+      operationId: getSubmission
+      summary: Get a submission
+      responses:
+        "200": { description: Submission }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- banners
+  /context/banners:
+    get:
+      tags: [banners]
+      operationId: listBanners
+      summary: List banners
+      responses:
+        "200": { description: Banners }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [banners]
+      operationId: createBanner
+      summary: Create a banner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/banners/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [banners]
+      operationId: getBanner
+      summary: Get a banner
+      responses:
+        "200": { description: Banner }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [banners]
+      operationId: updateBanner
+      summary: Update a banner
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [banners]
+      operationId: deleteBanner
+      summary: Delete a banner
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- placements
+  /context/placements:
+    get:
+      tags: [placements]
+      operationId: listPlacements
+      summary: List placements
+      responses:
+        "200": { description: Placements }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [placements]
+      operationId: createPlacement
+      summary: Create a placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/placements/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [placements]
+      operationId: getPlacement
+      summary: Get a placement
+      responses:
+        "200": { description: Placement }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [placements]
+      operationId: updatePlacement
+      summary: Update a placement
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [placements]
+      operationId: deletePlacement
+      summary: Delete a placement
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- campaigns
+  /context/campaigns:
+    get:
+      tags: [campaigns]
+      operationId: listCampaigns
+      summary: List campaigns
+      responses:
+        "200": { description: Campaigns }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [campaigns]
+      operationId: createCampaign
+      summary: Create a campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/campaigns/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [campaigns]
+      operationId: getCampaign
+      summary: Get a campaign
+      responses:
+        "200": { description: Campaign }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [campaigns]
+      operationId: updateCampaign
+      summary: Update a campaign
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [campaigns]
+      operationId: deleteCampaign
+      summary: Delete a campaign
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- tracking (context-scoped)
+  /context/tracking/dashboard:
+    get:
+      tags: [tracking]
+      operationId: getDashboard
+      summary: Tracking dashboard metrics
+      responses:
+        "200":
+          description: Metrics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardMetrics" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/tracking/events:
+    get:
+      tags: [tracking]
+      operationId: getTrackingEvents
+      summary: List raw tracking events
+      parameters:
+        - { name: type, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        "200": { description: Events }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/tracking/visitors:
+    get:
+      tags: [tracking]
+      operationId: listTrackingVisitors
+      summary: List visitors
+      responses:
+        "200": { description: Visitors }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /context/tracking/visitors/{id}/events:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [tracking]
+      operationId: getVisitorEvents
+      summary: Events for one visitor
+      responses:
+        "200": { description: Events }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  # --------------------------------------------------------------- tracking (admin, global)
+  /admin/tracking/visitors:
+    get:
+      tags: [tracking]
+      operationId: adminListVisitors
+      summary: List visitors across the account (admin)
+      responses:
+        "200": { description: Visitors }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/tracking/visitors/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [tracking]
+      operationId: adminGetVisitor
+      summary: Visitor detail (admin)
+      responses:
+        "200": { description: Visitor }
+        "404": { description: Not found }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /admin/tracking/visitors/{id}/events:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [tracking]
+      operationId: adminGetVisitorEvents
+      summary: Visitor events (admin)
+      responses:
+        "200": { description: Events }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+components:
+  schemas:
+    Context:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ContextInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        is_active: { type: boolean, default: true }
+    ContextInfo:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [owner, admin, member] }
+    Contact:
+      type: object
+      description: Contact entity. JSON keys are the Go field names (no tags).
+      properties:
+        ID: { type: string, format: uuid }
+        ContextID: { type: string, format: uuid }
+        Email: { type: ["string", "null"] }
+        FirstName: { type: string }
+        LastName: { type: string }
+        Phone: { type: string }
+        Company: { type: string }
+        CustomFields: { type: object, additionalProperties: true }
+        Source: { type: string, description: e.g. form, tracking, manual }
+        SourceID: { type: string }
+        Hidden: { type: boolean, description: true for anonymous visitor contacts }
+        Tags:
+          type: array
+          items: { type: object }
+        CreatedAt: { type: string, format: date-time }
+        UpdatedAt: { type: string, format: date-time }
+    ContactInput:
+      type: object
+      properties:
+        email: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        phone: { type: string }
+        company: { type: string }
+        source: { type: string }
+        custom_fields: { type: object, additionalProperties: true }
+    FormInput:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        fields:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              type: { type: string }
+              required: { type: boolean }
+    APIKey:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        context_id: { type: string, format: uuid }
+        name: { type: string }
+        expires_at: { type: ["string", "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    APIKeyCreated:
+      type: object
+      description: Creation response — the plaintext key appears only here.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        key: { type: string, description: "Plaintext key (ak_...), shown once" }
+        expires_at: { type: ["string", "null"], format: date-time }
+    DashboardMetrics:
+      type: object
+      properties:
+        total_visitors: { type: integer }
+        active_visitors: { type: integer }
+        page_views: { type: integer }
+        top_pages:
+          type: array
+          items:
+            type: object
+            properties:
+              URL: { type: string }
+              Count: { type: integer }
+        top_referrers:
+          type: array
+          items:
+            type: object
+            properties:
+              Referrer: { type: string }
+              Count: { type: integer }
+        device_breakdown: { type: object, additionalProperties: { type: integer } }
+        browser_breakdown: { type: object, additionalProperties: { type: integer } }
+  responses:
+    Unauthorized:
+      description: Missing or invalid Authorization header
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: "invalid token or API key" }
