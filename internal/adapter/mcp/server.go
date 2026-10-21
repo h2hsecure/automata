@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	_ "embed"
 	"net/http"
 	"strings"
 	"sync"
@@ -30,6 +31,11 @@ type Deps struct {
 }
 
 type apiKeyCtxKey struct{}
+
+// SkillMD is the MCP client skill guide, served at GET /api/mcp-skill.md.
+//
+//go:embed skill.md
+var SkillMD string
 
 // NewHandler returns an http.Handler serving stateless streamable MCP at the
 // mounted path. Every request must carry a valid Bearer API key.

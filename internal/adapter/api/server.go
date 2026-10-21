@@ -8,6 +8,7 @@ import (
 	"github.com/hekemen/automata/internal/adapter/api/handler"
 	"github.com/hekemen/automata/internal/adapter/api/middleware"
 	"github.com/hekemen/automata/internal/adapter/api/swagger"
+	mcpadapter "github.com/hekemen/automata/internal/adapter/mcp"
 	"github.com/hekemen/automata/internal/adapter/proxy"
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
@@ -25,6 +26,7 @@ import (
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
 	emailusecase "github.com/hekemen/automata/internal/usecase/email"
+	bannerusecase "github.com/hekemen/automata/internal/usecase/banner"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -150,6 +152,11 @@ func NewServer(
 	emailUsecase := emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
 	emailHandler := handler.NewEmailHandlerWithInbox(emailUsecase, email_repo.NewInboxRepo(pool))
 
+	// Form, tracking, and banner repos (shared by context routes and MCP).
+	formRepo := formRepo.New(pool)
+	trackingRepo := trackingRepo.New(pool)
+	bannerRepo := bannerRepo.New(pool)
+
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("", emailHandler.List)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("", emailHandler.Create)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("/:id", emailHandler.Get)
@@ -172,6 +179,22 @@ func NewServer(
 	admin.DELETE("/webhooks/:id", webhookHandler.Delete)
 	admin.POST("/webhooks/:id/test", webhookHandler.TestDeliver)
 
+	// MCP server (streamable HTTP, stateless). Registered before
+	// ContextResolver so it never requires a context header.
+	mcpDeps := mcpadapter.Deps{
+		AuthService:   authService,
+		ContactRepo:   contactRepo,
+		FormRepo:      formRepo,
+		BannerUsecase: bannerusecase.NewBannerUsecase(bannerRepo),
+		TrackingRepo:  trackingRepo,
+		EmailUsecase:  emailUsecase,
+		WebhookSvc:    webhookSvc,
+	}
+	api.POST("/mcp", gin.WrapH(mcpadapter.NewHandler(mcpDeps)))
+	api.GET("/mcp-skill.md", middleware.AuthMiddleware(authService), func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/markdown", []byte(mcpadapter.SkillMD))
+	})
+
 	// Context-resolved routes (forms, snippets, static assets)
 	api.Use(ContextResolver(contextRepo))
 	contextEmailGroup := api.Group("/context/:slug/email")
@@ -192,8 +215,6 @@ func NewServer(
 	}
 
 	// Form routes (context-resolved)
-	formRepo := formRepo.New(pool)
-	trackingRepo := trackingRepo.New(pool)
 	formHandler := handler.NewFormHandlerWithEmail(formRepo, contactRepo, trackingRepo, emailUsecase)
 	{
 		api.GET("/context/forms", middleware.AuthMiddleware(authService), formHandler.List)
@@ -206,7 +227,6 @@ func NewServer(
 	}
 
 	// Banner routes (context-resolved)
-	bannerRepo := bannerRepo.New(pool)
 	bannerHandler := handler.NewBannerHandler(bannerRepo)
 	placementHandler := handler.NewPlacementHandler(bannerRepo)
 	campaignHandler := handler.NewCampaignHandler(bannerRepo)

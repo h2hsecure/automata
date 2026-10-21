@@ -166,3 +166,71 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 		Expect(resp.Result.Tools).To(BeEmpty())
 	})
 })
+
+var _ = Describe("MCP wiring (full engine)", func() {
+	var (
+		engine    *gin.Engine
+		adminJWT  string
+		apiKey    string
+		contextID string
+	)
+
+	BeforeEach(func() {
+		infraauth.InitForTesting("test-secret-key-for-jwt-signing-32bytes", "test-cookie-secret-32bytes-xxxx!")
+		engine = setupCreationServer()
+		adminJWT = loginAsAdmin(engine)
+
+		contextID = support.NewTestUUID()
+		_, err := pool.Exec(ctx, `
+			INSERT INTO contexts (id, slug, name, created_at, updated_at)
+			VALUES ($1, $2, $3, NOW(), NOW())
+		`, contextID, "mcp-wire-"+contextID, "MCP Wiring Context")
+		Expect(err).NotTo(HaveOccurred())
+
+		body := `{"name":"mcp-wire-key-` + support.NewTestUUID() + `"}`
+		req := httptest.NewRequest("POST", "/api/admin/api-keys", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+adminJWT)
+		req.Header.Set("X-Context-ID", contextID)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusCreated), "create api key: %s", w.Body.String())
+		var resp struct {
+			Key string `json:"key"`
+		}
+		Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+		apiKey = resp.Key
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	It("serves initialize over the production engine", func() {
+		w := mcpCall(engine, apiKey, 1, "initialize", map[string]any{
+			"protocolVersion": "2025-06-18",
+			"capabilities":    map[string]any{},
+			"clientInfo":      map[string]any{"name": "cicd", "version": "1.0"},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK))
+	})
+
+	It("requires auth for GET /api/mcp-skill.md", func() {
+		req := httptest.NewRequest("GET", "/api/mcp-skill.md", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusUnauthorized))
+	})
+
+	It("serves the skill file with a valid API key", func() {
+		req := httptest.NewRequest("GET", "/api/mcp-skill.md", bytes.NewBuffer(nil))
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(w.Header().Get("Content-Type")).To(HavePrefix("text/markdown"))
+		Expect(w.Body.String()).To(ContainSubstring("Automata MCP"))
+	})
+})
