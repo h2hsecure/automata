@@ -202,7 +202,7 @@ func registerFormTools(s *mcp.Server, d Deps, contextID string) {
 		InputSchema:   json.RawMessage(schemaSubmissionsList),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in submissionsListIn) (*mcp.CallToolResult, any, error) {
 		offset, page, limit := clampPage(in.Page, in.Limit)
-		subs, total, err := formusecase.ListSubmissions(d.FormRepo, in.FormID, form.ListSubmissionsOptions{
+		subs, total, err := formusecase.ListSubmissions(d.FormRepo, contextID, in.FormID, form.ListSubmissionsOptions{
 			Offset: offset,
 			Limit:  limit,
 		})
@@ -224,7 +224,7 @@ func registerFormTools(s *mcp.Server, d Deps, contextID string) {
 		Description:   "Get a single submission by ID.",
 		InputSchema:   json.RawMessage(schemaSubmissionID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in submissionIDIn) (*mcp.CallToolResult, any, error) {
-		sub, err := formusecase.GetSubmission(d.FormRepo, in.SubmissionID)
+		sub, err := formusecase.GetSubmission(d.FormRepo, contextID, in.SubmissionID)
 		if err != nil {
 			return nil, nil, err
 		}

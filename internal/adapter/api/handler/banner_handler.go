@@ -69,9 +69,13 @@ func (h *BannerHandler) UpdateBanner(c *gin.Context) {
 
 // DeleteBanner handles DELETE /api/banners/:id — deletes a banner.
 func (h *BannerHandler) DeleteBanner(c *gin.Context) {
+	// contextID may be empty on public tracking routes; the usecase skips
+	// the ownership check in that case.
+	contextID := c.GetString("context_id")
+
 	bannerID := c.Param("id")
 
-	if err := bannerUsecase.NewBannerUsecase(h.repo).DeleteBanner(bannerID); err != nil {
+	if err := bannerUsecase.NewBannerUsecase(h.repo).DeleteBanner(contextID, bannerID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -81,9 +85,13 @@ func (h *BannerHandler) DeleteBanner(c *gin.Context) {
 
 // GetBanner handles GET /api/banners/:id — retrieves a banner.
 func (h *BannerHandler) GetBanner(c *gin.Context) {
+	// contextID may be empty on public tracking routes; the usecase skips
+	// the ownership check in that case.
+	contextID := c.GetString("context_id")
+
 	bannerID := c.Param("id")
 
-	banner, err := bannerUsecase.NewBannerUsecase(h.repo).GetBanner(bannerID)
+	banner, err := bannerUsecase.NewBannerUsecase(h.repo).GetBanner(contextID, bannerID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "banner not found"})
 		return
@@ -193,9 +201,13 @@ func (h *PlacementHandler) UpdatePlacement(c *gin.Context) {
 
 // DeletePlacement handles DELETE /api/placements/:id — deletes a placement.
 func (h *PlacementHandler) DeletePlacement(c *gin.Context) {
+	// contextID may be empty on public tracking routes; the usecase skips
+	// the ownership check in that case.
+	contextID := c.GetString("context_id")
+
 	placementID := c.Param("id")
 
-	if err := bannerUsecase.NewBannerUsecase(h.repo).DeletePlacement(placementID); err != nil {
+	if err := bannerUsecase.NewBannerUsecase(h.repo).DeletePlacement(contextID, placementID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -205,9 +217,13 @@ func (h *PlacementHandler) DeletePlacement(c *gin.Context) {
 
 // GetPlacement handles GET /api/placements/:id — retrieves a placement.
 func (h *PlacementHandler) GetPlacement(c *gin.Context) {
+	// contextID may be empty on public tracking routes; the usecase skips
+	// the ownership check in that case.
+	contextID := c.GetString("context_id")
+
 	placementID := c.Param("id")
 
-	placement, err := bannerUsecase.NewBannerUsecase(h.repo).GetPlacement(placementID)
+	placement, err := bannerUsecase.NewBannerUsecase(h.repo).GetPlacement(contextID, placementID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
@@ -300,9 +316,13 @@ func (h *CampaignHandler) UpdateCampaign(c *gin.Context) {
 
 // DeleteCampaign handles DELETE /api/campaigns/:id — deletes a campaign.
 func (h *CampaignHandler) DeleteCampaign(c *gin.Context) {
+	// contextID may be empty on public tracking routes; the usecase skips
+	// the ownership check in that case.
+	contextID := c.GetString("context_id")
+
 	campaignID := c.Param("id")
 
-	if err := bannerUsecase.NewBannerUsecase(h.repo).DeleteCampaign(campaignID); err != nil {
+	if err := bannerUsecase.NewBannerUsecase(h.repo).DeleteCampaign(contextID, campaignID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -312,9 +332,13 @@ func (h *CampaignHandler) DeleteCampaign(c *gin.Context) {
 
 // GetCampaign handles GET /api/campaigns/:id — retrieves a campaign.
 func (h *CampaignHandler) GetCampaign(c *gin.Context) {
+	// contextID may be empty on public tracking routes; the usecase skips
+	// the ownership check in that case.
+	contextID := c.GetString("context_id")
+
 	campaignID := c.Param("id")
 
-	campaign, err := bannerUsecase.NewBannerUsecase(h.repo).GetCampaign(campaignID)
+	campaign, err := bannerUsecase.NewBannerUsecase(h.repo).GetCampaign(contextID, campaignID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "campaign not found"})
 		return

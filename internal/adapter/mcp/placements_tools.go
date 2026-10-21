@@ -58,7 +58,7 @@ func registerPlacementTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Get a single placement by ID.",
 		InputSchema: json.RawMessage(schemaPlacementID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in placementIDIn) (*mcp.CallToolResult, any, error) {
-		p, err := d.BannerUsecase.GetPlacement(in.PlacementID)
+		p, err := d.BannerUsecase.GetPlacement(contextID, in.PlacementID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -107,7 +107,7 @@ func registerPlacementTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Delete a placement by ID.",
 		InputSchema: json.RawMessage(schemaPlacementID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in placementIDIn) (*mcp.CallToolResult, any, error) {
-		if err := d.BannerUsecase.DeletePlacement(in.PlacementID); err != nil {
+		if err := d.BannerUsecase.DeletePlacement(contextID, in.PlacementID); err != nil {
 			return nil, nil, err
 		}
 		return nil, placementDeletedOut{Deleted: true}, nil

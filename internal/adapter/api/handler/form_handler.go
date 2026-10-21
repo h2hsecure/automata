@@ -270,7 +270,7 @@ func (h *FormHandler) ListSubmissions(c *gin.Context) {
 		Limit:  limit,
 	}
 
-	submissions, total, err := uc.ListSubmissions(h.repo, formID, opts)
+	submissions, total, err := uc.ListSubmissions(h.repo, contextID, formID, opts)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -285,9 +285,15 @@ func (h *FormHandler) ListSubmissions(c *gin.Context) {
 }
 
 func (h *FormHandler) GetSubmission(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
 	id := c.Param("id")
 
-	submission, err := uc.GetSubmission(h.repo, id)
+	submission, err := uc.GetSubmission(h.repo, contextID, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "submission not found"})
 		return

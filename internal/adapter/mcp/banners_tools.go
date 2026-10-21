@@ -128,7 +128,7 @@ func registerBannerTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Get a single banner by ID.",
 		InputSchema: json.RawMessage(schemaBannerID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in bannerIDIn) (*mcp.CallToolResult, any, error) {
-		b, err := d.BannerUsecase.GetBanner(in.BannerID)
+		b, err := d.BannerUsecase.GetBanner(contextID, in.BannerID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -193,7 +193,7 @@ func registerBannerTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Delete a banner by ID.",
 		InputSchema: json.RawMessage(schemaBannerID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in bannerIDIn) (*mcp.CallToolResult, any, error) {
-		if err := d.BannerUsecase.DeleteBanner(in.BannerID); err != nil {
+		if err := d.BannerUsecase.DeleteBanner(contextID, in.BannerID); err != nil {
 			return nil, nil, err
 		}
 		return nil, bannerDeletedOut{Deleted: true}, nil

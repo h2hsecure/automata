@@ -71,8 +71,8 @@ func (s *Service) CreateEndpoint(ctx context.Context, input webhook.CreateWebhoo
 	return ToResponse(e), nil
 }
 
-// UpdateEndpoint validates and updates an existing webhook endpoint.
-func (s *Service) UpdateEndpoint(ctx context.Context, id string, input webhook.UpdateWebhookInput) (*webhook.WebhookResponse, error) {
+// UpdateEndpoint validates and updates an existing webhook endpoint, scoped to the context.
+func (s *Service) UpdateEndpoint(ctx context.Context, contextID, id string, input webhook.UpdateWebhookInput) (*webhook.WebhookResponse, error) {
 	if err := input.ValidateUpdate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
@@ -80,6 +80,12 @@ func (s *Service) UpdateEndpoint(ctx context.Context, id string, input webhook.U
 	existing, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("webhook endpoint not found: %w", err)
+	}
+	if contextID != "" && existing.ContextID != contextID {
+		// Not-found (not "not yours"): foreign endpoints are
+		// indistinguishable from nonexistent ones. Empty contextID
+		// (admin surface) skips the check.
+		return nil, fmt.Errorf("webhook endpoint not found")
 	}
 
 	// Update fields
@@ -133,11 +139,14 @@ func (s *Service) SignPayload(endpoint *webhook.WebhookEndpoint, payload map[str
 	return payload, nil
 }
 
-// DeliverTest sends a test payload to the webhook endpoint.
-func (s *Service) DeliverTest(ctx context.Context, endpointID string) (string, error) {
+// DeliverTest sends a test payload to the webhook endpoint, scoped to the context.
+func (s *Service) DeliverTest(ctx context.Context, contextID, endpointID string) (string, error) {
 	endpoint, err := s.repo.GetByID(endpointID)
 	if err != nil {
 		return "", fmt.Errorf("webhook endpoint not found: %w", err)
+	}
+	if contextID != "" && endpoint.ContextID != contextID {
+		return "", fmt.Errorf("webhook endpoint not found")
 	}
 
 	// Build sample payload

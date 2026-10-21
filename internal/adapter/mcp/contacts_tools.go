@@ -209,9 +209,12 @@ func registerContactTools(s *mcp.Server, d Deps, contextID string) {
 		}
 		return nil, contactsActivityOut{
 			Items: res.Activities,
-			Total: res.Total,
-			Page:  page,
-			Limit: limit,
+			pageMeta: pageMeta{
+				Total:   res.Total,
+				Page:    page,
+				Limit:   limit,
+				HasMore: int64(page*limit) < res.Total,
+			},
 		}, nil
 	})
 }
@@ -283,7 +286,5 @@ type contactsActivityIn struct {
 
 type contactsActivityOut struct {
 	Items []contact.ActivityDetail `json:"items"`
-	Total int64                    `json:"total"`
-	Page  int                      `json:"page"`
-	Limit int                      `json:"limit"`
+	pageMeta
 }

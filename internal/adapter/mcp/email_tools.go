@@ -96,7 +96,12 @@ func registerEmailTools(s *mcp.Server, d Deps, contextID string) {
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in emailTemplateIDIn) (*mcp.CallToolResult, any, error) {
 		tmpl, err := d.EmailUsecase.Repo().GetByID(in.TemplateID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("template not found: %w", err)
+			return nil, nil, fmt.Errorf("template not found")
+		}
+		if tmpl.ContextID != contextID {
+			// Not-found (not "not yours"): foreign templates are
+			// indistinguishable from nonexistent ones.
+			return nil, nil, fmt.Errorf("template not found")
 		}
 		return nil, tmpl, nil
 	})
@@ -145,7 +150,10 @@ func registerEmailTools(s *mcp.Server, d Deps, contextID string) {
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in emailTemplateUpdateIn) (*mcp.CallToolResult, any, error) {
 		existing, err := d.EmailUsecase.Repo().GetByID(in.TemplateID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("template not found: %w", err)
+			return nil, nil, fmt.Errorf("template not found")
+		}
+		if existing.ContextID != contextID {
+			return nil, nil, fmt.Errorf("template not found")
 		}
 		if in.Subject != "" {
 			existing.Subject = in.Subject
@@ -183,6 +191,13 @@ func registerEmailTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Delete an email template.",
 		InputSchema: json.RawMessage(schemaEmailTemplateID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in emailTemplateIDIn) (*mcp.CallToolResult, any, error) {
+		tmpl, err := d.EmailUsecase.Repo().GetByID(in.TemplateID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("template not found")
+		}
+		if tmpl.ContextID != contextID {
+			return nil, nil, fmt.Errorf("template not found")
+		}
 		if err := d.EmailUsecase.Repo().Delete(in.TemplateID); err != nil {
 			return nil, nil, fmt.Errorf("delete template: %w", err)
 		}

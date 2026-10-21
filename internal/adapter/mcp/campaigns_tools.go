@@ -60,7 +60,7 @@ func registerCampaignTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Get a single campaign by ID.",
 		InputSchema: json.RawMessage(schemaCampaignID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in campaignIDIn) (*mcp.CallToolResult, any, error) {
-		c, err := d.BannerUsecase.GetCampaign(in.CampaignID)
+		c, err := d.BannerUsecase.GetCampaign(contextID, in.CampaignID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -111,7 +111,7 @@ func registerCampaignTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Delete a campaign by ID.",
 		InputSchema: json.RawMessage(schemaCampaignID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in campaignIDIn) (*mcp.CallToolResult, any, error) {
-		if err := d.BannerUsecase.DeleteCampaign(in.CampaignID); err != nil {
+		if err := d.BannerUsecase.DeleteCampaign(contextID, in.CampaignID); err != nil {
 			return nil, nil, err
 		}
 		return nil, campaignDeletedOut{Deleted: true}, nil

@@ -69,7 +69,12 @@ func registerWebhookTools(s *mcp.Server, d Deps, contextID string) {
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in webhookIDIn) (*mcp.CallToolResult, any, error) {
 		e, err := d.WebhookSvc.Repo().GetByID(in.WebhookID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("webhook not found: %w", err)
+			return nil, nil, fmt.Errorf("webhook not found")
+		}
+		if e.ContextID != contextID {
+			// Not-found (not "not yours"): foreign endpoints are
+			// indistinguishable from nonexistent ones.
+			return nil, nil, fmt.Errorf("webhook not found")
 		}
 		return nil, webhook.ToResponse(e), nil
 	})
@@ -98,7 +103,7 @@ func registerWebhookTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Update a webhook endpoint.",
 		InputSchema: json.RawMessage(schemaWebhookUpdate),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in webhookUpdateIn) (*mcp.CallToolResult, any, error) {
-		resp, err := d.WebhookSvc.UpdateEndpoint(ctx, in.WebhookID, whook.UpdateWebhookInput{
+		resp, err := d.WebhookSvc.UpdateEndpoint(ctx, contextID, in.WebhookID, whook.UpdateWebhookInput{
 			Name:   in.Name,
 			URL:    in.URL,
 			Events: in.Events,
@@ -116,6 +121,13 @@ func registerWebhookTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Delete a webhook endpoint.",
 		InputSchema: json.RawMessage(schemaWebhookID),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in webhookIDIn) (*mcp.CallToolResult, any, error) {
+		e, err := d.WebhookSvc.Repo().GetByID(in.WebhookID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("webhook not found")
+		}
+		if e.ContextID != contextID {
+			return nil, nil, fmt.Errorf("webhook not found")
+		}
 		if err := d.WebhookSvc.Repo().Delete(in.WebhookID); err != nil {
 			return nil, nil, fmt.Errorf("delete webhook: %w", err)
 		}
@@ -127,7 +139,7 @@ func registerWebhookTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Send a test delivery to a webhook endpoint and return the delivery message.",
 		InputSchema: json.RawMessage(schemaWebhookID),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in webhookIDIn) (*mcp.CallToolResult, any, error) {
-		msg, err := d.WebhookSvc.DeliverTest(ctx, in.WebhookID)
+		msg, err := d.WebhookSvc.DeliverTest(ctx, contextID, in.WebhookID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("test delivery: %w", err)
 		}

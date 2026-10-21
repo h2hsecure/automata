@@ -64,6 +64,11 @@ func (u *BannerUsecase) UpdateBanner(contextID, bannerID string, req *bdomain.Up
 	if err != nil {
 		return nil, fmt.Errorf("banner not found: %w", err)
 	}
+	if b.ContextID != contextID {
+		// Not-found (not "not yours"): foreign banners are indistinguishable
+		// from nonexistent ones.
+		return nil, fmt.Errorf("banner not found")
+	}
 
 	if req.Name != "" {
 		b.Name = req.Name
@@ -117,7 +122,13 @@ func (u *BannerUsecase) UpdateBanner(contextID, bannerID string, req *bdomain.Up
 }
 
 // DeleteBanner deletes a banner.
-func (u *BannerUsecase) DeleteBanner(bannerID string) error {
+func (u *BannerUsecase) DeleteBanner(contextID, bannerID string) error {
+	b, err := u.repo.GetBanner(bannerID)
+	// Empty contextID (public tracking routes, legacy callers) skips the
+	// ownership check; a present context must own the banner.
+	if err != nil || (contextID != "" && b.ContextID != contextID) {
+		return fmt.Errorf("banner not found")
+	}
 	if err := u.repo.DeleteBanner(bannerID); err != nil {
 		return fmt.Errorf("delete banner: %w", err)
 	}
@@ -125,10 +136,13 @@ func (u *BannerUsecase) DeleteBanner(bannerID string) error {
 }
 
 // GetBanner retrieves a banner by ID.
-func (u *BannerUsecase) GetBanner(bannerID string) (*bdomain.Banner, error) {
+func (u *BannerUsecase) GetBanner(contextID, bannerID string) (*bdomain.Banner, error) {
 	b, err := u.repo.GetBanner(bannerID)
 	if err != nil {
 		return nil, fmt.Errorf("get banner: %w", err)
+	}
+	if contextID != "" && b.ContextID != contextID {
+		return nil, fmt.Errorf("banner not found")
 	}
 	return b, nil
 }
@@ -169,6 +183,9 @@ func (u *BannerUsecase) UpdatePlacement(contextID, placementID string, req *bdom
 	if err != nil {
 		return nil, fmt.Errorf("placement not found: %w", err)
 	}
+	if p.ContextID != contextID {
+		return nil, fmt.Errorf("placement not found")
+	}
 
 	if req.Name != "" {
 		p.Name = req.Name
@@ -198,7 +215,11 @@ func (u *BannerUsecase) UpdatePlacement(contextID, placementID string, req *bdom
 }
 
 // DeletePlacement deletes a placement.
-func (u *BannerUsecase) DeletePlacement(placementID string) error {
+func (u *BannerUsecase) DeletePlacement(contextID, placementID string) error {
+	p, err := u.repo.GetPlacement(placementID)
+	if err != nil || (contextID != "" && p.ContextID != contextID) {
+		return fmt.Errorf("placement not found")
+	}
 	if err := u.repo.DeletePlacement(placementID); err != nil {
 		return fmt.Errorf("delete placement: %w", err)
 	}
@@ -206,10 +227,13 @@ func (u *BannerUsecase) DeletePlacement(placementID string) error {
 }
 
 // GetPlacement retrieves a placement by ID.
-func (u *BannerUsecase) GetPlacement(placementID string) (*bdomain.Placement, error) {
+func (u *BannerUsecase) GetPlacement(contextID, placementID string) (*bdomain.Placement, error) {
 	p, err := u.repo.GetPlacement(placementID)
 	if err != nil {
 		return nil, fmt.Errorf("get placement: %w", err)
+	}
+	if contextID != "" && p.ContextID != contextID {
+		return nil, fmt.Errorf("placement not found")
 	}
 	return p, nil
 }
@@ -251,6 +275,9 @@ func (u *BannerUsecase) UpdateCampaign(contextID, campaignID string, req *bdomai
 	if err != nil {
 		return nil, fmt.Errorf("campaign not found: %w", err)
 	}
+	if c.ContextID != contextID {
+		return nil, fmt.Errorf("campaign not found")
+	}
 
 	if req.Name != "" {
 		c.Name = req.Name
@@ -283,7 +310,11 @@ func (u *BannerUsecase) UpdateCampaign(contextID, campaignID string, req *bdomai
 }
 
 // DeleteCampaign deletes a campaign.
-func (u *BannerUsecase) DeleteCampaign(campaignID string) error {
+func (u *BannerUsecase) DeleteCampaign(contextID, campaignID string) error {
+	c, err := u.repo.GetCampaign(campaignID)
+	if err != nil || (contextID != "" && c.ContextID != contextID) {
+		return fmt.Errorf("campaign not found")
+	}
 	if err := u.repo.DeleteCampaign(campaignID); err != nil {
 		return fmt.Errorf("delete campaign: %w", err)
 	}
@@ -291,10 +322,13 @@ func (u *BannerUsecase) DeleteCampaign(campaignID string) error {
 }
 
 // GetCampaign retrieves a campaign by ID.
-func (u *BannerUsecase) GetCampaign(campaignID string) (*bdomain.Campaign, error) {
+func (u *BannerUsecase) GetCampaign(contextID, campaignID string) (*bdomain.Campaign, error) {
 	c, err := u.repo.GetCampaign(campaignID)
 	if err != nil {
 		return nil, fmt.Errorf("get campaign: %w", err)
+	}
+	if contextID != "" && c.ContextID != contextID {
+		return nil, fmt.Errorf("campaign not found")
 	}
 	return c, nil
 }

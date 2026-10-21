@@ -920,6 +920,189 @@ var _ = Describe("MCP webhook tools", func() {
 	})
 })
 
+var _ = Describe("MCP cross-tenant scoping (ID-based tools)", func() {
+	var (
+		engine    *gin.Engine
+		apiKey    string
+		contextID string
+		adminJWT  string
+		keyB      string
+		ctxB      string
+	)
+
+	BeforeEach(func() {
+		// The webhook endpoints table has its own (idempotent) migration.
+		Expect(webhookrepo.RunMigrations(pool)).To(Succeed())
+		engine, apiKey, contextID, adminJWT = setupMCPEngine()
+		keyB, ctxB = mintAPIKey(engine, adminJWT, "xct")
+		DeferCleanup(func() {
+			_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, ctxB)
+		})
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM webhook_deliveries WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM webhook_endpoints WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM email_templates WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM form_submissions WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM forms WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM banners WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM placements WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM campaigns WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	// createInB runs a create tool with context B's key and returns the
+	// entity ID (domain structs serialize with an uppercase "ID").
+	createInB := func(tool string, args map[string]any) string {
+		w := mcpTool(engine, keyB, 1, tool, args)
+		Expect(w.Code).To(Equal(http.StatusOK), "%s: %s", tool, w.Body.String())
+		text := mcpToolText(w)
+		var out struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(text), &out)).To(Succeed(), "%s text: %s", tool, text)
+		Expect(out.ID).NotTo(BeEmpty())
+		return out.ID
+	}
+
+	It("banners_get/update/delete refuse a foreign banner", func() {
+		banID := createInB("banners_create", map[string]any{"name": "Foreign Banner", "type": "image"})
+
+		w := mcpTool(engine, apiKey, 2, "banners_get", map[string]any{"banner_id": banID})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		w = mcpTool(engine, apiKey, 3, "banners_update", map[string]any{"banner_id": banID, "name": "Hacked"})
+		isErr, _ = mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		// Owner can still read the original name (update was refused).
+		w = mcpTool(engine, keyB, 4, "banners_get", map[string]any{"banner_id": banID})
+		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Banner"))
+
+		w = mcpTool(engine, apiKey, 5, "banners_delete", map[string]any{"banner_id": banID})
+		isErr, _ = mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		// Banner still exists for the owner.
+		w = mcpTool(engine, keyB, 6, "banners_get", map[string]any{"banner_id": banID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Banner"))
+	})
+
+	It("placements_get refuses a foreign placement", func() {
+		plID := createInB("placements_create", map[string]any{"name": "Foreign Placement", "css_selector": ".f-slot"})
+
+		w := mcpTool(engine, apiKey, 2, "placements_get", map[string]any{"placement_id": plID})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+	})
+
+	It("campaigns_delete refuses a foreign campaign", func() {
+		campID := createInB("campaigns_create", map[string]any{"name": "Foreign Camp"})
+
+		w := mcpTool(engine, apiKey, 2, "campaigns_delete", map[string]any{"campaign_id": campID})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		w = mcpTool(engine, keyB, 3, "campaigns_get", map[string]any{"campaign_id": campID})
+		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Camp"))
+	})
+
+	It("form_submissions_get/list refuse a foreign form's submissions", func() {
+		w := mcpTool(engine, keyB, 1, "forms_create", map[string]any{
+			"slug":   "xct-form-" + support.NewTestUUID(),
+			"name":   "Foreign Form",
+			"fields": []map[string]any{{"slug": "email", "type": "email", "label": "Email"}},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var f struct {
+			ID   string `json:"ID"`
+			Slug string `json:"Slug"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &f)).To(Succeed())
+
+		w = mcpTool(engine, keyB, 2, "forms_submit", map[string]any{
+			"form_id": f.Slug,
+			"data":    map[string]any{"email": "xct-sub-" + support.NewTestUUID() + "@example.com"},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var sub struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &sub)).To(Succeed())
+
+		w = mcpTool(engine, apiKey, 3, "form_submissions_get", map[string]any{"submission_id": sub.ID})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		w = mcpTool(engine, apiKey, 4, "form_submissions_list", map[string]any{"form_id": f.ID, "page": 1, "limit": 10})
+		isErr, _ = mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+	})
+
+	It("email_templates_get/delete refuse a foreign template", func() {
+		tmplID := createInB("email_templates_create", map[string]any{
+			"key": "xct_tmpl", "subject": "Foreign", "body_text": "body",
+		})
+
+		w := mcpTool(engine, apiKey, 2, "email_templates_get", map[string]any{"template_id": tmplID})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		w = mcpTool(engine, apiKey, 3, "email_templates_delete", map[string]any{"template_id": tmplID})
+		isErr, _ = mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		// Template still exists for the owner.
+		w = mcpTool(engine, keyB, 4, "email_templates_get", map[string]any{"template_id": tmplID})
+		Expect(mcpToolText(w)).To(ContainSubstring("Foreign"))
+	})
+
+	It("webhooks_get/update refuse a foreign endpoint", func() {
+		w := mcpTool(engine, keyB, 1, "webhooks_create", map[string]any{
+			"name": "Foreign Hook", "url": "http://127.0.0.1:9/collect",
+			"events": []string{"form.submitted"},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var out struct {
+			ID string `json:"id"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &out)).To(Succeed())
+
+		w = mcpTool(engine, apiKey, 2, "webhooks_get", map[string]any{"webhook_id": out.ID})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		w = mcpTool(engine, apiKey, 3, "webhooks_update", map[string]any{"webhook_id": out.ID, "name": "Hacked"})
+		isErr, _ = mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+
+		// Owner still sees the original name (update was refused).
+		w = mcpTool(engine, keyB, 4, "webhooks_get", map[string]any{"webhook_id": out.ID})
+		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Hook"))
+	})
+
+	It("contacts_activity response includes has_more", func() {
+		email := "mcp-act-hm-" + support.NewTestUUID() + "@example.com"
+		w := mcpTool(engine, apiKey, 1, "contacts_create", map[string]any{"email": email})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var c struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &c)).To(Succeed())
+
+		w = mcpTool(engine, apiKey, 2, "contacts_activity", map[string]any{
+			"contact_id": c.ID, "page": 1, "limit": 10,
+		})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring(`"has_more"`))
+	})
+})
+
 var _ = Describe("MCP tool catalog", func() {
 	var (
 		engine    *gin.Engine
