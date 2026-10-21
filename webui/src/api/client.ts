@@ -283,6 +283,12 @@ export async function fetchApiDocs(which: 'swagger' | 'swagger-public'): Promise
   return response.data as string
 }
 
+// MCP skill file (auth required — same as the MCP endpoint itself)
+export async function fetchMcpSkill(): Promise<string> {
+  const response = await client.get('/mcp-skill.md', { responseType: 'text' })
+  return response.data as string
+}
+
 // User endpoints (admin only)
 export async function listUsers(): Promise<User[]> {
   const response = await client.get('/admin/users')

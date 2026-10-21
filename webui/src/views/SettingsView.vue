@@ -6,6 +6,7 @@ import SettingsPanel from '@/components/settings/SettingsPanel.vue'
 import ApiKeysPanel from '@/components/settings/ApiKeysPanel.vue'
 import UsersPanel from '@/components/settings/UsersPanel.vue'
 import WebsitesPanel from '@/components/settings/WebsitesPanel.vue'
+import McpPanel from '@/components/settings/McpPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +15,7 @@ const tabs = [
   { id: 'users', label: 'Users' },
   { id: 'settings', label: 'Settings' },
   { id: 'api-keys', label: 'API Keys' },
+  { id: 'mcp', label: 'MCP' },
   { id: 'websites', label: 'Websites' },
 ]
 
@@ -56,6 +58,7 @@ function selectTab(id: string) {
       <SettingsPanel />
     </Card>
     <ApiKeysPanel v-else-if="activeTab === 'api-keys'" />
+    <McpPanel v-else-if="activeTab === 'mcp'" />
     <WebsitesPanel v-else-if="activeTab === 'websites'" />
   </div>
 </template>
