@@ -106,7 +106,8 @@ export async function listContacts(
 
 export async function getContact(id: string): Promise<Contact> {
   const response = await client.get(`/context/contacts/${id}`)
-  return response.data
+  // The detail endpoint returns { contact, activity_count }.
+  return response.data.contact
 }
 
 export async function createContact(data: ContactInput): Promise<Contact> {
