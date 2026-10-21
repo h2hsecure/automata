@@ -122,7 +122,7 @@ var _ = Describe("Tracking context resolution and snippet host", func() {
 			engine.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(w.Body.String()).To(ContainSubstring(`a.apiHost="http://pweb.home.arpa"`))
+			Expect(w.Body.String()).To(ContainSubstring(`"http://pweb.home.arpa"`))
 		})
 
 		It("should keep localhost apiHost for localhost requests", func() {
@@ -133,7 +133,7 @@ var _ = Describe("Tracking context resolution and snippet host", func() {
 			engine.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(w.Body.String()).To(ContainSubstring(`a.apiHost="http://localhost:8081"`))
+			Expect(w.Body.String()).To(ContainSubstring(`"http://localhost:8081"`))
 		})
 	})
 
@@ -143,9 +143,9 @@ var _ = Describe("Tracking context resolution and snippet host", func() {
 
 			js, err := snippet.Generate(contextID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(js).To(ContainSubstring(`type:evt.eventType`))
-			Expect(js).To(ContainSubstring(`url:evt.pageURL`))
-			Expect(js).To(ContainSubstring(`visitor_id:a._visitorId`))
+			Expect(js).To(ContainSubstring(`v:v,t:t,u:`))
+			Expect(js).To(ContainSubstring(`r:r||document.referrer`))
+			Expect(js).To(ContainSubstring(`p:p||{}`))
 		})
 	})
 })

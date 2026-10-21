@@ -2,10 +2,23 @@ package snippet
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 )
 
-// Generate produces a self-contained JavaScript tracking snippet for the given context.
+// cookieName derives a short, opaque per-context cookie name so the snippet
+// carries no human-readable identifiers.
+func cookieName(contextID string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(contextID))
+	return fmt.Sprintf("a%x", h.Sum32()&0xffff)
+}
+
+// Generate produces a self-contained, obfuscated JavaScript tracking snippet
+// for the given context. It exposes no window globals (closure only), keeps
+// its config in a packed string array, and posts compact events
+// ({"v","t","u","r","p"}) to POST /track/<contextID> with a text/plain body
+// so cross-origin requests skip the CORS preflight.
 func Generate(contextID string, trackingURL string, options map[string]interface{}) (string, error) {
 	if contextID == "" {
 		return "", fmt.Errorf("contextID required")
@@ -18,7 +31,7 @@ func Generate(contextID string, trackingURL string, options map[string]interface
 
 	trackEndpoint, _ := options["trackEndpoint"].(string)
 	if trackEndpoint == "" {
-		trackEndpoint = "/track"
+		trackEndpoint = "/track/" + contextID
 	}
 
 	batchSize, _ := options["batchSize"].(float64)
@@ -31,10 +44,10 @@ func Generate(contextID string, trackingURL string, options map[string]interface
 		batchInterval = 30
 	}
 
-	snippet := fmt.Sprintf(`(function(){var a=window.Automata=a||{};a.contextId="%s";a.apiHost="%s";a.trackEndpoint="%s";a._events=[];a._batchSize=%d;a._batchInterval=%d;a._cookieName="automata_visitor";function _generateId(){return"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==="x"?r:r&0x3|0x8).toString(16)})}function _getCookie(n){var m=n+"=";var c=document.cookie.split(";");for(var i=0;i<c.length;i++){var v=c[i].trim();if(v.indexOf(m)===0)return v.substring(m.length,v.length)}return null}function _setCookie(n,v,d){var e="";if(d){var o=new Date;o.setTime(o.getTime()+d*24*60*60*1000);e="; expires="+o.toUTCString()}document.cookie=n+"="+v+e+"; path=/; SameSite=Lax"}a._visitorId=_getCookie(a._cookieName);if(!a._visitorId){a._visitorId=_generateId();_setCookie(a._cookieName,a._visitorId,365)}function _sendEvent(evt){var url=a.apiHost+a.trackEndpoint;var body={contextId:a.contextId,visitor_id:a._visitorId,type:evt.eventType,url:evt.pageURL||document.location.href,referrer:evt.referrer||document.referrer,properties:evt.properties||{}};try{fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),keepalive:true})}catch(e){}};a._flush=function(){if(a._events.length===0)return;var events=a._events.slice();a._events=[];for(var i=0;i<events.length;i++){_sendEvent(events[i])}};a.track=function(eventName,properties){var evt={eventType:eventName,properties:properties||{}};a._events.push(evt);if(a._events.length>=a._batchSize){a._flush()}};a.trackPageView=function(referrer){var evt={eventType:"page_view",pageURL:document.location.href,referrer:referrer||document.referrer,properties:{pageTitle:document.title}};a._events.push(evt);if(a._events.length>=a._batchSize){a._flush()}};setInterval(function(){a._flush()},a._batchInterval*1000);a.trackPageView()})();`,
-		contextID,
+	snippet := fmt.Sprintf(`(function(){var s=[%q,%q,%q],q=[],v;function g(n){var m=n+"=";var c=document.cookie.split(";");for(var i=0;i<c.length;i++){var t=c[i].trim();if(t.indexOf(m)===0)return t.substring(m.length)}return null}v=g(s[2]);if(!v){v="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16)});document.cookie=s[2]+"="+v+"; path=/; expires="+new Date(Date.now()+31536e6).toUTCString()+"; SameSite=Lax"}function f(){if(!q.length)return;var e=q;q=[];for(var i=0;i<e.length;i++){try{fetch(s[0]+s[1],{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(e[i]),keepalive:true})}catch(_){}}}function d(t,u,r,p){q.push({v:v,t:t,u:u||location.href,r:r||document.referrer,p:p||{}});if(q.length>=%d)f()}setInterval(f,%d*1000);d("pv",location.href,document.referrer,{title:document.title})})()`,
 		apiHost,
 		trackEndpoint,
+		cookieName(contextID),
 		int(batchSize),
 		int(batchInterval),
 	)

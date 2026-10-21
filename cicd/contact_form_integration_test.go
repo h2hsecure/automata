@@ -21,14 +21,14 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 	var (
 		ctx    context.Context
 		pool   *pgxpool.Pool
-		tenantID string
+		contextID string
 	)
 
 	BeforeEach(func() {
 		gin.SetMode(gin.TestMode)
 		ctx = context.Background()
 		pool = db.Pool
-		tenantID = support.NewTestContextID()
+		contextID = support.NewTestContextID()
 	})
 
 	AfterEach(func() {
@@ -51,7 +51,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 
 	Describe("Contact creation and validation", func() {
 		It("should store contact with NULL email", func() {
-			contactData := support.NewTestContact(tenantID)
+			contactData := support.NewTestContact(contextID)
 			customFields, _ := json.Marshal(contactData["custom_fields"])
 
 			_, err := pool.Exec(ctx, `
@@ -84,7 +84,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			emails := []string{"user@example.com", "user.name+tag@sub.domain.co.uk", "a@b.cd"}
 
 			for _, email := range emails {
-				contactData := support.NewTestContact(tenantID)
+				contactData := support.NewTestContact(contextID)
 				contactData["id"] = support.NewTestUUID()
 				contactData["email"] = email
 
@@ -121,7 +121,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			email := "shared@example.com"
 			tenant2 := support.NewTestContextID()
 
-			for _, t := range []string{tenantID, tenant2} {
+			for _, t := range []string{contextID, tenant2} {
 				contactData := support.NewTestContact(t)
 				contactData["id"] = support.NewTestUUID()
 				contactData["email"] = email
@@ -156,7 +156,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		})
 
 		It("should store and retrieve custom fields", func() {
-			contactData := support.NewTestContact(tenantID)
+			contactData := support.NewTestContact(contextID)
 			contactData["custom_fields"] = map[string]interface{}{
 				"lead_score":   85,
 				"industry":     "technology",
@@ -200,7 +200,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			sources := []string{"form", "import", "api", "webhook", "manual"}
 
 			for i, source := range sources {
-				contactData := support.NewTestContact(tenantID)
+				contactData := support.NewTestContact(contextID)
 				contactData["id"] = support.NewTestUUID()
 				contactData["source"] = source
 				contactData["email"] = fmt.Sprintf("source%d@example.com", i)
@@ -237,7 +237,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		})
 
 		It("should store contact with all optional fields", func() {
-			contactData := support.NewTestContact(tenantID)
+			contactData := support.NewTestContact(contextID)
 			contactData["phone"] = "+1-555-123-4567"
 			contactData["company"] = "Acme Corp"
 			contactData["source"] = "form"
@@ -281,7 +281,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		var formID string
 
 		BeforeEach(func() {
-			formData := support.NewTestForm(tenantID)
+			formData := support.NewTestForm(contextID)
 			formID = formData["id"].(string)
 
 			fields, _ := json.Marshal(formData["fields"])
@@ -305,7 +305,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		})
 
 		It("should accept submission with valid email field", func() {
-			submissionData := support.NewTestFormSubmission(formID, tenantID)
+			submissionData := support.NewTestFormSubmission(formID, contextID)
 			submissionData["data"] = map[string]interface{}{
 				"email": "valid@example.com",
 				"name":  "John Doe",
@@ -320,7 +320,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				support.NewTestUUID(),
 				formID,
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -334,7 +334,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		})
 
 		It("should handle submission with multiple file attachments", func() {
-			submissionData := support.NewTestFormSubmission(formID, tenantID)
+			submissionData := support.NewTestFormSubmission(formID, contextID)
 			submissionData["files"] = []map[string]interface{}{
 				{"name": "document.pdf", "size": 102400, "url": "/uploads/doc.pdf", "type": "application/pdf"},
 				{"name": "image.jpg", "size": 204800, "url": "/uploads/img.jpg", "type": "image/jpeg"},
@@ -350,7 +350,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				support.NewTestUUID(),
 				formID,
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -368,7 +368,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		})
 
 		It("should store submission data as JSONB", func() {
-			submissionData := support.NewTestFormSubmission(formID, tenantID)
+			submissionData := support.NewTestFormSubmission(formID, contextID)
 			submissionData["data"] = map[string]interface{}{
 				"email":       "test@example.com",
 				"message":     "Hello world",
@@ -385,7 +385,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				support.NewTestUUID(),
 				formID,
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -405,7 +405,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		})
 
 		It("should handle empty form submission data", func() {
-			submissionData := support.NewTestFormSubmission(formID, tenantID)
+			submissionData := support.NewTestFormSubmission(formID, contextID)
 			submissionData["data"] = map[string]interface{}{}
 
 			data, _ := json.Marshal(submissionData["data"])
@@ -417,7 +417,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				support.NewTestUUID(),
 				formID,
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -430,8 +430,8 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			Expect(count).To(Equal(1))
 		})
 
-		It("should link submission to correct form and tenantID", func() {
-			submissionData := support.NewTestFormSubmission(formID, tenantID)
+		It("should link submission to correct form and contextID", func() {
+			submissionData := support.NewTestFormSubmission(formID, contextID)
 
 			data, _ := json.Marshal(submissionData["data"])
 			files, _ := json.Marshal(submissionData["files"])
@@ -443,7 +443,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				submissionID,
 				formID,
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -454,11 +454,11 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			err = pool.QueryRow(ctx, "SELECT form_id, context_id FROM form_submissions WHERE id = $1", submissionID).Scan(&retrievedFormID, &retrievedContextID)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(retrievedFormID).To(Equal(formID))
-			Expect(retrievedContextID).To(Equal(tenantID))
+			Expect(retrievedContextID).To(Equal(contextID))
 		})
 
 		It("should store submission with nested data structures", func() {
-			submissionData := support.NewTestFormSubmission(formID, tenantID)
+			submissionData := support.NewTestFormSubmission(formID, contextID)
 			submissionData["data"] = map[string]interface{}{
 				"email": "nested@example.com",
 				"address": map[string]interface{}{
@@ -479,7 +479,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				support.NewTestUUID(),
 				formID,
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -501,7 +501,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 
 	Describe("Contact-form relationship", func() {
 		It("should create a contact from a form submission with matching email", func() {
-			formData := support.NewTestForm(tenantID)
+			formData := support.NewTestForm(contextID)
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
@@ -521,7 +521,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 
-			submissionData := support.NewTestFormSubmission(formData["id"].(string), tenantID)
+			submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 			submissionData["data"] = map[string]interface{}{
 				"email":      "newcontact@example.com",
 				"first_name": "New",
@@ -537,7 +537,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				support.NewTestUUID(),
 				formData["id"],
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -551,7 +551,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				support.NewTestUUID(),
-				tenantID,
+				contextID,
 				email,
 				"New",
 				"Contact",
@@ -577,7 +577,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 
 		It("should link form submission to contact by email", func() {
 			email := "linked@example.com"
-			formData := support.NewTestForm(tenantID)
+			formData := support.NewTestForm(contextID)
 			fields, _ := json.Marshal(formData["fields"])
 			settings, _ := json.Marshal(formData["settings"])
 
@@ -603,7 +603,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`,
 				support.NewTestUUID(),
-				tenantID,
+				contextID,
 				email,
 				"Linked",
 				"Contact",
@@ -612,12 +612,12 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 				"{}",
 				"form",
 				formData["id"].(string),
-				support.NewTestContact(tenantID)["created_at"].(time.Time),
-				support.NewTestContact(tenantID)["updated_at"].(time.Time),
+				support.NewTestContact(contextID)["created_at"].(time.Time),
+				support.NewTestContact(contextID)["updated_at"].(time.Time),
 			)
 			Expect(err).NotTo(HaveOccurred())
 
-			submissionData := support.NewTestFormSubmission(formData["id"].(string), tenantID)
+			submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 			submissionData["data"] = map[string]interface{}{"email": email}
 
 			data, _ := json.Marshal(submissionData["data"])
@@ -629,7 +629,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			`,
 				support.NewTestUUID(),
 				formData["id"],
-				tenantID,
+				contextID,
 				data,
 				files,
 				submissionData["created_at"],
@@ -651,7 +651,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			validTypes := []string{"text", "email", "tel", "number", "textarea", "checkbox", "radio", "select", "hidden"}
 
 			for i, fieldType := range validTypes {
-				formData := support.NewTestForm(tenantID)
+				formData := support.NewTestForm(contextID)
 				formData["id"] = support.NewTestUUID()
 				formData["slug"] = fmt.Sprintf("form-%s-%d", fieldType, i)
 				formData["fields"] = []map[string]interface{}{
@@ -685,7 +685,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		})
 
 		It("should store form field definitions as JSONB array", func() {
-			formData := support.NewTestForm(tenantID)
+			formData := support.NewTestForm(contextID)
 			formData["fields"] = []map[string]interface{}{
 				{"name": "email", "type": "email", "required": true, "placeholder": "Enter email"},
 				{"name": "phone", "type": "tel", "required": false, "placeholder": "Enter phone"},
@@ -724,8 +724,8 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			Expect(fieldsList[0]["required"]).To(Equal(true))
 		})
 
-		It("should validate form slug uniqueness per tenantID", func() {
-			formData := support.NewTestForm(tenantID)
+		It("should validate form slug uniqueness per contextID", func() {
+			formData := support.NewTestForm(contextID)
 			formData["slug"] = "unique-slug"
 
 			fields, _ := json.Marshal(formData["fields"])
@@ -748,13 +748,13 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM forms WHERE context_id = $1 AND slug = $2", tenantID, "unique-slug").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM forms WHERE context_id = $1 AND slug = $2", contextID, "unique-slug").Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 		})
 
 		It("should store form settings as JSONB", func() {
-			formData := support.NewTestForm(tenantID)
+			formData := support.NewTestForm(contextID)
 			formData["settings"] = map[string]interface{}{
 				"thank_you_message": "Thanks for your submission!",
 				"redirect_url":      "https://example.com/thanks",
@@ -794,35 +794,35 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 	})
 
 	Describe("Tracking snippet generation", func() {
-		It("should generate a valid tracking script with tenantID ID", func() {
-			tenantID := support.NewTestContextID()
-			js, err := snippet.Generate(tenantID, "", nil)
+		It("should generate a valid tracking script with contextID ID", func() {
+			contextID := support.NewTestContextID()
+			js, err := snippet.Generate(contextID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(js).To(ContainSubstring(tenantID))
-			Expect(js).To(ContainSubstring("Automata"))
+			Expect(js).To(ContainSubstring(contextID))
+			Expect(js).To(ContainSubstring("text/plain"))
 			Expect(js).To(ContainSubstring("function()"))
 		})
 
 		It("should generate snippet with custom API host", func() {
-			tenantID := support.NewTestContextID()
+			contextID := support.NewTestContextID()
 			apiHost := "https://track.example.com"
 
-			js, err := snippet.Generate(tenantID, apiHost, nil)
+			js, err := snippet.Generate(contextID, apiHost, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(ContainSubstring(apiHost))
 		})
 
 		It("should generate banner snippet", func() {
-			tenantID := support.NewTestContextID()
-			js, err := snippet.GenerateBannerSnippet(tenantID, nil)
+			contextID := support.NewTestContextID()
+			js, err := snippet.GenerateBannerSnippet(contextID, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(js).To(ContainSubstring(tenantID))
+			Expect(js).To(ContainSubstring(contextID))
 			Expect(js).To(ContainSubstring("AutomataBanner"))
 		})
 
 		It("should generate minified snippet", func() {
-			tenantID := support.NewTestContextID()
-			js, err := snippet.Generate(tenantID, "", nil)
+			contextID := support.NewTestContextID()
+			js, err := snippet.Generate(contextID, "", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).ToNot(ContainSubstring("\n"))
 		})
@@ -851,9 +851,9 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 				c.String(200, "ok")
 			})
 			engine.Use(func(c *gin.Context) {
-				tenantID := c.GetHeader("X-Tenant-ID")
-				if tenantID == "" {
-					c.AbortWithStatusJSON(400, map[string]interface{}{"error": "missing tenantID ID"})
+				contextID := c.GetHeader("X-Tenant-ID")
+				if contextID == "" {
+					c.AbortWithStatusJSON(400, map[string]interface{}{"error": "missing contextID ID"})
 					return
 				}
 				c.Next()
@@ -862,15 +862,15 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			Expect(w.Code).To(Equal(200))
 		})
 
-		It("should reject tracking requests without tenantID header", func() {
+		It("should reject tracking requests without contextID header", func() {
 			req := httptest.NewRequest(http.MethodPost, "/track/event", bytes.NewBufferString(`{"context_id":"test","event":"page_view"}`))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 			engine := gin.New()
 			engine.Use(func(c *gin.Context) {
-				tenantID := c.GetHeader("X-Tenant-ID")
-				if tenantID == "" {
-					c.AbortWithStatusJSON(400, map[string]interface{}{"error": "missing tenantID ID"})
+				contextID := c.GetHeader("X-Tenant-ID")
+				if contextID == "" {
+					c.AbortWithStatusJSON(400, map[string]interface{}{"error": "missing contextID ID"})
 					return
 				}
 				c.Next()
@@ -902,13 +902,13 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 
 	Describe("Snippet endpoint serving", func() {
 		It("should serve JS snippet at /snippet/{context_id}", func() {
-			tenantID := support.NewTestContextID()
-			req := httptest.NewRequest(http.MethodGet, "/snippet/"+tenantID, nil)
+			contextID := support.NewTestContextID()
+			req := httptest.NewRequest(http.MethodGet, "/snippet/"+contextID, nil)
 			w := httptest.NewRecorder()
 			engine := gin.New()
 			engine.GET("/snippet/:context_id", func(c *gin.Context) {
-				tenantID := c.Param("context_id")
-				js, err := snippet.Generate(tenantID, "", nil)
+				contextID := c.Param("context_id")
+				js, err := snippet.Generate(contextID, "", nil)
 				if err != nil {
 					c.String(500, "error")
 					return
@@ -919,17 +919,17 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			engine.ServeHTTP(w, req)
 			Expect(w.Code).To(Equal(200))
 			Expect(w.Header().Get("Content-Type")).To(ContainSubstring("application/javascript"))
-			Expect(w.Body.String()).To(ContainSubstring(tenantID))
+			Expect(w.Body.String()).To(ContainSubstring(contextID))
 		})
 
 		It("should serve banner snippet at /banner/{context_id}", func() {
-			tenantID := support.NewTestContextID()
-			req := httptest.NewRequest(http.MethodGet, "/banner/"+tenantID, nil)
+			contextID := support.NewTestContextID()
+			req := httptest.NewRequest(http.MethodGet, "/banner/"+contextID, nil)
 			w := httptest.NewRecorder()
 			engine := gin.New()
 			engine.GET("/banner/:context_id", func(c *gin.Context) {
-				tenantID := c.Param("context_id")
-				js, err := snippet.GenerateBannerSnippet(tenantID, nil)
+				contextID := c.Param("context_id")
+				js, err := snippet.GenerateBannerSnippet(contextID, nil)
 				if err != nil {
 					c.String(500, "error")
 					return
@@ -940,13 +940,13 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			engine.ServeHTTP(w, req)
 			Expect(w.Code).To(Equal(200))
 			Expect(w.Header().Get("Content-Type")).To(ContainSubstring("application/javascript"))
-			Expect(w.Body.String()).To(ContainSubstring(tenantID))
+			Expect(w.Body.String()).To(ContainSubstring(contextID))
 		})
 	})
 
 	Describe("Form submission endpoint", func() {
 		It("should accept POST to /form/submit/{slug}", func() {
-			formData := support.NewTestForm(tenantID)
+			formData := support.NewTestForm(contextID)
 			slug := formData["slug"].(string)
 
 			fields, _ := json.Marshal(formData["fields"])
@@ -968,7 +968,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 
-			submissionData := support.NewTestFormSubmission(formData["id"].(string), tenantID)
+			submissionData := support.NewTestFormSubmission(formData["id"].(string), contextID)
 			body, _ := json.Marshal(submissionData["data"])
 
 			req := httptest.NewRequest(http.MethodPost, "/form/submit/"+slug, bytes.NewBuffer(body))

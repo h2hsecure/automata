@@ -156,6 +156,23 @@ func TestTrackEvent_NormalizesPageViewSentinel(t *testing.T) {
 	}
 }
 
+func TestTrackEvent_NormalizesCompactPVSentinel(t *testing.T) {
+	cr := &fakeContactRepo{}
+	tr := &fakeDashRepo{}
+
+	event := newPageViewEvent("vid-5")
+	event.Type = "pv"
+	if err := TrackEvent(cr, tr, "ctx-1", event); err != nil {
+		t.Fatalf("TrackEvent: %v", err)
+	}
+	if event.Type != tracking.EventTypePageView {
+		t.Errorf("event.Type = %q, want %q", event.Type, tracking.EventTypePageView)
+	}
+	if len(cr.contacts) != 1 || len(cr.activities) != 1 {
+		t.Errorf("contacts/activities = (%d, %d), want (1, 1)", len(cr.contacts), len(cr.activities))
+	}
+}
+
 func TestTrackEvent_NoContactWithoutVisitorID(t *testing.T) {
 	cr := &fakeContactRepo{}
 	tr := &fakeDashRepo{}

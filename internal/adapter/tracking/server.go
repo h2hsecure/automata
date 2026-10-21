@@ -21,6 +21,7 @@ func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHa
 
 	// Tracking endpoints
 	r.POST("/track", trackHandler.Track)
+	r.POST("/track/:cid", trackHandler.TrackScoped)
 	r.POST("/track/batch", trackHandler.TrackBatch)
 	r.GET("/snippet/:id.js", snippetHandler.ServeSnippet)
 

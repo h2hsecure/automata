@@ -172,6 +172,88 @@ var _ = Describe("HTTP Integration Tests - Tracking", func() {
 		})
 	})
 
+	Describe("POST /track/:cid", func() {
+		It("should store a compact event with title from p.title", func() {
+			contextID := support.NewTestContextID()
+			vid := support.NewTestUUID()
+			body := `{"v":"` + vid + `","t":"pv","u":"https://example.com/home","r":"https://google.com","p":{"title":"Home - Example"}}`
+
+			req := httptest.NewRequest("POST", "/track/"+contextID, bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "text/plain")
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNoContent))
+
+			var eventType, title, visitorID, url, referrer string
+			err := pool.QueryRow(ctx,
+				"SELECT type, title, visitor_id, url, referrer FROM tracking_events WHERE context_id = $1",
+				contextID,
+			).Scan(&eventType, &title, &visitorID, &url, &referrer)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(eventType).To(Equal("pageview"))
+			Expect(title).To(Equal("Home - Example"))
+			Expect(visitorID).To(Equal(vid))
+			Expect(url).To(Equal("https://example.com/home"))
+			Expect(referrer).To(Equal("https://google.com"))
+		})
+
+		It("should return 400 for a non-UUID context ID in the path", func() {
+			body := `{"v":"` + support.NewTestUUID() + `","t":"pv","u":"/x","p":{}}`
+
+			req := httptest.NewRequest("POST", "/track/not-a-uuid", bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "text/plain")
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+		})
+
+		It("should return 400 when the body has no type", func() {
+			contextID := support.NewTestContextID()
+			body := `{"v":"` + support.NewTestUUID() + `","u":"/x","p":{}}`
+
+			req := httptest.NewRequest("POST", "/track/"+contextID, bytes.NewBufferString(body))
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+		})
+
+		It("should accept legacy long keys on the scoped endpoint", func() {
+			contextID := support.NewTestContextID()
+			vid := support.NewTestUUID()
+			body := `{"visitor_id":"` + vid + `","type":"page_view","url":"/legacy","referrer":"","properties":{"pageTitle":"Legacy Title"}}`
+
+			req := httptest.NewRequest("POST", "/track/"+contextID, bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "application/json")
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNoContent))
+
+			var title string
+			err := pool.QueryRow(ctx, "SELECT title FROM tracking_events WHERE context_id = $1", contextID).Scan(&title)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(title).To(Equal("Legacy Title"))
+		})
+	})
+
+	Describe("POST /track (legacy)", func() {
+		It("should store the title from properties.pageTitle", func() {
+			contextID := support.NewTestContextID()
+			vid := support.NewTestUUID()
+			body := `{"contextId":"` + contextID + `","visitor_id":"` + vid + `","type":"page_view","url":"https://example.com/","referrer":"","properties":{"pageTitle":"Changelogs - PDAccess"}}`
+
+			req := httptest.NewRequest("POST", "/track", bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "application/json")
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNoContent))
+
+			var title string
+			err := pool.QueryRow(ctx, "SELECT title FROM tracking_events WHERE context_id = $1", contextID).Scan(&title)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(title).To(Equal("Changelogs - PDAccess"))
+		})
+	})
+
 	Describe("GET /track/banner/list", func() {
 		It("should list banners for a context", func() {
 			contextID := support.NewTestContextID()

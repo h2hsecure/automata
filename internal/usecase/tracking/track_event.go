@@ -20,8 +20,10 @@ func TrackEvent(contactRepo ct.Repository, trackingRepo tracking.Repository, con
 
 	event.ContextID = contextID
 
-	// Normalize the snippet's "page_view" sentinel to the canonical event type.
-	if event.Type == "page_view" {
+	// Normalize the snippet's "page_view" / compact "pv" sentinels to the
+	// canonical event type.
+	switch event.Type {
+	case "page_view", "pv":
 		event.Type = tracking.EventTypePageView
 	}
 

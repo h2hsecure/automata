@@ -17,9 +17,13 @@ info:
     <script src="https://<tracking-domain>/snippet/<snippet-id>.js"></script>
     ```
 
-    The snippet sends `pageview` events automatically and exposes
-    `window.automata.track(eventName, properties)` for custom events.
-    Events are buffered and flushed via `POST /track/batch`.
+    The snippet is fully self-contained (no window globals) and posts compact
+    events with short keys (`v`=visitor, `t`=type, `u`=url, `r`=referrer,
+    `p`=properties) to `POST /track/{cid}` with a `text/plain` body, so
+    cross-origin requests skip the CORS preflight. Page titles are captured
+    in `p.title` and stored on the event. The legacy `POST /track` endpoint
+    (long keys, `application/json`) remains available for already-deployed
+    snippets.
 
     Forms: `GET /form/snippet/:contextID/:slug` returns a self-rendering form
     snippet; `GET /form/definition/:contextID/:slug` returns the raw form
@@ -33,10 +37,12 @@ info:
 
     Events are attributed to a context by, in order:
 
-    1. **Per-event `contextId`** (UUID) in the event body — sent by the snippet.
-    2. **`X-Context-ID` request header** — used by form/banner endpoints and as
+    1. **Context ID in the path** — `POST /track/{cid}` (used by the snippet).
+    2. **Per-event `contextId`** (UUID) in the event body — legacy snippets and
+       batch events.
+    3. **`X-Context-ID` request header** — used by form/banner endpoints and as
        the batch fallback.
-    3. **Subdomain/domain match** against each context's configured tracking
+    4. **Subdomain/domain match** against each context's configured tracking
        domain.
 
     If no context can be resolved the request is rejected silently.
@@ -78,6 +84,32 @@ paths:
       responses:
         "204": { description: Event recorded }
         "400": { description: Invalid body }
+        "500": { description: Internal error }
+  /track/{cid}:
+    post:
+      tags: [track]
+      operationId: trackScoped
+      summary: Track a single event for the context in the path
+      description: |
+        Compact, preflight-free variant used by the tracking snippet. The
+        context ID is a UUID in the path; the body uses short keys
+        (`v`, `t`, `u`, `r`, `p`) — legacy long keys are also accepted.
+        The body may be sent with any `Content-Type` (the snippet uses
+        `text/plain`). `t: "pv"` is normalized to `pageview`; the title is
+        taken from top-level `title` or `p.title` / `p.pageTitle`.
+      security: []
+      parameters:
+        - { name: cid, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema: { type: string, example: '{"v":"11111111-1111-4111-8111-111111111111","t":"pv","u":"/home","r":"","p":{"title":"Home"}}' }
+          application/json:
+            schema: { $ref: "#/components/schemas/TrackingEvent" }
+      responses:
+        "204": { description: Event recorded }
+        "400": { description: Invalid context ID, body, or missing type }
         "500": { description: Internal error }
   /track/batch:
     post:
@@ -253,6 +285,10 @@ components:
   schemas:
     TrackingEvent:
       type: object
+      description: |
+        Legacy long-key form. The compact form used by the snippet maps
+        `v`→visitor_id, `t`→type, `u`→url, `r`→referrer, `p`→properties,
+        and carries the context in the path (`POST /track/{cid}`).
       properties:
         contextId: { type: string, format: uuid, description: Per-event context override (takes priority over X-Context-ID / subdomain) }
         type: { type: string, description: "Event type: pageview, event, form_submit, ... (page_view is normalized to pageview)" }

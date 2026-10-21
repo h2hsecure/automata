@@ -29,20 +29,97 @@ type ContactRepository interface {
 	ct.Repository
 }
 
-// Track handles POST /track — single event tracking.
-func (h *TrackHandler) Track(c *gin.Context) {
-	var req struct {
-		ContextID  string                 `json:"contextId"`
-		Type       string                 `json:"type"`
-		URL        string                 `json:"url"`
-		Title      string                 `json:"title"`
-		Referrer   string                 `json:"referrer"`
-		EventName  string                 `json:"event_name"`
-		Properties map[string]interface{} `json:"properties"`
-		VisitorID  string                 `json:"visitor_id"`
+// strField returns the first non-empty string value among the given keys.
+func strField(raw map[string]interface{}, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := raw[k].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// eventFromRaw builds a tracking.Event from a raw JSON body. It accepts both
+// the compact keys (v, t, u, r, p) and the legacy long keys (visitor_id,
+// type, url, referrer, title, event_name, properties). The title falls back
+// to p.title / p.pageTitle so nested titles are not lost, and the event name
+// falls back to p.n for compact custom events.
+func eventFromRaw(contextID string, raw map[string]interface{}, c *gin.Context) *tracking.Event {
+	props, _ := raw["p"].(map[string]interface{})
+	if props == nil {
+		props, _ = raw["properties"].(map[string]interface{})
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	event := &tracking.Event{
+		ID:         uuid.New().String(),
+		ContextID:  contextID,
+		VisitorID:  strField(raw, "v", "visitor_id"),
+		Type:       tracking.EventType(strField(raw, "t", "type")),
+		URL:        strField(raw, "u", "url"),
+		Referrer:   strField(raw, "r", "referrer"),
+		Title:      strField(raw, "title"),
+		EventName:  strField(raw, "event_name"),
+		Properties: props,
+		UserAgent:  c.GetHeader("User-Agent"),
+		IP:         c.ClientIP(),
+		CreatedAt:  time.Now(),
+	}
+
+	if event.Title == "" && props != nil {
+		if v, ok := props["title"].(string); ok {
+			event.Title = v
+		} else if v, ok := props["pageTitle"].(string); ok {
+			event.Title = v
+		}
+	}
+	if event.EventName == "" && props != nil {
+		if v, ok := props["n"].(string); ok {
+			event.EventName = v
+		}
+	}
+
+	return event
+}
+
+// TrackScoped handles POST /track/:cid — compact event tracking with the
+// context ID in the path (no contextId repeated in the body). The body uses
+// short keys ({"v","t","u","r","p"}); legacy long keys are also accepted.
+// The body may be sent with any Content-Type (the snippet uses text/plain to
+// avoid a CORS preflight).
+func (h *TrackHandler) TrackScoped(c *gin.Context) {
+	contextID := c.Param("cid")
+	if _, err := uuid.Parse(contextID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid context ID"})
+		return
+	}
+
+	var raw map[string]interface{}
+	if err := c.ShouldBindJSON(&raw); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	event := eventFromRaw(contextID, raw, c)
+	if event.Type == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "type required"})
+		return
+	}
+
+	if err := trackingUsecase.TrackEvent(h.contactRepo, h.repo, contextID, event); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// Track handles POST /track — single event tracking (legacy endpoint, kept
+// for already-deployed snippets). The body uses long keys (contextId,
+// visitor_id, type, url, referrer, title, event_name, properties); compact
+// keys are also accepted.
+func (h *TrackHandler) Track(c *gin.Context) {
+	var raw map[string]interface{}
+	if err := c.ShouldBindJSON(&raw); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -50,31 +127,19 @@ func (h *TrackHandler) Track(c *gin.Context) {
 	// Prefer a valid contextId in the body (sent by the snippet); otherwise
 	// fall back to header/subdomain resolution.
 	contextID := ""
-	if _, err := uuid.Parse(req.ContextID); err == nil {
-		contextID = req.ContextID
-	} else {
+	if s := strField(raw, "contextId", "c"); s != "" {
+		if _, err := uuid.Parse(s); err == nil {
+			contextID = s
+		}
+	}
+	if contextID == "" {
 		contextID = ResolveContext(c)
 		if contextID == "" {
 			return
 		}
 	}
 
-	userAgent := c.GetHeader("User-Agent")
-
-	event := &tracking.Event{
-		ID:          uuid.New().String(),
-		ContextID:    contextID,
-		VisitorID:   req.VisitorID,
-		Type:        tracking.EventType(req.Type),
-		URL:         req.URL,
-		Title:       req.Title,
-		Referrer:    req.Referrer,
-		EventName:   req.EventName,
-		Properties:  req.Properties,
-		UserAgent:   userAgent,
-		IP:          c.ClientIP(),
-		CreatedAt:   time.Now(),
-	}
+	event := eventFromRaw(contextID, raw, c)
 
 	if err := trackingUsecase.TrackEvent(h.contactRepo, h.repo, contextID, event); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
