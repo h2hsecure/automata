@@ -96,5 +96,28 @@ func getOrCreateServer(deps Deps, contextID string) *mcp.Server {
 }
 
 func registerAllTools(s *mcp.Server, d Deps, contextID string) {
-	// per-domain registrations added in later tasks
+	registerContactTools(s, d, contextID)
+}
+
+// clampPage normalizes MCP paging arguments into an offset plus clamped
+// 1-based page and limit (default limit 20, max 100).
+func clampPage(page, limit int) (offset, clampedPage, clampedLimit int) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	return (page - 1) * limit, page, limit
+}
+
+// pageMeta is the standard paging metadata shared by all list tools.
+type pageMeta struct {
+	Total   int64 `json:"total"`
+	Page    int   `json:"page"`
+	Limit   int   `json:"limit"`
+	HasMore bool  `json:"has_more"`
 }
