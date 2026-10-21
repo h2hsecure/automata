@@ -233,6 +233,8 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 		Expect(names).To(ConsistOf(
 			"contacts_list", "contacts_get", "contacts_create", "contacts_update",
 			"contacts_delete", "contacts_merge", "contacts_activity",
+			"forms_list", "forms_get", "forms_create", "forms_update",
+			"forms_delete", "forms_submit", "form_submissions_list", "form_submissions_get",
 		))
 	})
 })
@@ -416,5 +418,125 @@ var _ = Describe("MCP contacts tools", func() {
 		text := mcpToolText(w)
 		Expect(text).To(ContainSubstring(`"limit":100`))
 		Expect(text).To(ContainSubstring(`"page":1`))
+	})
+})
+
+var _ = Describe("MCP forms tools", func() {
+	var (
+		engine    *gin.Engine
+		apiKey    string
+		contextID string
+	)
+
+	BeforeEach(func() {
+		engine, apiKey, contextID, _ = setupMCPEngine()
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	createForm := func(key string, slug string) (id, slugOut string) {
+		w := mcpTool(engine, key, 1, "forms_create", map[string]any{
+			"slug":        slug,
+			"name":        "MCP Form",
+			"description": "created by mcp spec",
+			"fields": []map[string]any{
+				{"slug": "email", "type": "email", "label": "Email"},
+			},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		text := mcpToolText(w)
+		var f struct {
+			ID   string `json:"ID"`
+			Slug string `json:"Slug"`
+		}
+		Expect(json.Unmarshal([]byte(text), &f)).To(Succeed(), "text: %s", text)
+		Expect(f.Slug).To(Equal(slug))
+		Expect(f.ID).NotTo(BeEmpty())
+		return f.ID, f.Slug
+	}
+
+	It("forms_create then forms_get (and forms_list contains it)", func() {
+		slug := "mcp-form-" + support.NewTestUUID()
+		_, gotSlug := createForm(apiKey, slug)
+
+		w := mcpTool(engine, apiKey, 2, "forms_get", map[string]any{"form_id": gotSlug})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		text := mcpToolText(w)
+		Expect(text).To(ContainSubstring(slug))
+		Expect(text).To(ContainSubstring("MCP Form"))
+
+		w = mcpTool(engine, apiKey, 3, "forms_list", map[string]any{})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring(slug))
+	})
+
+	It("forms_update then forms_delete", func() {
+		slug := "mcp-form-" + support.NewTestUUID()
+		formID, _ := createForm(apiKey, slug)
+
+		w := mcpTool(engine, apiKey, 2, "forms_update", map[string]any{
+			"form_id": formID,
+			"name":    "Renamed Form",
+			"fields": []map[string]any{
+				{"slug": "email", "type": "email", "label": "Email"},
+			},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring("Renamed Form"))
+
+		w = mcpTool(engine, apiKey, 3, "forms_delete", map[string]any{"form_id": formID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring(`"deleted":true`))
+
+		_, text := mcpToolResult(mcpTool(engine, apiKey, 4, "forms_get", map[string]any{"form_id": slug}))
+		Expect(text).NotTo(ContainSubstring(slug))
+	})
+
+	It("forms_submit then form_submissions_list", func() {
+		slug := "mcp-form-" + support.NewTestUUID()
+		formID, gotSlug := createForm(apiKey, slug)
+
+		w := mcpTool(engine, apiKey, 2, "forms_submit", map[string]any{
+			"form_id":     gotSlug,
+			"data":        map[string]any{"email": "sub-" + support.NewTestUUID() + "@example.com"},
+			"visitor_id":  "visitor-mcp-" + support.NewTestUUID(),
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		text := mcpToolText(w)
+		var sub struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(text), &sub)).To(Succeed(), "text: %s", text)
+		Expect(sub.ID).NotTo(BeEmpty())
+
+		w = mcpTool(engine, apiKey, 3, "form_submissions_list", map[string]any{"form_id": formID, "page": 1, "limit": 10})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		listText := mcpToolText(w)
+		Expect(listText).To(ContainSubstring(`"total":1`))
+		Expect(listText).To(ContainSubstring(`"has_more":false`))
+		Expect(listText).To(ContainSubstring(sub.ID))
+	})
+
+	It("form_submissions_get", func() {
+		slug := "mcp-form-" + support.NewTestUUID()
+		_, gotSlug := createForm(apiKey, slug)
+
+		w := mcpTool(engine, apiKey, 2, "forms_submit", map[string]any{
+			"form_id": gotSlug,
+			"data":    map[string]any{"email": "sub2-" + support.NewTestUUID() + "@example.com"},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var sub struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &sub)).To(Succeed())
+
+		w = mcpTool(engine, apiKey, 3, "form_submissions_get", map[string]any{"submission_id": sub.ID})
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mcpToolText(w)).To(ContainSubstring(sub.ID))
 	})
 })

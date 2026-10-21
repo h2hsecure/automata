@@ -97,6 +97,7 @@ func getOrCreateServer(deps Deps, contextID string) *mcp.Server {
 
 func registerAllTools(s *mcp.Server, d Deps, contextID string) {
 	registerContactTools(s, d, contextID)
+	registerFormTools(s, d, contextID)
 }
 
 // clampPage normalizes MCP paging arguments into an offset plus clamped
