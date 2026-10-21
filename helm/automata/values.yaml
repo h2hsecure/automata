@@ -34,10 +34,11 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 
+# Secrets live in values.local.yaml (gitignored) — never commit real values.
 secretKey: "change-this-in-production"
 cookieSecret: "change-this-in-production"
 adminEmail: "admin@automata.local"
-adminPassword: "REDACTED"
+adminPassword: ""
 
 database:
   # PostgreSQL connection settings (overridden by sub-chart if enabled)
@@ -51,7 +52,7 @@ postgresql:
   auth:
     database: automata
     username: automata
-    password: "REDACTED"
+    password: ""
   primary:
     persistence:
       enabled: true

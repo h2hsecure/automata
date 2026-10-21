@@ -77,10 +77,6 @@ async function handleLogin() {
         </Button>
       </form>
 
-      <!-- Footer -->
-      <p class="text-center text-xs text-muted-foreground">
-        admin@automata.local / REDACTED
-      </p>
-    </div>
+      </div>
   </div>
 </template>

@@ -41,8 +41,14 @@ console.log('   Title:', await page.title());
 console.log('   Has login form:', (await page.locator('form').count()) > 0);
 
 // Fill and submit
-await page.fill('input[type="email"]', 'admin@automata.local');
-await page.fill('input[type="password"]', 'REDACTED');
+const email = process.env.E2E_ADMIN_EMAIL;
+const password = process.env.E2E_ADMIN_PASSWORD;
+if (!email || !password) {
+  console.error('Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD');
+  process.exit(1);
+}
+await page.fill('input[type="email"]', email);
+await page.fill('input[type="password"]', password);
 await page.click('button[type="submit"]');
 await page.waitForTimeout(3000);
 console.log('   After login URL:', page.url());

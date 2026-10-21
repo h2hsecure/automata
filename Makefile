@@ -38,7 +38,8 @@ deploy-staging:
 	@test -n "$(IMG)" || (echo "IMG required, e.g. IMG=$(shell git rev-parse --short HEAD)"; exit 1)
 	@test -n "$(CHART)" || (echo "CHART required, e.g. CHART=$(shell date -u +%Y.%m.%d)-$(shell git rev-parse --short HEAD)"; exit 1)
 	helm pull oci://ghcr.io/hekemen/automata-chart --version $(CHART) --destination ./tmp-chart
-	helm upgrade -i automata ./tmp-chart/automata-$(CHART).tgz -n automata --set image.tag=$(IMG)
+	helm upgrade -i automata ./tmp-chart/automata-$(CHART).tgz -n automata \
+		-f helm/automata/values.local.yaml --set image.tag=$(IMG)
 	rm -rf ./tmp-chart
 
 clean:

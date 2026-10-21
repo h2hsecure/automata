@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 const BASE = 'http://localhost:8081';
-const EMAIL = 'admin@demo.com';
-const PASSWORD = 'REDACTED';
+const EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@demo.com';
+const PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
 
 async function login(page: any) {
   await page.goto(`${BASE}/login`);
@@ -167,7 +167,7 @@ test.describe('Navigation', () => {
 test.describe('API Endpoints', () => {
   test('admin api-keys endpoint exists', async ({ request }) => {
     const loginRes = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: 'admin@demo.com', password: 'REDACTED' }
+      data: { email: EMAIL, password: PASSWORD }
     });
     const { token } = await loginRes.json();
     

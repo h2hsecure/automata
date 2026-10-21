@@ -3,4 +3,16 @@
 worktrees/
 
 # Dependencies
+node_modules/
 webui/node_modules/
+
+# Build artifacts
+/automata
+npm-debug.log
+
+# Playwright MCP artifacts (can contain session and credential data)
+.playwright-mcp/
+
+# Local secrets / deployment overrides (never commit)
+helm/automata/values.local.yaml
+*.env
