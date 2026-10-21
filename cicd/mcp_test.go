@@ -243,6 +243,9 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 			"campaigns_delete",
 			"tracking_dashboard", "tracking_events", "tracking_visitors",
 			"tracking_visitor_events", "tracking_visitor_get",
+			"email_templates_list", "email_templates_get", "email_templates_create",
+			"email_templates_update", "email_templates_delete", "email_send",
+			"email_send_to_contact", "email_test_send",
 		))
 	})
 })
@@ -748,5 +751,87 @@ var _ = Describe("MCP tracking tools", func() {
 		w = mcpTool(engine, apiKey, 2, "tracking_visitor_get", map[string]any{"visitor_id": vid})
 		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
 		Expect(mcpToolText(w)).To(ContainSubstring(vid))
+	})
+})
+
+var _ = Describe("MCP email tools", func() {
+	var (
+		engine    *gin.Engine
+		apiKey    string
+		contextID string
+	)
+
+	// EmailTemplate has no json tags → JSON output uses the Go field name "ID".
+	templateID := func(w *httptest.ResponseRecorder) string {
+		var out struct {
+			ID string `json:"ID"`
+		}
+		Expect(json.Unmarshal([]byte(mcpToolText(w)), &out)).To(Succeed())
+		return out.ID
+	}
+
+	BeforeEach(func() {
+		engine, apiKey, contextID, _ = setupMCPEngine()
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM email_jobs WHERE context_id = $1", contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM email_templates WHERE context_id = $1`, contextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	It("email_templates create/list/get/update/delete", func() {
+		// ValidateKey allows only alphanumerics and underscores (no hyphens).
+		key := "mcp" + support.NewTestUUID()[:8]
+
+		w := mcpTool(engine, apiKey, 1, "email_templates_create", map[string]any{
+			"key": key, "subject": "Hi {{.name}}", "body_text": "Hello",
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		id := templateID(w)
+		Expect(id).NotTo(BeEmpty())
+
+		w = mcpTool(engine, apiKey, 2, "email_templates_list", nil)
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring(key))
+
+		w = mcpTool(engine, apiKey, 3, "email_templates_get", map[string]any{"template_id": id})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		Expect(mcpToolText(w)).To(ContainSubstring("Hi {{.name}}"))
+
+		w = mcpTool(engine, apiKey, 4, "email_templates_update", map[string]any{
+			"template_id": id, "subject": "New subject",
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		w = mcpTool(engine, apiKey, 5, "email_templates_get", map[string]any{"template_id": id})
+		Expect(mcpToolText(w)).To(ContainSubstring("New subject"))
+
+		w = mcpTool(engine, apiKey, 6, "email_templates_delete", map[string]any{"template_id": id})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		w = mcpTool(engine, apiKey, 7, "email_templates_get", map[string]any{"template_id": id})
+		isErr, _ := mcpToolResult(w)
+		Expect(isErr).To(BeTrue())
+	})
+
+	It("email_test_send renders a template", func() {
+		key := "mcp" + support.NewTestUUID()[:8]
+
+		w := mcpTool(engine, apiKey, 1, "email_templates_create", map[string]any{
+			"key": key, "subject": "Hi {{.name}}", "body_text": "Hello {{.name}}",
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		w = mcpTool(engine, apiKey, 2, "email_test_send", map[string]any{
+			"to": "t@example.com", "template": key, "variables": map[string]any{"name": "World"},
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		text := mcpToolText(w)
+		Expect(text).To(ContainSubstring(`"subject"`))
+		Expect(text).To(ContainSubstring(`"preview"`))
+		Expect(text).To(ContainSubstring("Hi World"))
 	})
 })

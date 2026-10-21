@@ -102,6 +102,7 @@ func registerAllTools(s *mcp.Server, d Deps, contextID string) {
 	registerPlacementTools(s, d, contextID)
 	registerCampaignTools(s, d, contextID)
 	registerTrackingTools(s, d, contextID)
+	registerEmailTools(s, d, contextID)
 }
 
 // clampPage normalizes MCP paging arguments into an offset plus clamped
