@@ -643,3 +643,23 @@ Append an "Execution Status" section (per repo convention in `docs/superpowers/p
 - Full cicd suite vs baseline: MCP focus 32/32 specs green (incl. the 49-tool catalog and skill-file content); full suite 438/441 with only the known pre-existing `tracking_server` 200/204 failure plus the known repo-CRUD full-suite flakes (contact/banner CRUD), both green in isolation. Race check on the MCP focus (`-race`) passes.
 - Notable fixes along the way: latent `webhookRepo.Create` double-UUID bug (returned ID never matched the stored row) and the tracking `get_visitor_detail` nil-context fix.
 - `web/` rebuilt via `webui && npm run build` (Task 10); `go build ./...` clean.
+
+## Final Review Fix Pass
+
+Whole-branch review verdict: **With fixes** — C1 Critical (18 ID-based tools bypass tenant scoping), I1 Important (`contacts_activity` missing `has_more`), M1–M4 minors, 6 declined-to-judge lines. Executed in one TDD pass; ledger entries in `.superpowers/sdd/2026-10-21-mcp-server/progress.md`.
+
+**C1 (Critical) — fixed.** Ownership checks added at the usecase boundary, fetch-then-check:
+- `banner.go` Get*/Delete* (banner/placement/campaign): ownership check **conditional on `contextID != ""`** — scoped where a context exists (REST 8080 + MCP), raw-ID where it doesn't (public tracking server `internal/adapter/tracking/server.go` reuses these handlers on contextless routes; legacy REST tests send no `X-Context-ID`). Ruling: empty contextID bypasses the check, same pattern as the webhook service.
+- `Update*` checks stay unconditional: every Update caller always passes a context (REST middleware, MCP, tests).
+- `form` `GetSubmission`/`ListSubmissions`: unconditional contextID check (all form routes carry context via `ContextMiddleware`).
+- Webhook `UpdateEndpoint`/`DeliverTest`: conditional contextID; admin `webhook_handler.go` passes `""` (admin routes out of scope per plan).
+- MCP email/webhook get/update/delete tools fetch-then-check in the adapter, returning not-found-style errors ("template not found", "webhook endpoint not found") so foreign IDs do not leak existence. Ruling: deliberate deviation from `update_form.go`'s "does not belong to context" message to avoid existence leakage across tenants.
+- REST `banner_handler.go` Get/Delete handlers pass `c.GetString("context_id")` (no 400 guard — guard would break the public tracking routes).
+
+**I1 (Important) — fixed.** `contactsActivityOut` embeds `pageMeta`; handler sets `HasMore: int64(page*limit) < res.Total`.
+
+**Minors:** M1 resolved (skill.md:9 "no tool takes a context_id" re-verified true post-C1, no text change); M2/M3/M4 → `Final: minor (deferred)`.
+
+**Verification:** RED first — cross-tenant Describe in `cicd/mcp_test.go` (7 specs, all failed pre-fix); GREEN — MCP focus 39/39 (`ok ... 16.134s`), `-race` MCP focus green, full suite **446/448** (above the 438/441 baseline; the 2 failures are the known pre-existing `tracking_server_test.go:138` 200-vs-204 and the repo-CRUD flake), `go build ./...` clean. Test bug fixed along the way: `cicd/mcp_test.go` template key `"xct-tmpl"` → `"xct_tmpl"` (hyphens invalid).
+
+**Commit:** `20068ed` (15 files).
