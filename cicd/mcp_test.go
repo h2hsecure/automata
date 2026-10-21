@@ -919,3 +919,69 @@ var _ = Describe("MCP webhook tools", func() {
 		}
 	})
 })
+
+var _ = Describe("MCP tool catalog", func() {
+	var (
+		engine    *gin.Engine
+		apiKey    string
+		contextID string
+	)
+
+	BeforeEach(func() {
+		engine, apiKey, contextID, _ = setupMCPEngine()
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
+		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
+	})
+
+	It("exposes exactly the 49 catalog tools", func() {
+		w := mcpCall(engine, apiKey, 1, "tools/list", map[string]any{})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		var resp struct {
+			Result struct {
+				Tools []struct {
+					Name string `json:"name"`
+				} `json:"tools"`
+			} `json:"result"`
+		}
+		Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed(), "body: %s", w.Body.String())
+		names := make([]string, 0, len(resp.Result.Tools))
+		for _, t := range resp.Result.Tools {
+			names = append(names, t.Name)
+		}
+		Expect(names).To(HaveLen(49))
+		for _, want := range []string{
+			"banners_create", "banners_delete", "banners_get", "banners_list", "banners_update",
+			"campaigns_create", "campaigns_delete", "campaigns_get", "campaigns_list", "campaigns_update",
+			"contacts_activity", "contacts_create", "contacts_delete", "contacts_get",
+			"contacts_list", "contacts_merge", "contacts_update",
+			"email_send", "email_send_to_contact", "email_templates_create",
+			"email_templates_delete", "email_templates_get", "email_templates_list",
+			"email_templates_update", "email_test_send",
+			"form_submissions_get", "form_submissions_list",
+			"forms_create", "forms_delete", "forms_get", "forms_list", "forms_submit", "forms_update",
+			"placements_create", "placements_delete", "placements_get", "placements_list", "placements_update",
+			"tracking_dashboard", "tracking_events", "tracking_visitor_events",
+			"tracking_visitor_get", "tracking_visitors",
+			"webhooks_create", "webhooks_delete", "webhooks_get", "webhooks_list",
+			"webhooks_test", "webhooks_update",
+		} {
+			Expect(names).To(ContainElement(want), "missing tool: %s (have %d)", want, len(names))
+		}
+	})
+
+	It("skill file served from the production engine lists domains", func() {
+		req := httptest.NewRequest("GET", "/api/mcp-skill.md", bytes.NewBuffer(nil))
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+		body := w.Body.String()
+		Expect(body).To(ContainSubstring("## Contacts"))
+		Expect(body).To(ContainSubstring("contacts_list"))
+		Expect(body).To(ContainSubstring("Authorization"))
+	})
+})
