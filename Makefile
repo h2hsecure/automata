@@ -37,14 +37,14 @@ down:
 deploy-staging:
 	@test -n "$(IMG)" || (echo "IMG required, e.g. IMG=$(shell git rev-parse --short HEAD)"; exit 1)
 	@test -n "$(CHART)" || (echo "CHART required, e.g. CHART=$(shell date -u +%Y.%m.%d)-$(shell git rev-parse --short HEAD)"; exit 1)
+	# Install directly from the OCI registry (no local tgz).
 	# Full path: helm 4 push appends the chart name to the OCI repo
 	# (package is automata-chart/automata). Works with helm 3 and 4.
-	# mkdir required: helm 4 pull fails if --destination does not exist.
-	mkdir -p ./tmp-chart
-	helm pull oci://ghcr.io/hekemen/automata-chart/automata --version $(CHART) --destination ./tmp-chart
-	helm upgrade -i automata ./tmp-chart/automata-$(CHART).tgz -n automata \
+	# Note: `helm repo add` does not support OCI registries, so the
+	# oci:// reference is passed straight to helm upgrade.
+	helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
+		--version $(CHART) -n automata \
 		-f helm/automata/values.local.yaml --set image.tag=$(IMG)
-	rm -rf ./tmp-chart
 
 clean:
 	rm -f automata
