@@ -58,6 +58,9 @@ jobs:
           cp -r helm/automata "${WORK}/chart"
           sed -i "s/^version:.*/version: ${VERSION}/" "${WORK}/chart/Chart.yaml"
           sed -i "s/^appVersion:.*/appVersion: \"${SHA}\"/" "${WORK}/chart/Chart.yaml"
+          # Bundle chart dependencies so the published tgz is self-contained
+          # (runner has helm 3, which does not auto-resolve at install time).
+          helm dependency update "${WORK}/chart"
           helm package "${WORK}/chart" --destination "${WORK}"
           echo "${{ secrets.GHCR_PAT }}" | helm registry login ghcr.io -u hekemen --password-stdin
           helm push "${WORK}/automata-${VERSION}.tgz" oci://ghcr.io/hekemen/automata-chart
