@@ -65,9 +65,10 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify contact was inserted
+			// Verify contact was inserted (scoped to this spec's context:
+			// other specs may leave rows in shared tables, and ginkgo order is random)
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM contacts").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM contacts WHERE context_id = $1", contactData["context_id"]).Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 
@@ -152,9 +153,9 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 			_, err = pool.Exec(ctx, "DELETE FROM contacts WHERE id = $1", contactData["id"])
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify deletion
+			// Verify deletion (scoped to this spec's context)
 			var count int
-			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM contacts").Scan(&count)
+			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM contacts WHERE context_id = $1", contactData["context_id"]).Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(0))
 		})
@@ -190,11 +191,11 @@ var _ = Describe("Contact Repository Integration Tests", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			// Verify total count
+			// Verify total count (scoped to this spec's context)
 			var totalCount int
 			err := pool.QueryRow(ctx, `
-				SELECT COUNT(*) FROM contacts
-			`).Scan(&totalCount)
+				SELECT COUNT(*) FROM contacts WHERE context_id = $1
+			`, contextID).Scan(&totalCount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(totalCount).To(Equal(10))
 		})
