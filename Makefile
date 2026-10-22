@@ -39,6 +39,8 @@ deploy-staging:
 	@test -n "$(CHART)" || (echo "CHART required, e.g. CHART=$(shell date -u +%Y.%m.%d)-$(shell git rev-parse --short HEAD)"; exit 1)
 	# Full path: helm 4 push appends the chart name to the OCI repo
 	# (package is automata-chart/automata). Works with helm 3 and 4.
+	# mkdir required: helm 4 pull fails if --destination does not exist.
+	mkdir -p ./tmp-chart
 	helm pull oci://ghcr.io/hekemen/automata-chart/automata --version $(CHART) --destination ./tmp-chart
 	helm upgrade -i automata ./tmp-chart/automata-$(CHART).tgz -n automata \
 		-f helm/automata/values.local.yaml --set image.tag=$(IMG)
