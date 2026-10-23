@@ -33,6 +33,14 @@ ingress:
   hostname: automata.home.arpa
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  # Optional TLS termination. When non-empty, rendered into spec.tls.
+  # With cert-manager, pair with a cert-manager.io/issuer (or
+  # cluster-issuer) annotation so the cert is provisioned into secretName.
+  # Example:
+  # tls:
+  #   - hosts: [example.com]
+  #     secretName: automata-tls
+  tls: []
 
 # Secrets live in values.local.yaml (gitignored) — never commit real values.
 secretKey: "change-this-in-production"

@@ -37,6 +37,11 @@ kubectl -n automata create secret docker-registry ghcr-registry \
 ```yaml
 ingress:
   hostname: <PROD-DOMAIN>
+  annotations:
+    cert-manager.io/cluster-issuer: <your-issuer>  # or cert-manager.io/issuer: <name>
+  tls:
+    - hosts: [<PROD-DOMAIN>]
+      secretName: automata-tls
 secretKey: "<random 32+ chars>"
 cookieSecret: "<random 32+ chars>"
 adminEmail: admin@<PROD-DOMAIN>
@@ -45,6 +50,11 @@ postgresql:
   auth:
     password: "<strong DB password>"
 ```
+
+The `tls` block + issuer annotation make cert-manager provision a
+certificate into the `automata-tls` secret, which the ingress terminates.
+(If your cluster only has a plain `Issuer` in the `automata` namespace, use
+`cert-manager.io/issuer` with that issuer's name.)
 
 > **Secrets must be fresh.** The staging `secretKey`, `cookieSecret`,
 > admin password, and Postgres password are all public in git history —
@@ -75,17 +85,15 @@ Then check health over the public domain:
 curl -s https://<PROD-DOMAIN>/api/health   # expect {"status":"ok"}
 ```
 
+## 5) Verify TLS
+
+```bash
+# cert issued and ready (READY=True)
+kubectl -n automata get certificate automata-tls
+curl -sI https://<PROD-DOMAIN>/api/health   # expect 200 over TLS
+```
+
 ## Notes
-
-- If your prod ingress uses cert-manager, add the issuer annotation under
-  `ingress.annotations` in `values.prod.yaml` for TLS, e.g.:
-
-  ```yaml
-  ingress:
-    annotations:
-      cert-manager.io/issuer: <your-issuer>
-      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-  ```
 
 - Future releases: bump both tags to the new 7-char SHA
   (`make deploy-staging` pattern: `IMG=<sha> CHART=<YYYY.MM.DD>-<sha>`).
