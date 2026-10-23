@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,17 +25,19 @@ var migrationAPIKeysUsersFKSQL string
 // migration_users_columns.sql, and migration_user_contexts.sql, then
 // repoints the api_keys.user_id FK onto the users table.
 func RunUserContextMigrations(db *pgxpool.Pool) error {
-	if _, err := db.Exec(context.Background(), migrationUsersSQL); err != nil {
-		return fmt.Errorf("execute user-context migration: %w", err)
-	}
-	if _, err := db.Exec(context.Background(), migrationUsersColumnsSQL); err != nil {
-		return fmt.Errorf("execute user-columns migration: %w", err)
-	}
-	if _, err := db.Exec(context.Background(), migrationUserContextsSQL); err != nil {
-		return fmt.Errorf("execute user-contexts migration: %w", err)
-	}
-	if _, err := db.Exec(context.Background(), migrationAPIKeysUsersFKSQL); err != nil {
-		return fmt.Errorf("execute api-keys users FK migration: %w", err)
-	}
-	return nil
+	return RunUnderMigrationLock(context.Background(), db, func(conn *pgx.Conn) error {
+		if _, err := conn.Exec(context.Background(), migrationUsersSQL); err != nil {
+			return fmt.Errorf("execute user-context migration: %w", err)
+		}
+		if _, err := conn.Exec(context.Background(), migrationUsersColumnsSQL); err != nil {
+			return fmt.Errorf("execute user-columns migration: %w", err)
+		}
+		if _, err := conn.Exec(context.Background(), migrationUserContextsSQL); err != nil {
+			return fmt.Errorf("execute user-contexts migration: %w", err)
+		}
+		if _, err := conn.Exec(context.Background(), migrationAPIKeysUsersFKSQL); err != nil {
+			return fmt.Errorf("execute api-keys users FK migration: %w", err)
+		}
+		return nil
+	})
 }

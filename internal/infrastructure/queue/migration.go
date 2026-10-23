@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/hekemen/automata/internal/infrastructure/database"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -15,13 +17,16 @@ var queueMigrationSQL string
 var webhookMigrationSQL string
 
 // RunMigrations executes the queue package migrations (email_jobs and
-// webhook_deliveries tables) against the provided database pool.
+// webhook_deliveries tables) against the provided database pool, serialized
+// under the shared migration advisory lock.
 func RunMigrations(pool *pgxpool.Pool) error {
-	if _, err := pool.Exec(context.Background(), queueMigrationSQL); err != nil {
-		return fmt.Errorf("execute queue migration: %w", err)
-	}
-	if _, err := pool.Exec(context.Background(), webhookMigrationSQL); err != nil {
-		return fmt.Errorf("execute webhook queue migration: %w", err)
-	}
-	return nil
+	return database.RunUnderMigrationLock(context.Background(), pool, func(conn *pgx.Conn) error {
+		if _, err := conn.Exec(context.Background(), queueMigrationSQL); err != nil {
+			return fmt.Errorf("execute queue migration: %w", err)
+		}
+		if _, err := conn.Exec(context.Background(), webhookMigrationSQL); err != nil {
+			return fmt.Errorf("execute webhook queue migration: %w", err)
+		}
+		return nil
+	})
 }

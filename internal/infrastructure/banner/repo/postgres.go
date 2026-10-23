@@ -10,18 +10,23 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/banner"
+	"github.com/hekemen/automata/internal/infrastructure/database"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 //go:embed migration.sql
 var migrationSQL string
 
-// RunMigrations executes the embedded migration.sql against the provided database pool.
+// RunMigrations executes the embedded migration.sql against the provided
+// database pool, serialized under the shared migration advisory lock.
 func RunMigrations(db *pgxpool.Pool) error {
-	if _, err := db.Exec(context.Background(), migrationSQL); err != nil {
-		return fmt.Errorf("execute banner migration: %w", err)
-	}
-	return nil
+	return database.RunUnderMigrationLock(context.Background(), db, func(conn *pgx.Conn) error {
+		if _, err := conn.Exec(context.Background(), migrationSQL); err != nil {
+			return fmt.Errorf("execute banner migration: %w", err)
+		}
+		return nil
+	})
 }
 
 // bannerRepo implements the banner.Repository interface using PostgreSQL.
