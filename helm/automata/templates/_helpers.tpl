@@ -63,3 +63,27 @@ BFF selector labels
 {{ include "automata.selectorLabels" . }}
 app.kubernetes.io/component: bff
 {{- end }}
+
+{{/*
+Init container that blocks pod startup until PostgreSQL accepts connections.
+Without it, a fresh install starts the app before the subchart's Postgres is
+ready, and the app crash-loops (observed as RESTARTS on clean installs).
+DB host/name/user/port mirror configmap.yaml so the wait targets the same
+server the app connects to. pg_isready needs no credentials.
+*/}}
+{{- define "automata.waitForPostgresInitContainer" -}}
+{{- $dbHost := ternary (printf "%s-postgresql" .Release.Name) (.Values.database.host | default "automata-postgresql") .Values.postgresql.enabled -}}
+{{- $dbName := ternary (.Values.postgresql.auth.database | default "automata") (.Values.database.name | default "automata") .Values.postgresql.enabled -}}
+{{- $dbUser := ternary (.Values.postgresql.auth.username | default "automata") (.Values.database.user | default "automata") .Values.postgresql.enabled -}}
+{{- $dbPort := .Values.database.port | default "5432" -}}
+- name: wait-for-postgres
+  image: postgres:17-alpine
+  command:
+    - sh
+    - -c
+    - |
+      until pg_isready -h {{ $dbHost }} -p {{ $dbPort }} -U {{ $dbUser }} -d {{ $dbName }} -q; do
+        echo "waiting for postgres at {{ $dbHost }}:{{ $dbPort }}..."
+        sleep 2
+      done
+{{- end }}

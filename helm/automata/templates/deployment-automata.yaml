@@ -20,6 +20,8 @@ spec:
       imagePullSecrets:
         {{- toYaml .Values.image.pullSecrets | nindent 8 }}
       {{- end }}
+      initContainers:
+        {{- include "automata.waitForPostgresInitContainer" . | nindent 8 }}
       containers:
         - name: automata
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
