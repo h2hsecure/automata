@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -23,11 +24,15 @@ type SessionData struct {
 
 // Manager handles encryption and decryption of session cookies.
 type Manager struct {
-	secret string
+	// key is the AES-256 key derived from the configured secret.
+	key [32]byte
 }
 
 // New creates a new cookie Manager with the given encryption secret.
-// The secret must be at least 16 characters long; an empty or too-short secret will panic.
+// The secret is a passphrase, not a raw AES key: it is hashed with SHA-256
+// to derive an AES-256 key, so any secret of 16+ characters is valid
+// (including 64-char hex from `openssl rand -hex 32`).
+// An empty or too-short secret will panic.
 // Callers should use auth.GetCookieSecret() to obtain the configured secret.
 func New(secret string) *Manager {
 	if secret == "" {
@@ -36,7 +41,9 @@ func New(secret string) *Manager {
 	if len(secret) < 16 {
 		panic(fmt.Sprintf("cookie: secret must be at least 16 characters long (got %d)", len(secret)))
 	}
-	return &Manager{secret: secret}
+	var m Manager
+	m.key = sha256.Sum256([]byte(secret))
+	return &m
 }
 
 // Encrypt encrypts session data and returns a base64-encoded ciphertext.
@@ -46,7 +53,7 @@ func (m *Manager) Encrypt(data SessionData) (string, error) {
 		return "", fmt.Errorf("marshal session: %w", err)
 	}
 
-	block, err := aes.NewCipher([]byte(m.secret))
+	block, err := aes.NewCipher(m.key[:])
 	if err != nil {
 		return "", fmt.Errorf("create cipher: %w", err)
 	}
@@ -74,7 +81,7 @@ func (m *Manager) Decrypt(cookieValue string) (SessionData, error) {
 		return data, fmt.Errorf("decode cookie: %w", err)
 	}
 
-	block, err := aes.NewCipher([]byte(m.secret))
+	block, err := aes.NewCipher(m.key[:])
 	if err != nil {
 		return data, fmt.Errorf("create cipher: %w", err)
 	}
@@ -132,7 +139,7 @@ func (m *Manager) EncryptRefreshToken(jwtToken string) (string, error) {
 		return "", fmt.Errorf("marshal refresh payload: %w", err)
 	}
 
-	block, err := aes.NewCipher([]byte(m.secret))
+	block, err := aes.NewCipher(m.key[:])
 	if err != nil {
 		return "", fmt.Errorf("create cipher: %w", err)
 	}
@@ -158,7 +165,7 @@ func (m *Manager) DecryptRefreshToken(cookieValue string) (string, error) {
 		return "", fmt.Errorf("decode refresh cookie: %w", err)
 	}
 
-	block, err := aes.NewCipher([]byte(m.secret))
+	block, err := aes.NewCipher(m.key[:])
 	if err != nil {
 		return "", fmt.Errorf("create cipher: %w", err)
 	}

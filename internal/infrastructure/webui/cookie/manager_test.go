@@ -117,6 +117,48 @@ func TestRefreshPayload_CreatedAt(t *testing.T) {
 	_ = before // used implicitly via time.Now() in Encrypt
 }
 
+// 64-char secrets (e.g. `openssl rand -hex 32`) must work: the secret is a
+// passphrase, not a raw AES key, so it must be derived, not used verbatim.
+// Regression: prod login 500'd with "token generation failed" because
+// aes.NewCipher rejected 64-byte keys.
+func TestEncryptDecrypt_SessionCookie_64CharSecret(t *testing.T) {
+	secret := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899" // 64 chars
+	m := New(secret)
+
+	data := SessionData{UserID: "u1", Email: "a@b.c", Token: "jwt"}
+	enc, err := m.Encrypt(data)
+	if err != nil {
+		t.Fatalf("Encrypt with 64-char secret failed: %v", err)
+	}
+
+	dec, err := m.Decrypt(enc)
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+	if dec.UserID != data.UserID || dec.Email != data.Email || dec.Token != data.Token {
+		t.Errorf("round-trip mismatch: got %+v", dec)
+	}
+}
+
+func TestEncryptDecryptRefreshToken_64CharSecret(t *testing.T) {
+	secret := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899" // 64 chars
+	m := New(secret)
+
+	jwtToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXN0IjoiZGF0YSJ9.signature"
+	enc, err := m.EncryptRefreshToken(jwtToken)
+	if err != nil {
+		t.Fatalf("EncryptRefreshToken with 64-char secret failed: %v", err)
+	}
+
+	dec, err := m.DecryptRefreshToken(enc)
+	if err != nil {
+		t.Fatalf("DecryptRefreshToken failed: %v", err)
+	}
+	if dec != jwtToken {
+		t.Errorf("round-trip mismatch: got %s", dec)
+	}
+}
+
 func TestCookieConstants(t *testing.T) {
 	if RefreshCookieName != "automata_refresh" {
 		t.Errorf("expected RefreshCookieName to be 'automata_refresh', got: %s", RefreshCookieName)
