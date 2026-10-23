@@ -7,11 +7,12 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:64b2fc9` |
-| Chart | `2026.10.23-64b2fc9` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:f4372da` |
+| Chart | `2026.10.23-f4372da` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-`64b2fc9` is CI-verified and staging-proven (includes the stale-JWT fix and
-the PostgreSQL readiness init container).
+`f4372da` is CI-verified (includes the stale-JWT fix, the PostgreSQL
+readiness init container, and the advisory-lock fix that serializes
+concurrent automata+bff migrations on a fresh install).
 
 ## 0) Point at the production cluster + helm access to GHCR (one-time)
 
@@ -55,8 +56,8 @@ postgresql:
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.23-64b2fc9 -n automata \
-  -f values.prod.yaml --set image.tag=64b2fc9
+  --version 2026.10.23-f4372da -n automata \
+  -f values.prod.yaml --set image.tag=f4372da
 ```
 
 ## 4) Verify rollout
