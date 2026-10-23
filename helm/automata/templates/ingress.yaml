@@ -24,8 +24,12 @@ spec:
   tls:
     {{- range .Values.ingress.tls }}
     - hosts:
+        {{- if kindIs "string" .hosts }}
+        - {{ .hosts | quote }}
+        {{- else }}
         {{- range .hosts }}
         - {{ . | quote }}
+        {{- end }}
         {{- end }}
       secretName: {{ .secretName }}
     {{- end }}
