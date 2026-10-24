@@ -12,6 +12,28 @@ spec:
     - host: {{ .Values.ingress.hostname | quote }}
       http:
         paths:
+          # Tracking server (snippet, tracking events, public forms)
+          - path: /snippet
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "automata.fullname" . }}-automata
+                port:
+                  number: 8081
+          - path: /track
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "automata.fullname" . }}-automata
+                port:
+                  number: 8081
+          - path: /form
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "automata.fullname" . }}-automata
+                port:
+                  number: 8081
           # Frontend + API proxy via BFF
           - path: /
             pathType: Prefix

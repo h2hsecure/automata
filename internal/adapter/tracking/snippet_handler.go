@@ -21,13 +21,20 @@ func (h *SnippetHandler) ServeSnippet(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "context ID required"})
 			return
 		}
-		// Derive the tracking host from the request so the snippet posts back
-		// to the same origin it was served from (e.g. the website's own host).
+		// Derive the tracking origin from the request so the snippet posts
+		// back to the same origin it was served from (e.g. the website's own
+		// host). Behind a TLS-terminating proxy, X-Forwarded-Proto carries
+		// the public scheme; without it the snippet would post over http and
+		// be blocked as mixed content on https pages.
 		host := c.GetHeader("Host")
 		if host == "" {
 			host = c.Request.Host
 		}
-		js, err := snippet.Generate(contextID, "http://"+host, nil)
+		scheme := "http"
+		if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+			scheme = strings.ToLower(strings.TrimSpace(strings.Split(proto, ",")[0]))
+		}
+		js, err := snippet.Generate(contextID, scheme+"://"+host, nil)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
