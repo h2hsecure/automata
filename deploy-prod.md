@@ -7,17 +7,22 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:9f86198` |
-| Chart | `2026.10.24-9f86198` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:6a17eef` |
+| Chart | `2026.10.25-6a17eef` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-`9f86198` is CI-verified (includes the stale-JWT fix, the PostgreSQL
+`6a17eef` is CI-verified (includes the stale-JWT fix, the PostgreSQL
 readiness init container, the advisory-lock fix that serializes concurrent
 automata+bff migrations, ingress TLS support, lenient handling of
 `ingress.tls[].hosts` as a bare string or a list, the cookie-secret
-fix that accepts any secret length of 16+ characters, and the tracking
+fix that accepts any secret length of 16+ characters, the tracking
 fix: ingress now routes `/snippet`, `/track`, `/form` to the tracking
 server on port 8081, and `ServeSnippet` honors `X-Forwarded-Proto` so
-snippets on HTTPS sites post back over https).
+snippets on HTTPS sites post back over https, and contact visitor info:
+each hidden contact now records user-agent, parsed device/browser, client
+IP, and offline GeoLite2 geolocation from the embedded
+GeoLite2-City database — no runtime dependency on MaxMind — shown in the
+WebUI contacts list and detail view; the embedded database can be
+refreshed monthly with `MAXMIND_LICENSE_KEY=<key> make geoip-update`).
 
 ## 0) Point at the production cluster + helm access to GHCR (one-time)
 
@@ -71,8 +76,8 @@ certificate into the `automata-tls` secret, which the ingress terminates.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.24-9f86198 -n automata \
-  -f values.prod.yaml --set image.tag=9f86198
+  --version 2026.10.25-6a17eef -n automata \
+  -f values.prod.yaml --set image.tag=6a17eef
 ```
 
 ## 4) Verify rollout
