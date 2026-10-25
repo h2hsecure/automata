@@ -32,13 +32,21 @@ func (r *repo) Create(c *ct.Contact) error {
 	ctx := context.Background()
 
 	query := `
-		INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, hidden, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+		INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company, custom_fields, source, source_id, hidden,
+			user_agent, device_type, browser, ip_address, geo_country, geo_country_code, geo_city, geo_region, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+			$12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW())
 	`
 
 	customFieldsJSON, err := json.Marshal(c.CustomFields)
 	if err != nil {
 		return fmt.Errorf("marshal custom fields: %w", err)
+	}
+
+	// Empty IP must bind as NULL, not as an empty string (invalid for INET).
+	var ip any
+	if c.IPAddress != "" {
+		ip = c.IPAddress
 	}
 
 	_, err = r.pool.Exec(ctx, query,
@@ -53,6 +61,14 @@ func (r *repo) Create(c *ct.Contact) error {
 		c.Source,
 		c.SourceID,
 		c.Hidden,
+		c.UserAgent,
+		c.DeviceType,
+		c.Browser,
+		ip,
+		c.GeoCountry,
+		c.GeoCountryCode,
+		c.GeoCity,
+		c.GeoRegion,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -69,7 +85,10 @@ func (r *repo) GetByID(id string) (*ct.Contact, error) {
 	ctx := context.Background()
 
 	query := `
-		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden,
+		COALESCE(user_agent,''), COALESCE(device_type,''), COALESCE(browser,''), COALESCE(host(ip_address),''),
+		COALESCE(geo_country,''), COALESCE(geo_country_code,''), COALESCE(geo_city,''), COALESCE(geo_region,''),
+		created_at, updated_at
 		FROM contacts
 		WHERE id = $1
 	`
@@ -89,6 +108,14 @@ func (r *repo) GetByID(id string) (*ct.Contact, error) {
 		&c.Source,
 		&c.SourceID,
 		&c.Hidden,
+		&c.UserAgent,
+		&c.DeviceType,
+		&c.Browser,
+		&c.IPAddress,
+		&c.GeoCountry,
+		&c.GeoCountryCode,
+		&c.GeoCity,
+		&c.GeoRegion,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 	)
@@ -123,7 +150,10 @@ func (r *repo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact,
 	}
 
 	listQuery := fmt.Sprintf(`
-		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden,
+		COALESCE(user_agent,''), COALESCE(device_type,''), COALESCE(browser,''), COALESCE(host(ip_address),''),
+		COALESCE(geo_country,''), COALESCE(geo_country_code,''), COALESCE(geo_city,''), COALESCE(geo_region,''),
+		created_at, updated_at
 		FROM contacts
 		WHERE %s
 		ORDER BY created_at DESC
@@ -157,6 +187,14 @@ func (r *repo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact,
 			&c.Source,
 			&c.SourceID,
 			&c.Hidden,
+			&c.UserAgent,
+			&c.DeviceType,
+			&c.Browser,
+			&c.IPAddress,
+			&c.GeoCountry,
+			&c.GeoCountryCode,
+			&c.GeoCity,
+			&c.GeoRegion,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		)
@@ -259,9 +297,18 @@ func (r *repo) Update(c *ct.Contact) error {
 	query := `
 		UPDATE contacts
 		SET email = $2, first_name = $3, last_name = $4, phone = $5, company = $6,
-			custom_fields = $7, source = $8, source_id = $9, hidden = $10, updated_at = NOW()
+			custom_fields = $7, source = $8, source_id = $9, hidden = $10,
+			user_agent = $11, device_type = $12, browser = $13, ip_address = $14,
+			geo_country = $15, geo_country_code = $16, geo_city = $17, geo_region = $18,
+			updated_at = NOW()
 		WHERE id = $1
 	`
+
+	// Empty IP must bind as NULL, not as an empty string (invalid for INET).
+	var ip any
+	if c.IPAddress != "" {
+		ip = c.IPAddress
+	}
 
 	_, err = r.pool.Exec(ctx, query,
 		c.ID,
@@ -274,6 +321,14 @@ func (r *repo) Update(c *ct.Contact) error {
 		c.Source,
 		c.SourceID,
 		c.Hidden,
+		c.UserAgent,
+		c.DeviceType,
+		c.Browser,
+		ip,
+		c.GeoCountry,
+		c.GeoCountryCode,
+		c.GeoCity,
+		c.GeoRegion,
 	)
 	if err != nil {
 		return fmt.Errorf("update contact: %w", err)
@@ -300,7 +355,10 @@ func (r *repo) FindByEmail(contextID, email string) (*ct.Contact, error) {
 	ctx := context.Background()
 
 	query := `
-		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden,
+		COALESCE(user_agent,''), COALESCE(device_type,''), COALESCE(browser,''), COALESCE(host(ip_address),''),
+		COALESCE(geo_country,''), COALESCE(geo_country_code,''), COALESCE(geo_city,''), COALESCE(geo_region,''),
+		created_at, updated_at
 		FROM contacts
 		WHERE context_id = $1 AND email = $2
 	`
@@ -322,6 +380,14 @@ func (r *repo) FindByEmail(contextID, email string) (*ct.Contact, error) {
 		&c.Source,
 		&c.SourceID,
 		&c.Hidden,
+		&c.UserAgent,
+		&c.DeviceType,
+		&c.Browser,
+		&c.IPAddress,
+		&c.GeoCountry,
+		&c.GeoCountryCode,
+		&c.GeoCity,
+		&c.GeoRegion,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 	)
@@ -351,7 +417,10 @@ func (r *repo) FindBySourceID(contextID, source, sourceID string) (*ct.Contact, 
 	ctx := context.Background()
 
 	query := `
-		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden, created_at, updated_at
+		SELECT id, context_id, email, COALESCE(first_name,''), COALESCE(last_name,''), COALESCE(phone,''), COALESCE(company,''), custom_fields, COALESCE(source,''), COALESCE(source_id,''), hidden,
+		COALESCE(user_agent,''), COALESCE(device_type,''), COALESCE(browser,''), COALESCE(host(ip_address),''),
+		COALESCE(geo_country,''), COALESCE(geo_country_code,''), COALESCE(geo_city,''), COALESCE(geo_region,''),
+		created_at, updated_at
 		FROM contacts
 		WHERE context_id = $1 AND source = $2 AND source_id = $3
 	`
@@ -373,6 +442,14 @@ func (r *repo) FindBySourceID(contextID, source, sourceID string) (*ct.Contact, 
 		&c.Source,
 		&c.SourceID,
 		&c.Hidden,
+		&c.UserAgent,
+		&c.DeviceType,
+		&c.Browser,
+		&c.IPAddress,
+		&c.GeoCountry,
+		&c.GeoCountryCode,
+		&c.GeoCity,
+		&c.GeoRegion,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 	)

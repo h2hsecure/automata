@@ -190,6 +190,34 @@ onMounted(load)
         </div>
       </Card>
 
+      <!-- Visitor client info (hidden contacts enriched from page visits) -->
+      <Card v-if="contact.UserAgent" title="Visitor">
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <p class="text-sm text-muted-foreground">Device</p>
+            <p class="text-sm">{{ contact.DeviceType || '-' }}</p>
+          </div>
+          <div>
+            <p class="text-sm text-muted-foreground">Browser</p>
+            <p class="text-sm">{{ contact.Browser || '-' }}</p>
+          </div>
+          <div>
+            <p class="text-sm text-muted-foreground">IP address</p>
+            <p class="text-sm">{{ contact.IPAddress || '-' }}</p>
+          </div>
+          <div>
+            <p class="text-sm text-muted-foreground">Location</p>
+            <p class="text-sm">
+              {{ [contact.GeoCity, contact.GeoRegion, contact.GeoCountry].filter(Boolean).join(', ') || '-' }}
+            </p>
+          </div>
+          <div class="sm:col-span-2">
+            <p class="text-sm text-muted-foreground">User agent</p>
+            <p class="text-sm break-all">{{ contact.UserAgent || '-' }}</p>
+          </div>
+        </div>
+      </Card>
+
       <!-- Activity feed -->
       <Card title="Activity">
         <div class="mt-4 flex items-center justify-between gap-4">

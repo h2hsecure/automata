@@ -40,7 +40,7 @@ var _ = Describe("Tracking Server Integration Tests", func() {
 		bannerHandler = bhandler.NewBannerHandler(bannerRepo)
 		placementHandler = bhandler.NewPlacementHandler(bannerRepo)
 		campaignHandler = bhandler.NewCampaignHandler(bannerRepo)
-		engine = ttracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo)
+		engine = ttracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, nil)
 	})
 
 	AfterEach(func() {

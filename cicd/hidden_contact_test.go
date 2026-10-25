@@ -11,6 +11,7 @@ import (
 	bhandler "github.com/hekemen/automata/internal/adapter/api/handler"
 	brepo "github.com/hekemen/automata/internal/infrastructure/banner/repo"
 	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
+	geoInfra "github.com/hekemen/automata/internal/infrastructure/geo"
 	formRepo "github.com/hekemen/automata/internal/infrastructure/form/repo"
 	ttracking "github.com/hekemen/automata/internal/adapter/tracking"
 	trepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
@@ -36,7 +37,7 @@ var _ = Describe("HTTP Integration Tests - Hidden Visitor Contacts", func() {
 		bannerHandler := bhandler.NewBannerHandler(bannerRepo)
 		placementHandler := bhandler.NewPlacementHandler(bannerRepo)
 		campaignHandler := bhandler.NewCampaignHandler(bannerRepo)
-		trackEngine = ttracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, crepo.New(pool))
+		trackEngine = ttracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, geoInfra.New(), crepo.New(pool))
 		contactEngine = setupContactEngine()
 
 		contextID = support.NewTestContextID()
@@ -72,6 +73,35 @@ var _ = Describe("HTTP Integration Tests - Hidden Visitor Contacts", func() {
 		`, contextID).Scan(&activityCount)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(activityCount).To(Equal(1))
+	})
+
+	It("should enrich the hidden contact with user-agent, device, browser, ip, and geo", func() {
+		body := `{"type":"pageview","url":"/home","title":"Home","visitor_id":"v-hc-geo"}`
+		req := httptest.NewRequest("POST", "/track", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Context-ID", contextID)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+		// 208.65.44.17 resolves to Naples, Florida, United States in GeoLite2-City.
+		req.RemoteAddr = "208.65.44.17:51234"
+		trackEngine.ServeHTTP(w, req)
+
+		Expect(w.Code).To(Equal(http.StatusNoContent))
+
+		var userAgent, device, browser, ip, country, countryCode, city, region string
+		err := pool.QueryRow(ctx, `
+			SELECT COALESCE(user_agent,''), COALESCE(device_type,''), COALESCE(browser,''), COALESCE(host(ip_address),''),
+			       COALESCE(geo_country,''), COALESCE(geo_country_code,''), COALESCE(geo_city,''), COALESCE(geo_region,'')
+			FROM contacts WHERE context_id = $1 AND source_id = 'v-hc-geo'
+		`, contextID).Scan(&userAgent, &device, &browser, &ip, &country, &countryCode, &city, &region)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(userAgent).To(ContainSubstring("Chrome"))
+		Expect(device).To(Equal("desktop"))
+		Expect(browser).To(Equal("Chrome"))
+		Expect(ip).To(Equal("208.65.44.17"))
+		Expect(country).To(Equal("United States"))
+		Expect(countryCode).To(Equal("US"))
+		Expect(city).To(Equal("Naples"))
+		Expect(region).To(Equal("Florida"))
 	})
 
 	It("should not duplicate the hidden contact on subsequent pageviews", func() {

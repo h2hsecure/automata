@@ -32,6 +32,7 @@ var _ = Describe("HTTP Integration Tests - Public Form Endpoints", func() {
 			bhandler.NewPlacementHandler(bannerRepo),
 			bhandler.NewCampaignHandler(bannerRepo),
 			trepo.New(pool),
+			nil,
 		)
 	})
 

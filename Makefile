@@ -1,4 +1,4 @@
-.PHONY: build test cicd-tests cicd-tests-ci cicd-tests-verbose cicd-tests-race cicd-tests-full local up down clean deploy-staging
+.PHONY: build test cicd-tests cicd-tests-ci cicd-tests-verbose cicd-tests-race cicd-tests-full local up down clean deploy-staging geoip-update
 
 build:
 	go build -o automata ./cmd/automata
@@ -45,6 +45,17 @@ deploy-staging:
 	helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
 		--version $(CHART) -n automata \
 		-f helm/automata/values.local.yaml --set image.tag=$(IMG)
+
+# Refresh the embedded GeoLite2-City database (monthly).
+# usage: MAXMIND_LICENSE_KEY=<key> make geoip-update
+geoip-update:
+	@test -n "$(MAXMIND_LICENSE_KEY)" || (echo "MAXMIND_LICENSE_KEY required"; exit 1)
+	tmp=$$(mktemp -d) && \
+	curl -sS -o "$$tmp/GeoLite2-City.tar.gz" \
+		"https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=$(MAXMIND_LICENSE_KEY)&file_type=tar.gz" && \
+	tar -xzf "$$tmp/GeoLite2-City.tar.gz" -C "$$tmp" && \
+	cp "$$tmp/GeoLite2-City/GeoLite2-City.mmdb" internal/infrastructure/geo/data/GeoLite2-City.mmdb && \
+	rm -rf "$$tmp"
 
 clean:
 	rm -f automata

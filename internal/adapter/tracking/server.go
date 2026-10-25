@@ -5,15 +5,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/adapter/api/handler"
+	geodomain "github.com/hekemen/automata/internal/domain/geo"
 )
 
 // NewServer creates a new tracking server with public-facing endpoints.
-// The optional contactRepo enables hidden visitor contacts and page_visit
-// activity logging; servers built without it (e.g. test harnesses) skip them.
-func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHandler, placementHandler *handler.PlacementHandler, campaignHandler *handler.CampaignHandler, trackingRepo Repository, contactRepo ...ContactRepository) *gin.Engine {
+// The geoLookup resolves visitor locations offline (nil disables
+// geolocation). The optional contactRepo enables hidden visitor contacts and
+// page_visit activity logging; servers built without it (e.g. test harnesses)
+// skip them.
+func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHandler, placementHandler *handler.PlacementHandler, campaignHandler *handler.CampaignHandler, trackingRepo Repository, geoLookup geodomain.Lookup, contactRepo ...ContactRepository) *gin.Engine {
 	r := gin.Default()
 
-	trackHandler := &TrackHandler{repo: trackingRepo}
+	trackHandler := &TrackHandler{repo: trackingRepo, geoLookup: geoLookup}
 	if len(contactRepo) > 0 && contactRepo[0] != nil {
 		trackHandler.contactRepo = contactRepo[0]
 	}

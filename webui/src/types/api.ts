@@ -21,6 +21,15 @@ export interface Contact {
   Source: string;
   SourceID: string;
   Hidden?: boolean;
+  // Visitor client fields (enriched from page_visit events on hidden contacts)
+  UserAgent?: string;
+  DeviceType?: string;
+  Browser?: string;
+  IPAddress?: string;
+  GeoCountry?: string;
+  GeoCountryCode?: string;
+  GeoCity?: string;
+  GeoRegion?: string;
   Tags: Tag[];
   CreatedAt: string;
   UpdatedAt: string;

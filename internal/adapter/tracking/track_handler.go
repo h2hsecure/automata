@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	ct "github.com/hekemen/automata/internal/domain/contact"
+	geodomain "github.com/hekemen/automata/internal/domain/geo"
 	"github.com/hekemen/automata/internal/domain/tracking"
 	trackingUsecase "github.com/hekemen/automata/internal/usecase/tracking"
 	"github.com/rs/zerolog/log"
@@ -16,6 +17,7 @@ import (
 type TrackHandler struct {
 	repo        Repository
 	contactRepo ContactRepository
+	geoLookup   geodomain.Lookup
 }
 
 // Repository is the interface for tracking event persistence.
@@ -105,7 +107,7 @@ func (h *TrackHandler) TrackScoped(c *gin.Context) {
 		return
 	}
 
-	if err := trackingUsecase.TrackEvent(h.contactRepo, h.repo, contextID, event); err != nil {
+	if err := trackingUsecase.TrackEvent(h.contactRepo, h.geoLookup, h.repo, contextID, event); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -141,7 +143,7 @@ func (h *TrackHandler) Track(c *gin.Context) {
 
 	event := eventFromRaw(contextID, raw, c)
 
-	if err := trackingUsecase.TrackEvent(h.contactRepo, h.repo, contextID, event); err != nil {
+	if err := trackingUsecase.TrackEvent(h.contactRepo, h.geoLookup, h.repo, contextID, event); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -220,7 +222,7 @@ func (h *TrackHandler) TrackBatch(c *gin.Context) {
 			continue
 		}
 
-		if err := trackingUsecase.TrackEvent(h.contactRepo, h.repo, contextID, event); err != nil {
+		if err := trackingUsecase.TrackEvent(h.contactRepo, h.geoLookup, h.repo, contextID, event); err != nil {
 			log.Warn().Err(err).Str("context_id", contextID).Msg("track batch: event failed")
 			rejected++
 			continue

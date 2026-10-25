@@ -19,9 +19,18 @@ type Contact struct {
 	Source       string
 	SourceID     string
 	Hidden       bool
-	Tags         []Tag
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// Visitor client fields (enriched from page_visit events on hidden contacts)
+	UserAgent      string
+	DeviceType     string
+	Browser        string
+	IPAddress      string
+	GeoCountry     string
+	GeoCountryCode string
+	GeoCity        string
+	GeoRegion      string
+	Tags           []Tag
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // Validate checks that the Contact has all required fields set.

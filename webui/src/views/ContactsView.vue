@@ -42,6 +42,7 @@ const formError = ref('')
 // Column definitions
 const columns = [
   { key: 'name', label: 'Name' },
+  { key: 'device', label: 'Device / Location' },
   { key: 'email', label: 'Email' },
   { key: 'phone', label: 'Phone' },
   { key: 'tags', label: 'Tags' },
@@ -179,6 +180,15 @@ onMounted(loadContacts)
             </div>
             <Badge v-if="row.Hidden" variant="warning">Hidden</Badge>
           </div>
+        </template>
+        <template #device="{ row }: { row: Contact }">
+          <div v-if="row.DeviceType" class="text-sm">
+            <p>{{ row.DeviceType }} · {{ row.Browser }}</p>
+            <p v-if="row.GeoCity || row.GeoCountry" class="text-xs text-muted-foreground">
+              {{ [row.GeoCity, row.GeoCountry].filter(Boolean).join(', ') }}
+            </p>
+          </div>
+          <span v-else class="text-sm text-muted-foreground">-</span>
         </template>
         <template #email="{ row }: { row: Contact }">
           <span class="text-sm">{{ row.Email }}</span>

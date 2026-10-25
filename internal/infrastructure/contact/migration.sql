@@ -25,6 +25,17 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FA
 CREATE INDEX IF NOT EXISTS idx_contacts_context_source_id
     ON contacts(context_id, source, source_id);
 
+-- Visitor client fields: raw user-agent, parsed device/browser, client IP,
+-- and offline (GeoLite2) geolocation, enriched from page_visit events.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS device_type VARCHAR(16);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS browser VARCHAR(16);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS ip_address INET;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS geo_country VARCHAR(128);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS geo_country_code CHAR(2);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS geo_city VARCHAR(128);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS geo_region VARCHAR(128);
+
 -- Tags table
 CREATE TABLE IF NOT EXISTS contact_tags (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

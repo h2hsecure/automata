@@ -27,6 +27,7 @@ import (
 	email_repo "github.com/hekemen/automata/internal/infrastructure/email/repo"
 	mailsmtp "github.com/hekemen/automata/internal/infrastructure/email/smtp"
 	form_repo "github.com/hekemen/automata/internal/infrastructure/form/repo"
+	geo_infra "github.com/hekemen/automata/internal/infrastructure/geo"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
 	settings_repo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
@@ -110,6 +111,7 @@ func main() {
 	bannerRepo := banner_repo.New(pool)
 	trackingRepo := tracking_repo.New(pool)
 	contactRepo := contact_repo.New(pool)
+	geoLookup := geo_infra.New()
 
 	// Admin bootstrap: create admin user on first startup
 	if err := bootstrap.Run(pool, userRepo); err != nil {
@@ -183,7 +185,7 @@ func main() {
 	}()
 
 	// Tracking server (port 8081)
-	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, contactRepo)
+	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, geoLookup, contactRepo)
 
 	trackingPort := config.Get("server.tracking_port")
 	if trackingPort == "" {

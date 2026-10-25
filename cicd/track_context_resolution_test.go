@@ -27,7 +27,7 @@ var _ = Describe("Tracking context resolution and snippet host", func() {
 		gin.SetMode(gin.TestMode)
 		w = httptest.NewRecorder()
 		trackingRepo = trepo.New(pool)
-		engine = ttracking.NewServer(nil, nil, nil, nil, trackingRepo)
+		engine = ttracking.NewServer(nil, nil, nil, nil, trackingRepo, nil)
 	})
 
 	AfterEach(func() {
