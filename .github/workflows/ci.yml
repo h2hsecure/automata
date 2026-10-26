@@ -19,9 +19,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # Skips known pre-existing failures plus the in-flight webhook
-      # delivery spec (Makefile cicd-tests-ci) so CI is red only for
-      # regressions.
+      # Skips two known pre-existing failures (handler_test.go:73,
+      # tracking_server_test.go:138) so CI is red only for regressions.
       - name: Run cicd suite
         run: make cicd-tests-ci
 
