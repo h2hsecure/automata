@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
 	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
@@ -62,6 +63,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"type":    "refresh",
 		"exp":     time.Now().Add(7 * 24 * time.Hour).Unix(),
 		"iat":     time.Now().Unix(),
+		"jti":     uuid.New().String(),
 	}
 	refresh := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	refreshTokenStr, err := refresh.SignedString([]byte(secretKey))

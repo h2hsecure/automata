@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	domainauth "github.com/hekemen/automata/internal/domain/auth"
 	"github.com/hekemen/automata/internal/domain/context"
 	"github.com/rs/zerolog/log"
@@ -108,11 +109,14 @@ func (s *service) Login(email, password string) (string, string, []domainauth.Co
 	}
 
 	// Generate JWT with is_admin claim
+	now := time.Now()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":    u.ID,
 		"user_email": email,
 		"is_admin":   u.IsAdmin,
-		"exp":        time.Now().Add(24 * time.Hour).Unix(),
+		"iat":        now.Unix(),
+		"exp":        now.Add(24 * time.Hour).Unix(),
+		"jti":        uuid.New().String(),
 	})
 
 	tokenString, err := token.SignedString([]byte(secretKey))
@@ -298,6 +302,7 @@ func (s *service) RefreshToken(refreshToken string) (string, string, error) {
 		"user_email": userEmail,
 		"is_admin":   isAdmin,
 		"exp":        time.Now().Add(24 * time.Hour).Unix(),
+		"jti":        uuid.New().String(),
 	})
 
 	accessTokenStr, err := accessToken.SignedString([]byte(secretKey))
@@ -312,6 +317,7 @@ func (s *service) RefreshToken(refreshToken string) (string, string, error) {
 		"type":       "refresh",
 		"exp":        time.Now().Add(7 * 24 * time.Hour).Unix(),
 		"iat":        time.Now().Unix(),
+		"jti":        uuid.New().String(),
 	})
 
 	newRefreshTokenStr, err := newRefreshToken.SignedString([]byte(secretKey))
