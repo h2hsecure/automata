@@ -7,16 +7,19 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:f4024d2` |
-| Chart | `2026.10.26-f4024d2` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:63c8a40` |
+| Chart | `2026.10.26-63c8a40` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-`f4024d2` is CI-verified. New in this release: contact CSV import/export
-plus tag CRUD (HTTP + MCP, 52-tool catalog), session revocation on
-password change (login tokens now carry `iat`), `jti` on all issued JWTs,
-the BFF as a docker-compose service, `form.submitted` webhook delivery
-to matching endpoints, and the tracking snippet now flushes its event
-queue on page unload so pageviews are not dropped when visitors
-navigate away before the 30s batch timer fires. The previous release (`6a17eef`) included the stale-JWT fix, the PostgreSQL
+`63c8a40` is CI-verified. New in this release: creating a second API key
+with a name already used in the same context now returns a clean 409
+("an API key with this name already exists in this context") instead of a
+raw 500 Postgres constraint error. The previous release (`f4024d2`)
+included contact CSV import/export plus tag CRUD (HTTP + MCP, 52-tool
+catalog), session revocation on password change (login tokens now carry
+`iat`), `jti` on all issued JWTs, the BFF as a docker-compose service,
+`form.submitted` webhook delivery to matching endpoints, and the tracking
+snippet now flushes its event queue on page unload so pageviews are not
+dropped when visitors navigate away before the 30s batch timer fires. The release before that (`6a17eef`) included the stale-JWT fix, the PostgreSQL
 readiness init container, the advisory-lock fix that serializes concurrent
 automata+bff migrations, ingress TLS support, lenient handling of
 `ingress.tls[].hosts` as a bare string or a list, the cookie-secret
@@ -82,8 +85,8 @@ certificate into the `automata-tls` secret, which the ingress terminates.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.26-f4024d2 -n automata \
-  -f values.prod.yaml --set image.tag=f4024d2
+  --version 2026.10.26-63c8a40 -n automata \
+  -f values.prod.yaml --set image.tag=63c8a40
 ```
 
 ## 4) Verify rollout
