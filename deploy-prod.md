@@ -7,10 +7,10 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:87ec4bb` |
-| Chart | `2026.10.26-87ec4bb` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:09d626d` |
+| Chart | `2026.10.26-09d626d` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-`87ec4bb` is CI-verified. New in this release: contact CSV import/export
+`09d626d` is CI-verified. New in this release: contact CSV import/export
 plus tag CRUD (HTTP + MCP, 52-tool catalog), session revocation on
 password change (login tokens now carry `iat`), `jti` on all issued JWTs,
 the BFF as a docker-compose service, and `form.submitted` webhook
@@ -80,8 +80,8 @@ certificate into the `automata-tls` secret, which the ingress terminates.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.26-87ec4bb -n automata \
-  -f values.prod.yaml --set image.tag=87ec4bb
+  --version 2026.10.26-09d626d -n automata \
+  -f values.prod.yaml --set image.tag=09d626d
 ```
 
 ## 4) Verify rollout
