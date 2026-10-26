@@ -36,7 +36,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"key": "value", "form_id": formID}
 
-			err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+			_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify webhook was inserted
@@ -61,7 +61,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 				"form_slug":     "contact-form",
 			}
 
-			err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+			_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify payload was stored
@@ -82,7 +82,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"test": "data"}
 
-			err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+			_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get pending webhooks
@@ -107,7 +107,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"test": "data"}
 
-			err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+			_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 			Expect(err).NotTo(HaveOccurred())
 
 			webhookQueue := queue.NewWebhookQueue(pool)
@@ -132,7 +132,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"test": "data"}
 
-			err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+			_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 			Expect(err).NotTo(HaveOccurred())
 
 			webhookQueue := queue.NewWebhookQueue(pool)
@@ -161,7 +161,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			formID := support.NewTestUUID()
 			payload := map[string]interface{}{"contact_email": "test@example.com"}
 
-			err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+			_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get and process webhook
@@ -198,7 +198,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			for i := 0; i < 3; i++ {
 				formID := support.NewTestUUID()
 				payload := map[string]interface{}{"index": i}
-				err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+				_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
@@ -232,7 +232,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 			for i := 0; i < 5; i++ {
 				formID := support.NewTestUUID()
 				payload := map[string]interface{}{"index": i}
-				err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+				_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
@@ -249,7 +249,7 @@ var _ = Describe("Webhook Queue Integration Tests", func() {
 
 			// Enqueue a webhook
 			payload := map[string]interface{}{"test": "data"}
-			err := queue.NewWebhookQueue(pool).Enqueue(webhookServer.URL(), payload, tenantID, formID)
+			_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, webhookServer.URL(), payload, tenantID, formID)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Mark one as success

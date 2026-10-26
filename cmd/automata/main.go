@@ -32,6 +32,7 @@ import (
 	settings_repo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
+	webhook_svc "github.com/hekemen/automata/internal/infrastructure/webhook"
 	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	"github.com/rs/zerolog/log"
 )
@@ -134,8 +135,12 @@ func main() {
 	emailQueue := queue.NewEmailQueue(pool)
 	emailUsecase := emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
 
+	// Webhook queue + service (shared by admin API, form-submission hook, and worker)
+	webhookQueue := queue.NewWebhookQueue(pool)
+	webhookSvc := webhook_svc.NewService(webhook_repo.New(pool), webhookQueue)
+
 	// Create handlers for tracking server
-	formHandler := handler.NewFormHandlerWithEmail(formRepo, contactRepo, trackingRepo, emailUsecase)
+	formHandler := handler.NewFormHandlerWithEmailAndWebhooks(formRepo, contactRepo, trackingRepo, emailUsecase, webhookSvc)
 	bannerHandler := handler.NewBannerHandler(bannerRepo)
 	placementHandler := handler.NewPlacementHandler(bannerRepo)
 	campaignHandler := handler.NewCampaignHandler(bannerRepo)
@@ -241,7 +246,6 @@ func main() {
 	go imapPoller.Start(ctx)
 
 	// Webhook delivery worker (API enqueues deliveries; worker POSTs them)
-	webhookQueue := queue.NewWebhookQueue(pool)
 	go queue.NewWebhookWorker(webhookQueue).Start(ctx)
 
 	// Graceful shutdown on SIGINT/SIGTERM

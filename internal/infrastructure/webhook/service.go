@@ -85,7 +85,7 @@ func (s *Service) UpdateEndpoint(ctx context.Context, contextID, id string, inpu
 		// Not-found (not "not yours"): foreign endpoints are
 		// indistinguishable from nonexistent ones. Empty contextID
 		// (admin surface) skips the check.
-		return nil, fmt.Errorf("webhook endpoint not found")
+		return nil, webhook.ErrNotFound
 	}
 
 	// Update fields
@@ -146,7 +146,7 @@ func (s *Service) DeliverTest(ctx context.Context, contextID, endpointID string)
 		return "", fmt.Errorf("webhook endpoint not found: %w", err)
 	}
 	if contextID != "" && endpoint.ContextID != contextID {
-		return "", fmt.Errorf("webhook endpoint not found")
+		return "", webhook.ErrNotFound
 	}
 
 	// Build sample payload
@@ -164,7 +164,7 @@ func (s *Service) DeliverTest(ctx context.Context, contextID, endpointID string)
 	}
 
 	// Enqueue via the existing webhook queue
-	deliveryID, err := enqueueDelivery(s.queue, endpoint.URL, signedPayload, endpoint.ContextID, "")
+	deliveryID, err := enqueueDelivery(ctx, s.queue, endpoint.URL, signedPayload, endpoint.ContextID, "")
 	if err != nil {
 		return "", fmt.Errorf("enqueue test delivery: %w", err)
 	}
@@ -199,7 +199,7 @@ func (s *Service) DeliverEvent(ctx context.Context, contextID, event, formID str
 			continue
 		}
 
-		_, err = enqueueDelivery(s.queue, endpoint.URL, signedPayload, contextID, formID)
+		_, err = enqueueDelivery(ctx, s.queue, endpoint.URL, signedPayload, contextID, formID)
 		if err != nil {
 			log.Error().Err(err).Str("endpoint_id", endpoint.ID).Msg("failed to enqueue webhook delivery")
 		}
@@ -233,13 +233,7 @@ func ToResponse(e *webhook.WebhookEndpoint) *webhook.WebhookResponse {
 	return resp
 }
 
-// enqueueDelivery is a helper that wraps queue.Enqueue with the delivery ID.
-func enqueueDelivery(q queue.WebhookQueue, url string, payload map[string]interface{}, contextID, formID string) (string, error) {
-	if err := q.Enqueue(url, payload, contextID, formID); err != nil {
-		return "", fmt.Errorf("enqueue delivery: %w", err)
-	}
-
-	// We don't have the delivery ID from Enqueue, so generate one
-	// The queue actually generates its own ID internally. Return empty string.
-	return "", nil
+// enqueueDelivery is a helper that wraps queue.Enqueue and returns the delivery ID.
+func enqueueDelivery(ctx context.Context, q queue.WebhookQueue, url string, payload map[string]interface{}, contextID, formID string) (string, error) {
+	return q.Enqueue(ctx, url, payload, contextID, formID)
 }

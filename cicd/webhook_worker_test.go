@@ -51,7 +51,8 @@ var _ = Describe("Webhook Delivery Worker", func() {
 		contextID := support.NewTestContextID()
 		formID := support.NewTestUUID()
 		payload := map[string]interface{}{"contact_email": "worker-test@example.com"}
-		Expect(queue.NewWebhookQueue(pool).Enqueue(whServer.URL(), payload, contextID, formID)).To(Succeed())
+		_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, whServer.URL(), payload, contextID, formID)
+		Expect(err).To(Succeed())
 
 		startWorker()
 
@@ -76,8 +77,10 @@ var _ = Describe("Webhook Delivery Worker", func() {
 		contextID := support.NewTestContextID()
 		formID := support.NewTestUUID()
 		whServer.SetResponseStatusCode(http.StatusServiceUnavailable)
-		Expect(queue.NewWebhookQueue(pool).Enqueue(whServer.URL(), map[string]interface{}{"t": 1}, contextID, formID)).To(Succeed())
-		Expect(queue.NewWebhookQueue(pool).Enqueue("http://127.0.0.1:1", map[string]interface{}{"t": 2}, contextID, formID)).To(Succeed())
+		_, err := queue.NewWebhookQueue(pool).Enqueue(ctx, whServer.URL(), map[string]interface{}{"t": 1}, contextID, formID)
+		Expect(err).To(Succeed())
+		_, err = queue.NewWebhookQueue(pool).Enqueue(ctx, "http://127.0.0.1:1", map[string]interface{}{"t": 2}, contextID, formID)
+		Expect(err).To(Succeed())
 
 		startWorker()
 

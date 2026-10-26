@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -108,7 +109,7 @@ func (h *WebhookHandler) Update(c *gin.Context) {
 	ctx := c.Request.Context()
 	result, err := h.service.UpdateEndpoint(ctx, "", id, input)
 	if err != nil {
-		if err.Error() == "webhook endpoint not found: sql: no rows in result set" {
+		if errors.Is(err, ehhook.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "webhook endpoint not found"})
 			return
 		}
@@ -138,8 +139,7 @@ func (h *WebhookHandler) TestDeliver(c *gin.Context) {
 	ctx := c.Request.Context()
 	deliveryID, err := h.service.DeliverTest(ctx, "", id)
 	if err != nil {
-		errMsg := err.Error()
-		if errMsg == "webhook endpoint not found: sql: no rows in result set" {
+		if errors.Is(err, ehhook.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "webhook endpoint not found"})
 			return
 		}

@@ -62,7 +62,7 @@ func (r *webhookRepo) GetByID(id string) (*webhook.WebhookEndpoint, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("webhook endpoint not found: %w", err)
+			return nil, fmt.Errorf("%w: %w", webhook.ErrNotFound, sql.ErrNoRows)
 		}
 		return nil, fmt.Errorf("get webhook endpoint: %w", err)
 	}
@@ -173,7 +173,7 @@ func (r *webhookRepo) Delete(id string) error {
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("webhook endpoint not found: %w", sql.ErrNoRows)
+		return fmt.Errorf("%w: %w", webhook.ErrNotFound, sql.ErrNoRows)
 	}
 
 	return nil

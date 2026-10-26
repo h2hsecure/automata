@@ -29,7 +29,7 @@ type WebhookDelivery struct {
 
 // WebhookQueue defines the interface for webhook delivery queue operations.
 type WebhookQueue interface {
-	Enqueue(url string, payload map[string]interface{}, contextID, formID string) error
+	Enqueue(ctx context.Context, url string, payload map[string]interface{}, contextID, formID string) (string, error)
 	GetPending(limit int) ([]*WebhookDelivery, error)
 	MarkSuccess(id string) error
 	MarkFailed(id string, err string) error
@@ -47,13 +47,13 @@ func NewWebhookQueue(pool *pgxpool.Pool) WebhookQueue {
 	}
 }
 
-// Enqueue adds a webhook delivery to the queue.
-func (q *webhookQueue) Enqueue(url string, payload map[string]interface{}, contextID, formID string) error {
+// Enqueue adds a webhook delivery to the queue and returns its delivery ID.
+func (q *webhookQueue) Enqueue(ctx context.Context, url string, payload map[string]interface{}, contextID, formID string) (string, error) {
 	id := uuid.New().String()
 
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshal webhook payload: %w", err)
+		return "", fmt.Errorf("marshal webhook payload: %w", err)
 	}
 
 	query := `
@@ -61,15 +61,15 @@ func (q *webhookQueue) Enqueue(url string, payload map[string]interface{}, conte
 		VALUES ($1, $2, $3, $4, $5, 'pending', 0, 3, NOW(), NOW(), NOW())
 	`
 
-	_, err = q.pool.Exec(context.Background(), query,
+	_, err = q.pool.Exec(ctx, query,
 		id, contextID, formID, url, payloadBytes,
 	)
 	if err != nil {
-		return fmt.Errorf("enqueue webhook: %w", err)
+		return "", fmt.Errorf("enqueue webhook: %w", err)
 	}
 
 	log.Info().Str("id", id).Str("url", url).Msg("webhook enqueued")
-	return nil
+	return id, nil
 }
 
 // GetPending retrieves pending webhook deliveries ready for processing.

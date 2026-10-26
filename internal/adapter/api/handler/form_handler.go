@@ -14,10 +14,11 @@ import (
 )
 
 type FormHandler struct {
-	repo         form.Repository
-	contactRepo  contactuc.Repository
-	trackingRepo tracking.Repository
-	emailUC      *emailusecase.EmailUsecase
+	repo            form.Repository
+	contactRepo     contactuc.Repository
+	trackingRepo    tracking.Repository
+	emailUC         *emailusecase.EmailUsecase
+	webhookNotifier uc.WebhookNotifier
 }
 
 func NewFormHandler(repo form.Repository) *FormHandler {
@@ -34,6 +35,13 @@ func NewFormHandlerWithIdentifiers(repo form.Repository, contactRepo contactuc.R
 // form-integrated email templates to the submitter on form submission.
 func NewFormHandlerWithEmail(repo form.Repository, contactRepo contactuc.Repository, trackingRepo tracking.Repository, emailUC *emailusecase.EmailUsecase) *FormHandler {
 	return &FormHandler{repo: repo, contactRepo: contactRepo, trackingRepo: trackingRepo, emailUC: emailUC}
+}
+
+// NewFormHandlerWithEmailAndWebhooks builds a form handler that also
+// enqueues webhook deliveries for matching endpoints on form submission.
+// Webhook failures are logged and never block the submission response.
+func NewFormHandlerWithEmailAndWebhooks(repo form.Repository, contactRepo contactuc.Repository, trackingRepo tracking.Repository, emailUC *emailusecase.EmailUsecase, webhookNotifier uc.WebhookNotifier) *FormHandler {
+	return &FormHandler{repo: repo, contactRepo: contactRepo, trackingRepo: trackingRepo, emailUC: emailUC, webhookNotifier: webhookNotifier}
 }
 
 // Repo exposes the form repository for adapters that need direct access.
@@ -231,6 +239,12 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 			h.emailUC.SendForSubmission(f, sub)
 		} else {
 			log.Warn().Err(err).Msg("load form for email send")
+		}
+	}
+
+	if h.webhookNotifier != nil {
+		if err := h.webhookNotifier.DeliverEvent(c.Request.Context(), contextID, "form.submitted", sub.FormID, data); err != nil {
+			log.Error().Err(err).Msg("deliver form submission webhook")
 		}
 	}
 
