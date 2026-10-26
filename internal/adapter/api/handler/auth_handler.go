@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -213,6 +214,10 @@ func (h *AuthHandler) CreateAPIKey(c *gin.Context) {
 
 	err = h.apiKeyRepo.Create(apiKey)
 	if err != nil {
+		if errors.Is(err, auth.ErrDuplicateKey) {
+			c.JSON(http.StatusConflict, gin.H{"error": "an API key with this name already exists in this context"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

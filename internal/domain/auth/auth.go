@@ -1,10 +1,14 @@
 package auth
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/hekemen/automata/internal/domain/context"
 )
+
+// ErrDuplicateKey is returned when an API key name already exists in a context.
+var ErrDuplicateKey = fmt.Errorf("api key name already exists for this context")
 
 // APIKey represents a context API key.
 type APIKey struct {

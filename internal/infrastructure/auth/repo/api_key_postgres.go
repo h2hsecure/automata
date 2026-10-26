@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/hekemen/automata/internal/domain/auth"
@@ -44,9 +45,17 @@ func (r *apiKeyPostgresRepo) Create(key *auth.APIKey) error {
 	).Scan(&key.ID, &key.CreatedAt)
 
 	if err != nil {
+		if isUniqueViolation(err) {
+			return auth.ErrDuplicateKey
+		}
 		return fmt.Errorf("create api key: %w", err)
 	}
 	return nil
+}
+
+// isUniqueViolation checks if a pgx error is a unique constraint violation.
+func isUniqueViolation(err error) bool {
+	return strings.Contains(err.Error(), "23505")
 }
 
 func (r *apiKeyPostgresRepo) GetByHash(hash string) (*auth.APIKey, error) {
