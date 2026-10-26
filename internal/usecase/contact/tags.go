@@ -41,6 +41,9 @@ type ActivityCloser interface {
 // TagRepository defines operations for tag management with activity support.
 type TagRepository interface {
 	ApplyTags(contextID, contactID string, tagNames []string, ac ActivityCloser) error
+	ListTags(contextID string) ([]*ct.Tag, error)
+	CreateTag(contextID, name, color string) (*ct.Tag, error)
+	DeleteTag(contextID, tagID string) error
 }
 
 // tagRepo handles tag and membership operations via raw SQL.
@@ -219,6 +222,48 @@ func applyTags(repo Repository, contextID, contactID string, tagNames []string) 
 	}
 
 	return fmt.Errorf("repository does not support tag operations")
+}
+
+// ListTags returns all tags in the context.
+func ListTags(repo Repository, contextID string) ([]*ct.Tag, error) {
+	tagRepo, err := tagRepoOf(repo)
+	if err != nil {
+		return nil, err
+	}
+	return tagRepo.ListTags(contextID)
+}
+
+// CreateTag creates a tag in the context. An empty color defaults to
+// the standard tag color.
+func CreateTag(repo Repository, contextID, name, color string) (*ct.Tag, error) {
+	tagRepo, err := tagRepoOf(repo)
+	if err != nil {
+		return nil, err
+	}
+	return tagRepo.CreateTag(contextID, name, color)
+}
+
+// DeleteTag removes a tag from the context.
+func DeleteTag(repo Repository, contextID, tagID string) error {
+	tagRepo, err := tagRepoOf(repo)
+	if err != nil {
+		return err
+	}
+	return tagRepo.DeleteTag(contextID, tagID)
+}
+
+// tagRepoOf extracts the TagRepository from a Repository that supports
+// tag operations, using the same type-assertion pattern as applyTags.
+func tagRepoOf(repo Repository) (TagRepository, error) {
+	type tagOpener interface {
+		TagRepository() TagRepository
+	}
+
+	if opener, ok := repo.(tagOpener); ok {
+		return opener.TagRepository(), nil
+	}
+
+	return nil, fmt.Errorf("repository does not support tag operations")
 }
 
 // _jsonUnmarshal is a helper to satisfy unused import checks.

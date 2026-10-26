@@ -1,6 +1,8 @@
 package contact
 
 import (
+	"bufio"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"strings"
@@ -23,8 +25,24 @@ func ImportContacts(repo Repository, contextID string, input ImportCSVInput) (*c
 		return nil, fmt.Errorf("context_id is required")
 	}
 
+	// When no explicit mapping is supplied, derive one from the CSV header
+	// row so that every column is mapped to its own field name.
+	mapping := input.Mapping
+	var data io.Reader = input.CSVData
+	if len(mapping) == 0 {
+		headerLine, rest, err := readFirstLine(input.CSVData)
+		if err != nil {
+			return nil, fmt.Errorf("read CSV header: %w", err)
+		}
+		mapping, err = mappingFromHeader(headerLine)
+		if err != nil {
+			return nil, fmt.Errorf("derive field mapping: %w", err)
+		}
+		data = io.MultiReader(strings.NewReader(headerLine), rest)
+	}
+
 	// Parse CSV
-	contacts, result, err := csvimport.ParseCSV(input.CSVData, input.Mapping, contextID)
+	contacts, result, err := csvimport.ParseCSV(data, mapping, contextID)
 	if err != nil {
 		return nil, fmt.Errorf("parse CSV: %w", err)
 	}
@@ -88,6 +106,51 @@ func ImportContacts(repo Repository, contextID string, input ImportCSVInput) (*c
 	}
 
 	return result, nil
+}
+
+// readFirstLine reads the first line of a CSV stream, including its
+// trailing newline, and returns the line along with a reader positioned
+// at the remainder of the stream. The remainder is a buffered reader so
+// any data the buffer has already pulled is preserved.
+func readFirstLine(r io.Reader) (string, io.Reader, error) {
+	br := bufio.NewReader(r)
+	line, err := br.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return "", nil, err
+	}
+	if line == "" {
+		return "", nil, fmt.Errorf("empty CSV data")
+	}
+	// If the final line has no newline, ReadString returns io.EOF with the
+	// content; normalize so the prepended data always ends with a newline.
+	if !strings.HasSuffix(line, "\n") {
+		line += "\n"
+	}
+	return line, br, nil
+}
+
+// mappingFromHeader parses a CSV header line and maps each non-empty,
+// trimmed column name to its index.
+func mappingFromHeader(headerLine string) (csvimport.FieldMapping, error) {
+	records, err := csv.NewReader(strings.NewReader(headerLine)).ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("parse header: %w", err)
+	}
+	if len(records) == 0 {
+		return nil, fmt.Errorf("header has no columns")
+	}
+	mapping := make(csvimport.FieldMapping)
+	for i, col := range records[0] {
+		name := strings.TrimSpace(col)
+		if name == "" {
+			continue
+		}
+		mapping[name] = i
+	}
+	if len(mapping) == 0 {
+		return nil, fmt.Errorf("header has no usable columns")
+	}
+	return mapping, nil
 }
 
 // extractCustomFields removes known standard fields from the contact map

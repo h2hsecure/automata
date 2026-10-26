@@ -249,6 +249,7 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 			"email_send_to_contact", "email_test_send",
 			"webhooks_list", "webhooks_get", "webhooks_create",
 			"webhooks_update", "webhooks_delete", "webhooks_test",
+			"contacts_import", "contacts_export", "tracking_track",
 		))
 	})
 })
@@ -1120,7 +1121,7 @@ var _ = Describe("MCP tool catalog", func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
 	})
 
-	It("exposes exactly the 49 catalog tools", func() {
+	It("exposes exactly the 52 catalog tools", func() {
 		w := mcpCall(engine, apiKey, 1, "tools/list", map[string]any{})
 		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
 		var resp struct {
@@ -1135,19 +1136,20 @@ var _ = Describe("MCP tool catalog", func() {
 		for _, t := range resp.Result.Tools {
 			names = append(names, t.Name)
 		}
-		Expect(names).To(HaveLen(49))
+		Expect(names).To(HaveLen(52))
 		for _, want := range []string{
 			"banners_create", "banners_delete", "banners_get", "banners_list", "banners_update",
 			"campaigns_create", "campaigns_delete", "campaigns_get", "campaigns_list", "campaigns_update",
 			"contacts_activity", "contacts_create", "contacts_delete", "contacts_get",
-			"contacts_list", "contacts_merge", "contacts_update",
+			"contacts_import", "contacts_list", "contacts_merge", "contacts_update",
+			"contacts_export",
 			"email_send", "email_send_to_contact", "email_templates_create",
 			"email_templates_delete", "email_templates_get", "email_templates_list",
 			"email_templates_update", "email_test_send",
 			"form_submissions_get", "form_submissions_list",
 			"forms_create", "forms_delete", "forms_get", "forms_list", "forms_submit", "forms_update",
 			"placements_create", "placements_delete", "placements_get", "placements_list", "placements_update",
-			"tracking_dashboard", "tracking_events", "tracking_visitor_events",
+			"tracking_dashboard", "tracking_events", "tracking_track", "tracking_visitor_events",
 			"tracking_visitor_get", "tracking_visitors",
 			"webhooks_create", "webhooks_delete", "webhooks_get", "webhooks_list",
 			"webhooks_test", "webhooks_update",

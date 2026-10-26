@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -332,6 +334,149 @@ func (h *ContactHandler) GetActivity(c *gin.Context) {
 		"activities": result.Activities,
 		"total":      result.Total,
 	})
+}
+
+// Import accepts a multipart form file field "file" or a raw CSV body and
+// returns the aggregate ImportResult as JSON.
+func (h *ContactHandler) Import(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
+	var reader io.Reader
+	if strings.HasPrefix(c.ContentType(), "multipart/") {
+		file, _, err := c.Request.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "file field is required"})
+			return
+		}
+		defer file.Close()
+		reader = file
+	} else {
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+			return
+		}
+		if len(bytes.TrimSpace(body)) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "empty body"})
+			return
+		}
+		reader = bytes.NewReader(body)
+	}
+
+	result, err := uc.ImportContacts(h.repo, contextID, uc.ImportCSVInput{CSVData: reader})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// defaultExportFields is the field set used when the caller omits ?fields=.
+var defaultExportFields = []string{"id", "email", "first_name", "last_name", "phone", "company", "source", "tags", "created_at"}
+
+// Export streams all contacts in the context as a CSV attachment.
+func (h *ContactHandler) Export(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
+	fields := defaultExportFields
+	if f := c.Query("fields"); f != "" {
+		fields = nil
+		for _, field := range strings.Split(f, ",") {
+			field = strings.TrimSpace(field)
+			if field != "" {
+				fields = append(fields, field)
+			}
+		}
+	}
+
+	csv, err := uc.ExportContacts(h.repo, contextID, contact.FilterOptions{}, fields)
+	if err != nil {
+		if strings.Contains(err.Error(), "no contacts to export") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no contacts to export"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Disposition", "attachment; filename=contacts.csv")
+	c.Data(http.StatusOK, "text/csv", csv)
+}
+
+// ListTags returns all tags in the context.
+func (h *ContactHandler) ListTags(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
+	tags, err := uc.ListTags(h.repo, contextID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"tags": tags})
+}
+
+type CreateTagInput struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+// CreateTag creates a new tag in the context.
+func (h *ContactHandler) CreateTag(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
+	var input CreateTagInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if strings.TrimSpace(input.Name) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+
+	tag, err := uc.CreateTag(h.repo, contextID, input.Name, input.Color)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, tag)
+}
+
+// DeleteTag removes a tag from the context.
+func (h *ContactHandler) DeleteTag(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
+	id := c.Param("id")
+
+	if err := uc.DeleteTag(h.repo, contextID, id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tag not found"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 // parseUUID validates a UUID string.

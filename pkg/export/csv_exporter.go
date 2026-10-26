@@ -21,7 +21,6 @@ func Generate(contacts []map[string]interface{}, fields []string) ([]byte, error
 
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	defer writer.Flush()
 
 	// Write header row
 	if err := writer.Write(fields); err != nil {
@@ -41,6 +40,13 @@ func Generate(contacts []map[string]interface{}, fields []string) ([]byte, error
 		if err := writer.Write(row); err != nil {
 			return nil, fmt.Errorf("write CSV row: %w", err)
 		}
+	}
+
+	// Flush before reading the buffer: the writer buffers output, so the
+	// data is not in buf until Flush has run.
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("write CSV: %w", err)
 	}
 
 	return buf.Bytes(), nil

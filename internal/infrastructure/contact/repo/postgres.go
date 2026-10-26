@@ -834,6 +834,78 @@ func (t *repoTagRepo) ApplyTags(contextID, contactID string, tagNames []string, 
 	return nil
 }
 
+// ListTags returns all tags in the context, ordered by name.
+func (t *repoTagRepo) ListTags(contextID string) ([]*ct.Tag, error) {
+	ctx := context.Background()
+	rows, err := t.pool.Query(ctx,
+		"SELECT id, context_id, name, color, created_at FROM contact_tags WHERE context_id = $1 ORDER BY name",
+		contextID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list tags: %w", err)
+	}
+	defer rows.Close()
+
+	tags := make([]*ct.Tag, 0)
+	for rows.Next() {
+		var tag ct.Tag
+		if err := rows.Scan(&tag.ID, &tag.ContextID, &tag.Name, &tag.Color, &tag.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan tag: %w", err)
+		}
+		tags = append(tags, &tag)
+	}
+	return tags, rows.Err()
+}
+
+// CreateTag creates a tag in the context, returning the existing tag when
+// the name is already taken. An empty color defaults to the standard color.
+func (t *repoTagRepo) CreateTag(contextID, name, color string) (*ct.Tag, error) {
+	ctx := context.Background()
+	if color == "" {
+		color = "#6366f1"
+	}
+
+	tagID := uuid.New().String()
+	_, err := t.pool.Exec(ctx,
+		"INSERT INTO contact_tags (id, context_id, name, color) VALUES ($1, $2, $3, $4)",
+		tagID, contextID, name, color,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			// Name already exists in this context: return the existing tag.
+			var existing ct.Tag
+			err := t.pool.QueryRow(ctx,
+				"SELECT id, context_id, name, color, created_at FROM contact_tags WHERE context_id = $1 AND name = $2",
+				contextID, name,
+			).Scan(&existing.ID, &existing.ContextID, &existing.Name, &existing.Color, &existing.CreatedAt)
+			if err != nil {
+				return nil, fmt.Errorf("find existing tag: %w", err)
+			}
+			return &existing, nil
+		}
+		return nil, fmt.Errorf("create tag: %w", err)
+	}
+
+	return &ct.Tag{ID: tagID, ContextID: contextID, Name: name, Color: color}, nil
+}
+
+// DeleteTag removes a tag from the context. Membership rows cascade.
+// Returns sql.ErrNoRows when the tag does not exist in the context.
+func (t *repoTagRepo) DeleteTag(contextID, tagID string) error {
+	ctx := context.Background()
+	tag, err := t.pool.Exec(ctx,
+		"DELETE FROM contact_tags WHERE id = $1 AND context_id = $2",
+		tagID, contextID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete tag: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // ensureTag ensures a tag exists for the context, creating it if necessary.
 func ensureTag(ctx context.Context, pool *pgxpool.Pool, contextID, name string) (string, error) {
 	var tagID string

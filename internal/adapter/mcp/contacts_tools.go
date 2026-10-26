@@ -2,10 +2,13 @@ package mcp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"strings"
 
 	contact "github.com/hekemen/automata/internal/domain/contact"
 	contactusecase "github.com/hekemen/automata/internal/usecase/contact"
+	csvimport "github.com/hekemen/automata/pkg/import"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -84,6 +87,24 @@ const (
 			"activity_type": {"type": "string", "description": "filter by activity type"}
 		},
 		"required": ["contact_id"]
+	}`
+
+	schemaContactsImport = `{
+		"type": "object",
+		"properties": {
+			"csv_data": {"type": "string", "description": "CSV data to import: header row plus data rows"},
+			"mapping": {"type": "object", "additionalProperties": {"type": "integer"}, "description": "optional field name to CSV column index mapping"},
+			"source": {"type": "string", "description": "source label recorded on imported contacts"}
+		},
+		"required": ["csv_data"]
+	}`
+
+	schemaContactsExport = `{
+		"type": "object",
+		"properties": {
+			"tags": {"type": "array", "items": {"type": "string"}, "description": "filter by tags"},
+			"fields": {"type": "array", "items": {"type": "string"}, "description": "fields to export, default id,email,first_name,last_name,phone,company,source,tags,created_at"}
+		}
 	}`
 )
 
@@ -217,6 +238,38 @@ func registerContactTools(s *mcp.Server, d Deps, contextID string) {
 			},
 		}, nil
 	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:          "contacts_import",
+		Description:   "Import contacts from CSV data (header row plus data rows). Returns created/updated/skipped counts and per-row errors. Duplicate emails are counted as updated.",
+		InputSchema:   json.RawMessage(schemaContactsImport),
+	}, func(_ context.Context, _ *mcp.CallToolRequest, in contactsImportIn) (*mcp.CallToolResult, any, error) {
+		result, err := contactusecase.ImportContacts(d.ContactRepo, contextID, contactusecase.ImportCSVInput{
+			CSVData: strings.NewReader(in.CSVData),
+			Mapping: in.Mapping,
+			Source:  in.Source,
+		})
+		if err != nil {
+			return nil, csvimport.ImportResult{}, err
+		}
+		return nil, *result, nil
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:          "contacts_export",
+		Description:   "Export contacts for this context as a base64-encoded CSV. Optional filters: tags, and fields (defaults to id,email,first_name,last_name,phone,company,source,tags,created_at).",
+		InputSchema:   json.RawMessage(schemaContactsExport),
+	}, func(_ context.Context, _ *mcp.CallToolRequest, in contactsExportIn) (*mcp.CallToolResult, any, error) {
+		fields := in.Fields
+		if len(fields) == 0 {
+			fields = []string{"id", "email", "first_name", "last_name", "phone", "company", "source", "tags", "created_at"}
+		}
+		csv, err := contactusecase.ExportContacts(d.ContactRepo, contextID, contact.FilterOptions{Tags: in.Tags}, fields)
+		if err != nil {
+			return nil, contactsExportOut{}, err
+		}
+		return nil, contactsExportOut{CSVBase64: base64.StdEncoding.EncodeToString(csv)}, nil
+	})
 }
 
 // --- In/Out types (In shapes mirror the schemas above) ---
@@ -287,4 +340,19 @@ type contactsActivityIn struct {
 type contactsActivityOut struct {
 	Items []contact.ActivityDetail `json:"items"`
 	pageMeta
+}
+
+type contactsImportIn struct {
+	CSVData string                   `json:"csv_data"`
+	Mapping csvimport.FieldMapping   `json:"mapping"`
+	Source  string                   `json:"source"`
+}
+
+type contactsExportIn struct {
+	Tags   []string `json:"tags"`
+	Fields []string `json:"fields"`
+}
+
+type contactsExportOut struct {
+	CSVBase64 string `json:"csv_base64"`
 }

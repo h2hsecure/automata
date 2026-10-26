@@ -3,8 +3,10 @@ package cicd_test
 import (
 	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/cicd/support"
@@ -39,6 +41,13 @@ func setupContactEngine() *gin.Engine {
 
 	contacts := engine.Group("/api/contacts")
 	{
+		// Static sub-routes must be registered before the :id wildcard routes.
+		contacts.GET("/export", contactHandler.Export)
+		contacts.POST("/import", contactHandler.Import)
+		contacts.GET("/tags", contactHandler.ListTags)
+		contacts.POST("/tags", contactHandler.CreateTag)
+		contacts.DELETE("/tags/:id", contactHandler.DeleteTag)
+
 		contacts.GET("", contactHandler.List)
 		contacts.GET("/:id", contactHandler.Get)
 		contacts.POST("", contactHandler.Create)
@@ -78,6 +87,7 @@ var _ = Describe("HTTP Integration Tests - Contact CRUD", func() {
 	})
 
 	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM contact_tag_memberships")
 		_, _ = pool.Exec(ctx, "DELETE FROM contact_tags")
 		_, _ = pool.Exec(ctx, "DELETE FROM contacts")
 	})
@@ -465,6 +475,171 @@ var _ = Describe("HTTP Integration Tests - Contact CRUD", func() {
 			fakeContactID := support.NewTestUUID()
 			req := httptest.NewRequest("GET", "/api/contacts/"+fakeContactID+"/activity", nil)
 			req.Header.Set("X-Context-ID", support.NewTestContextID())
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+		})
+	})
+
+	Describe("POST /api/contacts/import", func() {
+		It("should import contacts from a raw CSV body", func() {
+			body := "email,first_name,last_name\nimport-a@example.com,Alice,Imports\nimport-b@example.com,Bob,Imports\n"
+
+			req := httptest.NewRequest("POST", "/api/contacts/import", bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "text/csv")
+			req.Header.Set("X-Context-ID", contextID)
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+			var result struct {
+				Created int
+				Updated int
+				Skipped int
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &result)).To(Succeed(), "body: %s", w.Body.String())
+			Expect(result.Created).To(Equal(2))
+
+			var count int
+			err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM contacts WHERE context_id = $1", contextID).Scan(&count)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(2))
+		})
+
+		It("should import contacts from a multipart file field", func() {
+			var buf bytes.Buffer
+			mw := multipart.NewWriter(&buf)
+			fw, err := mw.CreateFormFile("file", "contacts.csv")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = fw.Write([]byte("email,first_name\nmultipart-a@example.com,Mary\n"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(mw.Close()).To(Succeed())
+
+			req := httptest.NewRequest("POST", "/api/contacts/import", &buf)
+			req.Header.Set("Content-Type", mw.FormDataContentType())
+			req.Header.Set("X-Context-ID", contextID)
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+			var result struct {
+				Created int
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &result)).To(Succeed(), "body: %s", w.Body.String())
+			Expect(result.Created).To(Equal(1))
+		})
+
+		It("should return 400 for empty CSV body", func() {
+			req := httptest.NewRequest("POST", "/api/contacts/import", bytes.NewBufferString(""))
+			req.Header.Set("Content-Type", "text/csv")
+			req.Header.Set("X-Context-ID", contextID)
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+		})
+	})
+
+	Describe("GET /api/contacts/export", func() {
+		It("should export contacts as a CSV attachment", func() {
+			contactID := support.NewTestUUID()
+			customFields, _ := json.Marshal(map[string]interface{}{})
+			_, err := pool.Exec(ctx, `
+				INSERT INTO contacts (id, context_id, email, first_name, last_name, phone, company,
+				                      custom_fields, source, source_id, created_at, updated_at)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+			`, contactID, contextID, "export-a@example.com", "Alice", "Exports", "+1234567890", "Test Corp",
+				customFields, "test", "")
+			Expect(err).NotTo(HaveOccurred())
+
+			req := httptest.NewRequest("GET", "/api/contacts/export?fields=email,first_name,last_name", nil)
+			req.Header.Set("X-Context-ID", contextID)
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+			Expect(w.Header().Get("Content-Type")).To(HavePrefix("text/csv"))
+			Expect(w.Header().Get("Content-Disposition")).To(ContainSubstring("filename=contacts.csv"))
+
+			csv := w.Body.String()
+			Expect(csv).To(ContainSubstring("email,first_name,last_name"))
+			Expect(csv).To(ContainSubstring("export-a@example.com,Alice,Exports"))
+		})
+
+		It("should return 404 when there are no contacts to export", func() {
+			req := httptest.NewRequest("GET", "/api/contacts/export?fields=email", nil)
+			req.Header.Set("X-Context-ID", contextID)
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+		})
+	})
+
+	Describe("Contact tag CRUD", func() {
+		It("should create, list, and delete a tag", func() {
+			// Each request gets its own recorder: ResponseRecorder.WriteHeader
+			// is a no-op once a code is set, so a shared recorder would keep
+			// the first request's status code and concatenate bodies.
+			do := func(method, path, contentType, body string) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(method, path, strings.NewReader(body))
+				if contentType != "" {
+					req.Header.Set("Content-Type", contentType)
+				}
+				req.Header.Set("X-Context-ID", contextID)
+				resp := httptest.NewRecorder()
+				engine.ServeHTTP(resp, req)
+				return resp
+			}
+
+			// Create
+			wCreate := do("POST", "/api/contacts/tags", "application/json", `{"name": "vip", "color": "#ff0000"}`)
+			Expect(wCreate.Code).To(Equal(http.StatusCreated), "body: %s", wCreate.Body.String())
+
+			var created struct {
+				ID   string `json:"ID"`
+				Name string `json:"Name"`
+			}
+			Expect(json.Unmarshal(wCreate.Body.Bytes(), &created)).To(Succeed(), "body: %s", wCreate.Body.String())
+			Expect(created.Name).To(Equal("vip"))
+			Expect(created.ID).NotTo(BeEmpty())
+
+			// List
+			wList := do("GET", "/api/contacts/tags", "", "")
+			Expect(wList.Code).To(Equal(http.StatusOK), "body: %s", wList.Body.String())
+			var list struct {
+				Tags []struct {
+					ID    string `json:"ID"`
+					Name  string `json:"Name"`
+					Color string `json:"Color"`
+				} `json:"tags"`
+			}
+			Expect(json.Unmarshal(wList.Body.Bytes(), &list)).To(Succeed(), "body: %s", wList.Body.String())
+			Expect(list.Tags).To(HaveLen(1))
+			Expect(list.Tags[0].Name).To(Equal("vip"))
+			Expect(list.Tags[0].Color).To(Equal("#ff0000"))
+
+			// Delete
+			wDelete := do("DELETE", "/api/contacts/tags/"+created.ID, "", "")
+			Expect(wDelete.Code).To(Equal(http.StatusNoContent), "body: %s", wDelete.Body.String())
+
+			// Verify deleted
+			wVerify := do("GET", "/api/contacts/tags", "", "")
+			Expect(wVerify.Code).To(Equal(http.StatusOK), "body: %s", wVerify.Body.String())
+			Expect(json.Unmarshal(wVerify.Body.Bytes(), &list)).To(Succeed())
+			Expect(list.Tags).To(BeEmpty())
+		})
+
+		It("should return 400 when creating a tag without a name", func() {
+			body := `{"color": "#ff0000"}`
+			req := httptest.NewRequest("POST", "/api/contacts/tags", bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Context-ID", contextID)
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+		})
+
+		It("should return 404 when deleting a non-existent tag", func() {
+			req := httptest.NewRequest("DELETE", "/api/contacts/tags/"+support.NewTestUUID(), nil)
+			req.Header.Set("X-Context-ID", contextID)
 			engine.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusNotFound))

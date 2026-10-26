@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	tdomain "github.com/hekemen/automata/internal/domain/tracking"
 	tuc "github.com/hekemen/automata/internal/usecase/tracking"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -70,6 +71,22 @@ const (
 			"limit": {"type": "integer", "description": "recent events to include, default 20, max 50"}
 		},
 		"required": ["visitor_id"]
+	}`
+
+	schemaTrackingTrack = `{
+		"type": "object",
+		"properties": {
+			"type": {"type": "string", "description": "pageview or event (page_view/pv also accepted for pageviews)"},
+			"visitor_id": {"type": "string", "description": "visitor identifier (cookie value)"},
+			"url": {"type": "string", "description": "page URL (pageviews)"},
+			"title": {"type": "string", "description": "page title (pageviews)"},
+			"referrer": {"type": "string", "description": "referrer URL (pageviews)"},
+			"event_name": {"type": "string", "description": "event name (events)"},
+			"properties": {"type": "object", "additionalProperties": true, "description": "event properties (events)"},
+			"user_agent": {"type": "string", "description": "client user agent"},
+			"ip": {"type": "string", "description": "client IP address"}
+		},
+		"required": ["type"]
 	}`
 )
 
@@ -181,6 +198,30 @@ func registerTrackingTools(s *mcp.Server, d Deps, contextID string) {
 		}
 		return nil, detail, nil
 	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "tracking_track",
+		Description: "Record a tracking event (pageview or event) for a visitor in this context.",
+		InputSchema: json.RawMessage(schemaTrackingTrack),
+	}, func(_ context.Context, _ *mcp.CallToolRequest, in trackingTrackIn) (*mcp.CallToolResult, any, error) {
+		event := &tdomain.Event{
+			ID:         uuid.New().String(),
+			VisitorID:  in.VisitorID,
+			Type:       tdomain.EventType(in.Type),
+			URL:        in.URL,
+			Title:      in.Title,
+			Referrer:   in.Referrer,
+			EventName:  in.EventName,
+			Properties: in.Properties,
+			UserAgent:  in.UserAgent,
+			IP:         in.IP,
+			CreatedAt:  time.Now(),
+		}
+		if err := tuc.TrackEvent(d.ContactRepo, nil, d.TrackingRepo, contextID, event); err != nil {
+			return nil, trackingTrackedOut{}, err
+		}
+		return nil, trackingTrackedOut{Tracked: true, EventID: event.ID}, nil
+	})
 }
 
 // --- In/Out types ---
@@ -226,4 +267,21 @@ type trackingVisitorEventsIn struct {
 type trackingVisitorGetIn struct {
 	VisitorID string `json:"visitor_id"`
 	Limit     int    `json:"limit"`
+}
+
+type trackingTrackIn struct {
+	Type       string                 `json:"type"`
+	VisitorID  string                 `json:"visitor_id"`
+	URL        string                 `json:"url"`
+	Title      string                 `json:"title"`
+	Referrer   string                 `json:"referrer"`
+	EventName  string                 `json:"event_name"`
+	Properties map[string]interface{} `json:"properties"`
+	UserAgent  string                 `json:"user_agent"`
+	IP         string                 `json:"ip"`
+}
+
+type trackingTrackedOut struct {
+	Tracked bool   `json:"tracked"`
+	EventID string `json:"event_id"`
 }

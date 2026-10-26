@@ -206,6 +206,11 @@ func NewServer(
 	contactHandler := handler.NewContactHandler(contactRepo)
 	{
 		api.GET("/context/contacts", middleware.AuthMiddleware(authService), contactHandler.List)
+		api.GET("/context/contacts/export", middleware.AuthMiddleware(authService), contactHandler.Export)
+		api.POST("/context/contacts/import", middleware.AuthMiddleware(authService), contactHandler.Import)
+		api.GET("/context/contacts/tags", middleware.AuthMiddleware(authService), contactHandler.ListTags)
+		api.POST("/context/contacts/tags", middleware.AuthMiddleware(authService), contactHandler.CreateTag)
+		api.DELETE("/context/contacts/tags/:id", middleware.AuthMiddleware(authService), contactHandler.DeleteTag)
 		api.GET("/context/contacts/:id", middleware.AuthMiddleware(authService), contactHandler.Get)
 		api.POST("/context/contacts", middleware.AuthMiddleware(authService), contactHandler.Create)
 		api.PUT("/context/contacts/:id", middleware.AuthMiddleware(authService), contactHandler.Update)
@@ -215,7 +220,7 @@ func NewServer(
 	}
 
 	// Form routes (context-resolved)
-	formHandler := handler.NewFormHandlerWithEmail(formRepo, contactRepo, trackingRepo, emailUsecase)
+	formHandler := handler.NewFormHandlerWithEmailAndWebhooks(formRepo, contactRepo, trackingRepo, emailUsecase, webhookSvc)
 	{
 		api.GET("/context/forms", middleware.AuthMiddleware(authService), formHandler.List)
 		api.GET("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Get)
