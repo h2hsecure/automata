@@ -1,5 +1,7 @@
 # PRD: User Tracking
 
+> **⚠️ SUPERSEDED (2026-10-26):** This document predates the 2026-09-24 tenant→context rename and later architecture changes (dual-server runtime, `/api/context/*` routes). Retained for historical reference; the canonical sources are the 2026-09-24+ plans/specs and `specs/roadmap.md`. Do not use it as an implementation guide.
+
 ## Overview
 
 Track website visitors, page views, and events via a JavaScript snippet, store the data, and display it in a dashboard. Target user: small-to-mid business owners who want to understand who visits their website and what they do.

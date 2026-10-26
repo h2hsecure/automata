@@ -1,5 +1,7 @@
 # PRD: Form Management
 
+> **⚠️ SUPERSEDED (2026-10-26):** This document predates the 2026-09-24 tenant→context rename and later architecture changes (dual-server runtime, `/api/context/*` routes). Retained for historical reference; the canonical sources are the 2026-09-24+ plans/specs and `specs/roadmap.md`. Do not use it as an implementation guide.
+
 ## Overview
 
 Let tenants create forms, collect submissions, and trigger actions on submission. Target user: small-to-mid business owners who need to collect leads, feedback, and other data from their websites.

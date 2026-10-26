@@ -1,5 +1,7 @@
 # PRD: Banner Management
 
+> **⚠️ SUPERSEDED (2026-10-26):** This document predates the 2026-09-24 tenant→context rename and later architecture changes (dual-server runtime, `/api/context/*` routes). Retained for historical reference; the canonical sources are the 2026-09-24+ plans/specs and `specs/roadmap.md`. Do not use it as an implementation guide.
+
 ## Overview
 
 Create, manage, and deploy visual banners/ads to tenant websites. Target user: small-to-mid business owners who want to display promotional content, announcements, or calls-to-action on their sites.

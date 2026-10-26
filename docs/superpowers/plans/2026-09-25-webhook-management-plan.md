@@ -492,4 +492,4 @@ Steps:
 
 ## Execution Status
 
-**Completed.** Marked Done in `specs/roadmap.md`; webhook CRUD routes and the delivery handler (`internal/adapter/api/handler/webhook_handler.go`) are implemented and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.
+**Completed.** Marked Done in `specs/roadmap.md`; webhook CRUD routes and the delivery handler (`internal/adapter/api/handler/webhook_handler.go`) are implemented. Coverage: CRUD is exercised via the MCP webhook tools in `cicd/mcp_test.go` (L864+), and queue/worker delivery is covered in `cicd/webhook_queue_test.go` and `cicd/webhook_worker_test.go`; there is no plan-named cicd test file for the HTTP routes. The steps above use numbered format and were not checkbox-tracked during execution.

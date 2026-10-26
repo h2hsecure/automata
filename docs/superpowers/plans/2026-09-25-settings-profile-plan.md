@@ -535,4 +535,4 @@ Per the user decision: **Per-user self-service** (any logged-in user can update 
 
 ## Execution Status
 
-**Completed.** Marked Done in `specs/roadmap.md`; `POST /auth/password` and the profile/settings endpoints are implemented and registered in `internal/adapter/api/server.go` and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.
+**Completed.** Marked Done in `specs/roadmap.md`; `POST /auth/password` and the profile/settings endpoints are implemented and registered in `internal/adapter/api/server.go`. Coverage note (2026-10-26 audit): `auth/profile`, `auth/password`, and `auth/logout-all` have NO cicd coverage today (the cicd user/settings test files cover user CRUD and context settings, not these auth routes). The steps above use numbered format and were not checkbox-tracked during execution.

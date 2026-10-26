@@ -1,5 +1,7 @@
 # Context Rename and Login Simplification Implementation Plan
 
+> **⚠️ SUPERSEDED:** Replaced by the 2026-09-24 canonical set (`2026-09-24-context-rename-and-login-simplification.md` plan / `2026-09-24-implementation-spec.md` spec). Retained for historical reference only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
 **Goal:** Rename tenant to context throughout the codebase, restructure users from tenant-scoped to platform-level with context memberships, simplify login to email+password only, and add admin bootstrap on first startup.

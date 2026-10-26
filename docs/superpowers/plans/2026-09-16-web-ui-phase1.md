@@ -1,5 +1,7 @@
 # Web UI Implementation Plan
 
+> **Note (2026-10-26):** The BFF server (`cmd/bff`, port 8082) and the `web/` asset-serving layout were introduced after this plan (2026-09-25), so served-asset paths referenced here have since diverged. See `docs/architecture.md`.
+
 > **For agentic workers:** Use subagent-driven-development or executing-plans to implement task-by-task.
 
 **Goal:** Build a Vue 3 SPA with login, dashboard, and contacts management, baked into the Go binary and served at root `/`.

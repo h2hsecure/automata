@@ -1,5 +1,7 @@
 # Design: Rename Tenant to Context + Simplify Login
 
+> **⚠️ SUPERSEDED:** Replaced by the 2026-09-24 canonical set (`2026-09-24-context-rename-and-login-simplification.md` plan / `2026-09-24-implementation-spec.md` spec). Retained for historical reference only.
+
 ## Overview
 
 Automata is a marketing automation tool where each "context" represents a website that uses the platform to manage contacts, forms, banners, and emails. This design renames "tenant" to "context" throughout the codebase, simplifies the login flow by removing the tenant field, and restructures the user model from tenant-scoped accounts to platform-level users with context memberships.

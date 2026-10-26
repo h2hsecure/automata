@@ -1,5 +1,7 @@
 # PRD: Contact Management
 
+> **⚠️ SUPERSEDED (2026-10-26):** This document predates the 2026-09-24 tenant→context rename and later architecture changes (dual-server runtime, `/api/context/*` routes). Retained for historical reference; the canonical sources are the 2026-09-24+ plans/specs and `specs/roadmap.md`. Do not use it as an implementation guide.
+
 ## Overview
 
 Store and manage contacts (leads/customers) collected via forms, tracking events, and manual entry. Target user: small-to-mid business owners who need a simple CRM to track their leads and customers.

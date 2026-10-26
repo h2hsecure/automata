@@ -344,4 +344,4 @@ Steps:
 
 ## Execution Status
 
-**Completed.** Marked Done in `specs/roadmap.md` and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.
+**Completed.** Marked Done in `specs/roadmap.md`. Coverage: the activity endpoints are tested in `cicd/contact_http_test.go` (the `GET /api/contacts/:id/activity` Describe block, L436+); there is no plan-named cicd test file for this feature. The steps above use numbered format and were not checkbox-tracked during execution.

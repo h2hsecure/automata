@@ -1,5 +1,7 @@
 # Core Platform Implementation Plan
 
+> **⚠️ SUPERSEDED (2026-10-26):** This document predates the 2026-09-24 tenant→context rename and later architecture changes (dual-server runtime, `/api/context/*` routes). Retained for historical reference; the canonical sources are the 2026-09-24+ plans/specs and `specs/roadmap.md`. Do not use it as an implementation guide.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the foundation for Automata: multi-tenant auth, reverse proxy, MCP server, config store, and email queue.

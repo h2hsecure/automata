@@ -1,5 +1,7 @@
 # Web UI Phase 2 Implementation Plan
 
+> **Note (2026-10-26):** The BFF server (`cmd/bff`, port 8082) and the `web/` asset-serving layout were introduced after this plan (2026-09-25), so served-asset paths referenced here have since diverged. See `docs/architecture.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add Tenants, Forms, API Keys pages to the Vue SPA and wire the Contacts page to real API endpoints, including backend infrastructure for contacts and forms.

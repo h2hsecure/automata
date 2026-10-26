@@ -660,4 +660,4 @@ Steps:
 
 ## Execution Status
 
-**Completed.** Marked Done in `specs/roadmap.md`; the `/tracking/visitors` endpoints are implemented and registered in `internal/adapter/api/server.go` and covered by the cicd integration suite. The steps above use numbered format and were not checkbox-tracked during execution.
+**Completed.** Marked Done in `specs/roadmap.md`; the `/context/tracking/visitors` endpoints are implemented and registered in `internal/adapter/api/server.go`. Coverage: the context-scoped visitor list/events specs live in `cicd/shadow_user_test.go` (L193+); there is no plan-named cicd test file for this feature. The steps above use numbered format and were not checkbox-tracked during execution.

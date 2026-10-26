@@ -1,5 +1,7 @@
 # Web UI Implementation Plan
 
+> **Note (2026-10-26):** The BFF server (`cmd/bff`, port 8082) and the `web/` asset-serving layout were introduced after this plan (2026-09-25), so served-asset paths referenced here have since diverged. See `docs/architecture.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the Automata Web UI — a Vue 3 single-page application with a Go BFF (Backend-for-Frontend) that provides a complete admin interface for managing contacts, forms, banners, email templates, tenants, and tracking analytics.
