@@ -31,15 +31,27 @@ pkg/                   — shared, domain-agnostic utilities
 
 ### Driver Adapters
 
-Three separate driver adapters handle different traffic patterns:
+Four separate driver adapters handle different traffic patterns:
 
 | Adapter | Location | Purpose |
 |---------|----------|---------|
 | API Server | `internal/adapter/api` | Admin dashboard API, tenant management, CRUD operations |
 | MCP Servers | `internal/adapter/mcp` | One MCP server per feature domain. Exposes tools for AI integration. |
 | Tracking | `internal/adapter/tracking` | High-throughput event ingestion endpoint. Independent from API server. |
+| BFF / WebUI | `internal/adapter/webui` | Backend-for-frontend: serves the built Web UI and WebUI API handlers. Runs as a separate binary (`cmd/bff`) on port 8082, proxying to the API server. |
 
 All adapters share tenant resolution middleware and auth.
+
+### BFF (Backend-for-Frontend)
+
+The `bff` binary (`cmd/bff`) serves the static Web UI (built by the Dockerfile into `/root/web`) plus WebUI handlers, and proxies API calls to the main API server (`bff.api_backend_url`). It shares the same database and auth secrets as the API server, so session cookies and JWTs are compatible across both.
+
+Configuration keys (see `config.example.yaml`):
+- `bff.port` — HTTP port (default `8082`)
+- `bff.api_backend_url` — URL of the API server (default `http://localhost:8080`)
+- `bff.web_dir` — Web UI build directory; empty falls back to `<exe_dir>/web`
+
+In `docker-compose.yml`, the `bff` service uses the same image as `automata` with `command: ["./bff"]` and `AUTOMATA_BFF_API_BACKEND_URL=http://automata:8080`.
 
 ### Configuration
 

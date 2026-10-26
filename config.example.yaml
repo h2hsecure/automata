@@ -20,6 +20,11 @@ context:
   resolution: path
   default_path: /
 
+bff:
+  port: "8082"
+  api_backend_url: http://localhost:8080
+  web_dir: ""
+
 smtp:
   host: ""
   port: "587"

@@ -15,6 +15,25 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  bff:
+    build: .
+    command: ["./bff"]
+    ports:
+      - "9082:8082"
+    environment:
+      - AUTOMATA_DATABASE_HOST=postgres
+      - AUTOMATA_DATABASE_NAME=automata
+      - AUTOMATA_DATABASE_USER=automata
+      - AUTOMATA_DATABASE_PASSWORD=changeme
+      - AUTOMATA_BFF_API_BACKEND_URL=http://automata:8080
+      - AUTOMATA_BFF_WEB_DIR=/root/web
+    depends_on:
+      postgres:
+        condition: service_healthy
+      automata:
+        condition: service_started
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     environment:
