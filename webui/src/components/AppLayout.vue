@@ -6,7 +6,7 @@ import AppHeader from './AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
-const sidebarOpen = ref(true)
+const sidebarOpen = ref(typeof window !== 'undefined' && window.innerWidth >= 1024)
 
 onMounted(() => {
   authStore.init()
