@@ -57,6 +57,25 @@ func TestGenerate_RequiresContextID(t *testing.T) {
 	}
 }
 
+func TestGenerate_FlushesQueueOnPageUnload(t *testing.T) {
+	// A page view must survive fast navigation: the queue is only flushed
+	// every batch interval (or at batch size), so the snippet must also
+	// flush on page unload, or pageviews are silently dropped when the
+	// user navigates away before the timer fires.
+	js, err := Generate(testContextID, "http://track.example.com", nil)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	for _, want := range []string{
+		`"pagehide"`,
+		`"beforeunload"`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("Generate() missing unload flush trigger %q", want)
+		}
+	}
+}
+
 func TestGenerate_KeepsBatchOptions(t *testing.T) {
 	js, err := Generate(testContextID, "http://track.example.com", map[string]interface{}{
 		"batchSize":     float64(5),
