@@ -7,10 +7,14 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:6a17eef` |
-| Chart | `2026.10.25-6a17eef` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:87ec4bb` |
+| Chart | `2026.10.26-87ec4bb` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-`6a17eef` is CI-verified (includes the stale-JWT fix, the PostgreSQL
+`87ec4bb` is CI-verified. New in this release: contact CSV import/export
+plus tag CRUD (HTTP + MCP, 52-tool catalog), session revocation on
+password change (login tokens now carry `iat`), `jti` on all issued JWTs,
+the BFF as a docker-compose service, and `form.submitted` webhook
+delivery to matching endpoints. The previous release (`6a17eef`) included the stale-JWT fix, the PostgreSQL
 readiness init container, the advisory-lock fix that serializes concurrent
 automata+bff migrations, ingress TLS support, lenient handling of
 `ingress.tls[].hosts` as a bare string or a list, the cookie-secret
@@ -76,8 +80,8 @@ certificate into the `automata-tls` secret, which the ingress terminates.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.25-6a17eef -n automata \
-  -f values.prod.yaml --set image.tag=6a17eef
+  --version 2026.10.26-87ec4bb -n automata \
+  -f values.prod.yaml --set image.tag=87ec4bb
 ```
 
 ## 4) Verify rollout
