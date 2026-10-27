@@ -1,6 +1,6 @@
 {{- if .Values.ingress.enabled -}}
 # Body-size limit for form/static file uploads. Traefik's default is 10 MiB;
-# override with ingress.maxBodySize (e.g. "50MiB").
+# override with ingress.maxBodySize (integer bytes; e.g. 52428800 = 50 MiB).
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -9,7 +9,14 @@ metadata:
     {{- include "automata.labels" . | nindent 4 }}
 spec:
   {{- if .Values.ingress.maxBodySize }}
-  maxBodySize: {{ .Values.ingress.maxBodySize | quote }}
+  # Traefik v2: the limit lives under `requestBody` as an int64 byte count.
+  # A bare top-level `maxBodySize` (or a string like "100M") is rejected with
+  # "invalid middleware type or middleware does not exist", which takes down
+  # every router that references this middleware.
+  requestBody:
+    # `int` keeps large byte counts as plain decimal (Helm would otherwise
+    # print 104857600 as 1.048576e+08).
+    maxBodySize: {{ .Values.ingress.maxBodySize | int }}
   {{- end }}
 ---
 apiVersion: traefik.io/v1alpha1
@@ -82,5 +89,13 @@ spec:
       match: Host(`{{ .Values.ingress.hostname }}`) && PathPrefix(`/`)
       middlewares:
         - name: {{ include "automata.fullname" . }}-redirect
+      services:
+        # Placeholder: the redirectScheme middleware terminates the request
+        # before it reaches any service. Some Traefik builds reject routers
+        # that have neither a service nor child routers
+        # ("router must have either a service or child routers"), so the
+        # BFF is listed to satisfy the check — it is never contacted.
+        - name: {{ include "automata.fullname" . }}-bff
+          port: 8082
 {{- end }}
 {{- end }}

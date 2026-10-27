@@ -72,8 +72,8 @@ ingress:
       secretName: automata-tls   # existing Certificate/secret in the automata ns
   certificate:
     enabled: false               # cert already provisioned outside the chart
-  # Max upload size if you need more than the 10 MiB Traefik default:
-  # maxBodySize: "50MiB"
+  # Max upload size, in bytes (int64) — chart default is 104857600 (100 MiB):
+  # maxBodySize: 52428800   # 50 MiB
 secretKey: "<random 32+ chars>"
 cookieSecret: "<random 32+ chars>"
 adminEmail: admin@<PROD-DOMAIN>
