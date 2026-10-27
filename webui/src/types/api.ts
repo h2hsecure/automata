@@ -93,6 +93,25 @@ export interface FormInput {
   settings?: Record<string, unknown>;
 }
 
+// NOTE: the backend Submission domain struct has no json tags, so responses
+// use Go's PascalCase field names. FileUpload does have snake_case tags.
+export interface FileUpload {
+  field: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+}
+
+export interface Submission {
+  ID: string;
+  FormID: string;
+  ContextID: string;
+  Data: Record<string, unknown>;
+  Files: FileUpload[];
+  CreatedAt: string;
+}
+
 export interface Banner {
   ID: string;
   ContextID: string;
@@ -252,6 +271,7 @@ export interface EmailTemplate {
   is_default: boolean;
   kind: 'standalone' | 'form';
   form_id: string | null;
+  audience: 'admin' | 'submitter';
   created_at: string;
   updated_at: string;
 }
@@ -265,6 +285,7 @@ export interface EmailTemplateInput {
   is_default?: boolean;
   kind?: string;
   form_id?: string | null;
+  audience?: string;
 }
 
 export interface InboxMessage {

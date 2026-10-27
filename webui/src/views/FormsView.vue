@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { Pencil, Trash2, Plus, ExternalLink, Code2, Copy, Check } from 'lucide-vue-next'
+import { ref, computed, onMounted, watch } from 'vue'
+import { Pencil, Trash2, Plus, ExternalLink, Code2, Copy, Check, Inbox, Paperclip } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -10,8 +10,9 @@ import Input from '@/components/Input.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
-import { listForms, deleteForm, createForm, updateForm } from '@/api/client'
-import type { Form, FormInput } from '@/types/api'
+import { usePagination } from '@/composables/usePagination'
+import { listForms, deleteForm, createForm, updateForm, listSubmissions, downloadSubmissionFile } from '@/api/client'
+import type { Form, FormInput, Submission } from '@/types/api'
 
 const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
@@ -24,6 +25,13 @@ const formName = ref('')
 const formSlug = ref('')
 const formFields = ref<Array<{ name: string; type: string; required: boolean; label: string; accept: string }>>([])
 const formError = ref('')
+
+// Submission notification settings (stored under Form.Settings.notifications).
+const notifAdminEnabled = ref(true)
+const notifAdminTo = ref('')
+const notifSubmitterEnabled = ref(true)
+// Other Settings keys, preserved across save.
+const editingSettings = ref<Record<string, any>>({})
 
 const embedOpen = ref(false)
 const embedTag = ref('')
@@ -61,6 +69,10 @@ function openCreate() {
     { name: 'email', type: 'email', required: true, label: 'Email', accept: '' },
     { name: 'name', type: 'text', required: true, label: 'Full Name', accept: '' },
   ]
+  notifAdminEnabled.value = true
+  notifAdminTo.value = ''
+  notifSubmitterEnabled.value = true
+  editingSettings.value = {}
   formError.value = ''
   modalOpen.value = true
 }
@@ -78,8 +90,96 @@ function openEdit(f: Form) {
     label: fl.label,
     accept: Array.isArray(fl.validation?.accept) ? (fl.validation.accept as string[]).join(', ') : '',
   }))
+  // Notification config lives in Settings.notifications; both audiences are
+  // enabled by default, and admin emails only send when `to` is non-empty.
+  const n = (f.Settings?.notifications ?? {}) as any
+  notifAdminEnabled.value = n.admin?.enabled !== false
+  notifAdminTo.value = Array.isArray(n.admin?.to) ? n.admin.to.join(', ') : ''
+  notifSubmitterEnabled.value = n.submitter?.enabled !== false
+  editingSettings.value = { ...(f.Settings ?? {}) }
   formError.value = ''
   modalOpen.value = true
+}
+
+function parseEmailList(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+// --- Submissions modal ---
+const subModalOpen = ref(false)
+const subForm = ref<Form | null>(null)
+const subRows = ref<Array<Record<string, any>>>([])
+const subsLoading = ref(false)
+const {
+  page: subPage,
+  limit: subLimit,
+  total: subTotal,
+  goToPage: subGoToPage,
+  setTotal: subSetTotal,
+  reset: subReset,
+} = usePagination(1, 20)
+
+const subColumns = computed(() => [
+  ...(subForm.value?.Fields ?? []).map((f) => ({ key: f.slug, label: f.label })),
+  { key: 'files', label: 'Files' },
+  { key: 'created', label: 'Created' },
+])
+
+// Flatten Data into slug-keyed cells so the default DataTable rendering works.
+function flattenSubmission(sub: Submission): Record<string, any> {
+  const row: Record<string, any> = {
+    ID: sub.ID,
+    Files: sub.Files ?? [],
+    created: sub.CreatedAt,
+  }
+  for (const f of subForm.value?.Fields ?? []) {
+    row[f.slug] = sub.Data?.[f.slug] ?? ''
+  }
+  return row
+}
+
+async function openSubmissions(f: Form) {
+  subForm.value = f
+  subRows.value = []
+  subReset()
+  subModalOpen.value = true
+  await loadSubmissions()
+}
+
+async function loadSubmissions() {
+  if (!subForm.value) return
+  subsLoading.value = true
+  try {
+    const res = await listSubmissions(subForm.value.ID, subPage.value, subLimit.value)
+    subRows.value = res.data.map(flattenSubmission)
+    subSetTotal(res.total)
+  } finally {
+    subsLoading.value = false
+  }
+}
+
+watch(() => subPage.value, loadSubmissions)
+
+// The file route is Bearer-authenticated, so downloads go through the axios
+// client and trigger a browser save via an object URL.
+async function downloadFile(row: Record<string, any>, index: number) {
+  if (!subForm.value) return
+  try {
+    const blob = await downloadSubmissionFile(subForm.value.ID, row.ID, index)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = row.Files[index]?.name || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    // handled
+  }
 }
 
 function addField() {
@@ -116,6 +216,17 @@ async function handleSave() {
             : null,
         order: i,
       })),
+      // Keep unrelated Settings keys and replace the notifications block.
+      settings: {
+        ...editingSettings.value,
+        notifications: {
+          admin: {
+            enabled: notifAdminEnabled.value,
+            to: parseEmailList(notifAdminTo.value),
+          },
+          submitter: { enabled: notifSubmitterEnabled.value },
+        },
+      },
     }
     if (isEdit.value) {
       await updateForm(editingId.value, data)
@@ -216,6 +327,13 @@ onMounted(loadForms)
           <div class="flex gap-1">
             <button
               class="p-1.5 rounded hover:bg-muted"
+              title="Submissions"
+              @click="openSubmissions(row)"
+            >
+              <Inbox class="h-4 w-4" />
+            </button>
+            <button
+              class="p-1.5 rounded hover:bg-muted"
               title="Embed"
               @click="openEmbed(row)"
             >
@@ -309,6 +427,32 @@ onMounted(loadForms)
           </div>
         </div>
 
+        <div class="rounded-md border p-3 space-y-3">
+          <label class="text-sm font-medium">Submission notifications</label>
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              v-model="notifSubmitterEnabled"
+              type="checkbox"
+              class="rounded border-gray-300"
+            />
+            Send a copy to the submitter
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              v-model="notifAdminEnabled"
+              type="checkbox"
+              class="rounded border-gray-300"
+            />
+            Notify admins
+          </label>
+          <Input
+            v-if="notifAdminEnabled"
+            v-model="notifAdminTo"
+            label="Admin recipients"
+            placeholder="admin@example.com, ops@example.com"
+          />
+        </div>
+
         <p v-if="formError" class="text-sm text-destructive">{{ formError }}</p>
       </div>
       <template #footer>
@@ -317,6 +461,64 @@ onMounted(loadForms)
           <Button :loading="loading" @click="handleSave">
             {{ isEdit ? 'Save' : 'Create' }}
           </Button>
+        </div>
+      </template>
+    </Modal>
+
+    <!-- Submissions Modal -->
+    <Modal :open="subModalOpen" title="Submissions" @close="subModalOpen = false">
+      <div class="space-y-3">
+        <DataTable
+          :columns="subColumns"
+          :data="subRows"
+          :loading="subsLoading"
+          empty-text="No submissions yet."
+        >
+          <template #files="{ row }: { row: any }">
+            <div v-if="row.Files?.length" class="flex flex-wrap gap-1">
+              <button
+                v-for="(file, i) in row.Files"
+                :key="i"
+                class="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"
+                @click="downloadFile(row, i)"
+              >
+                <Paperclip class="h-3 w-3" />
+                {{ file.name }}
+              </button>
+            </div>
+            <span v-else class="text-muted-foreground">-</span>
+          </template>
+          <template #created="{ row }: { row: any }">
+            {{ new Date(row.created).toLocaleDateString() }}
+          </template>
+        </DataTable>
+        <div v-if="subTotal > 0" class="flex items-center justify-between">
+          <span class="text-sm text-muted-foreground">
+            Showing {{ (subPage - 1) * subLimit + 1 }}-{{ Math.min(subPage * subLimit, subTotal) }} of {{ subTotal }}
+          </span>
+          <div class="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="subPage <= 1"
+              @click="subGoToPage(subPage - 1)"
+            >
+              Prev
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="subPage >= Math.ceil(subTotal / subLimit)"
+              @click="subGoToPage(subPage + 1)"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end">
+          <Button variant="outline" @click="subModalOpen = false">Close</Button>
         </div>
       </template>
     </Modal>

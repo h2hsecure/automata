@@ -23,6 +23,7 @@ import type {
   EmailStats,
   Activity,
   StaticFile,
+  Submission,
 } from '@/types/api'
 
 const client: AxiosInstance = axios.create({
@@ -172,8 +173,40 @@ export async function deleteForm(id: string): Promise<void> {
   await client.delete(`/context/forms/${id}`)
 }
 
-export async function listSubmissions(formId: string, page = 1, limit = 20) {
-  return { data: [], total: 0, page, limit }
+export async function listSubmissions(
+  formId: string,
+  page = 1,
+  limit = 20
+): Promise<PaginatedResponse<Submission>> {
+  const params: Record<string, string> = { page: String(page), limit: String(limit) }
+  const response = await client.get(`/context/forms/${formId}/submissions`, { params })
+  const d = response.data
+  return {
+    data: d.submissions ?? [],
+    total: d.total ?? 0,
+    page: d.page ?? page,
+    limit: d.limit ?? limit,
+  }
+}
+
+export async function getSubmission(formId: string, submissionId: string): Promise<Submission> {
+  const response = await client.get(`/context/forms/${formId}/submissions/${submissionId}`)
+  return response.data
+}
+
+// Downloads a stored file attached to a submission. The route is
+// Bearer-authenticated, so the link must go through this client rather than
+// a plain <a href>.
+export async function downloadSubmissionFile(
+  formId: string,
+  submissionId: string,
+  index: number
+): Promise<Blob> {
+  const response = await client.get(
+    `/context/forms/${formId}/submissions/${submissionId}/files/${index}`,
+    { responseType: 'blob' }
+  )
+  return response.data
 }
 
 export async function submitForm(formId: string, data: Record<string, string>): Promise<{ id: string }> {
