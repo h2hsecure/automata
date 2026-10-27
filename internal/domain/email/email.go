@@ -12,6 +12,12 @@ const (
 	TemplateKindForm       = "form"
 )
 
+// Audience values for form-integrated templates: who receives the email.
+const (
+	AudienceAdmin     = "admin"
+	AudienceSubmitter = "submitter"
+)
+
 // EmailTemplate represents a stored email template scoped to a context.
 type EmailTemplate struct {
 	ID        string
@@ -20,11 +26,12 @@ type EmailTemplate struct {
 	Subject   string
 	BodyText  string
 	BodyHTML  string
-	IsDefault bool
-	Kind      string
-	FormID    *string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	IsDefault  bool
+	Kind       string
+	FormID     *string
+	Audience   string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // CreateTemplateRequest is the request body for creating a template.
@@ -37,6 +44,7 @@ type CreateTemplateRequest struct {
 	IsDefault bool    `json:"is_default"`
 	Kind      string  `json:"kind"`
 	FormID    *string `json:"form_id"`
+	Audience  string  `json:"audience"`
 }
 
 // UpdateTemplateRequest is the request body for updating a template (all fields optional).
@@ -47,6 +55,7 @@ type UpdateTemplateRequest struct {
 	IsDefault *bool    `json:"is_default"`
 	Kind      *string  `json:"kind"`
 	FormID    **string `json:"form_id"`
+	Audience  *string  `json:"audience"`
 }
 
 // SendEmailRequest is the context-scoped send-email request.
@@ -78,6 +87,7 @@ type TemplateResponse struct {
 	IsDefault bool      `json:"is_default"`
 	Kind      string    `json:"kind"`
 	FormID    *string   `json:"form_id"`
+	Audience  string    `json:"audience"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -134,5 +144,16 @@ func ValidateCreateRequest(req CreateTemplateRequest) error {
 	if req.Kind == TemplateKindForm && req.FormID == nil {
 		return fmt.Errorf("form_id required for form templates")
 	}
-	return nil
+	return ValidateAudience(req.Audience)
+}
+
+// ValidateAudience checks that the audience is one of the allowed values.
+// An empty audience is allowed (defaults to submitter).
+func ValidateAudience(audience string) error {
+	switch audience {
+	case "", AudienceAdmin, AudienceSubmitter:
+		return nil
+	default:
+		return fmt.Errorf("invalid audience %q: must be %q or %q", audience, AudienceAdmin, AudienceSubmitter)
+	}
 }

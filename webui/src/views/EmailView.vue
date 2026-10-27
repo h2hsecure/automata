@@ -49,6 +49,7 @@ const editingId = ref('')
 const tplKey = ref('')
 const tplKind = ref<'standalone' | 'form'>('standalone')
 const tplFormId = ref('')
+const tplAudience = ref<'admin' | 'submitter'>('submitter')
 const tplSubject = ref('')
 const tplBody = ref('')
 const tplError = ref('')
@@ -81,6 +82,7 @@ function openCreate() {
   tplKey.value = ''
   tplKind.value = 'standalone'
   tplFormId.value = ''
+  tplAudience.value = 'submitter'
   tplSubject.value = ''
   tplBody.value = ''
   tplError.value = ''
@@ -93,6 +95,7 @@ function openEdit(t: EmailTemplate) {
   tplKey.value = t.key
   tplKind.value = t.kind === 'form' ? 'form' : 'standalone'
   tplFormId.value = t.form_id || ''
+  tplAudience.value = t.audience === 'admin' ? 'admin' : 'submitter'
   tplSubject.value = t.subject
   tplBody.value = t.body_text
   tplError.value = ''
@@ -110,12 +113,15 @@ async function handleSave() {
   }
   loading.value = true
   try {
-    const payload = {
+    const payload: Record<string, unknown> = {
       key: tplKey.value.trim(),
       kind: tplKind.value,
       form_id: tplKind.value === 'form' ? tplFormId.value : null,
       subject: tplSubject.value,
       body_text: tplBody.value,
+    }
+    if (tplKind.value === 'form') {
+      payload.audience = tplAudience.value
     }
     if (isEdit.value) {
       await updateEmailTemplate(editingId.value, payload)
@@ -428,6 +434,16 @@ onMounted(loadActiveTab)
           >
             <option value="" disabled>Select a form</option>
             <option v-for="f in forms" :key="f.ID" :value="f.ID">{{ f.Name }}</option>
+          </select>
+        </div>
+        <div v-if="tplKind === 'form'">
+          <label class="text-sm font-medium">Audience</label>
+          <select
+            v-model="tplAudience"
+            class="h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            <option value="submitter">Submitter (the person who submitted the form)</option>
+            <option value="admin">Admin (sent to the form's notification recipients)</option>
           </select>
         </div>
         <Input v-model="tplSubject" label="Subject" placeholder="Welcome, {{ .first_name }}!" />

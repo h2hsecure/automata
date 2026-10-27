@@ -239,10 +239,51 @@ func (u *EmailUsecase) SendToContact(contextID, templateID, contactID string) (s
 	return job.ID, nil
 }
 
-// SendForSubmission sends all form-integrated templates for the form to the
-// submitter's email address, recorded from the first email-type field in the
-// submission. All failures are logged, never returned: form submission must
-// not fail because of email.
+// notificationConfig is the form-level notification configuration, parsed
+// from the form's settings JSON.
+type notificationConfig struct {
+	AdminEnabled     bool
+	AdminTo          []string
+	SubmitterEnabled bool
+}
+
+// parseNotificationConfig reads the optional "notifications" object from the
+// form settings. Both notifications default to enabled; admin recipients
+// default to an empty list (no admin email sent until one is configured).
+func parseNotificationConfig(f *fwform.Form) notificationConfig {
+	cfg := notificationConfig{AdminEnabled: true, SubmitterEnabled: true}
+	if f == nil || f.Settings == nil {
+		return cfg
+	}
+	notif, ok := f.Settings["notifications"].(map[string]interface{})
+	if !ok {
+		return cfg
+	}
+	if admin, ok := notif["admin"].(map[string]interface{}); ok {
+		if enabled, ok := admin["enabled"].(bool); ok {
+			cfg.AdminEnabled = enabled
+		}
+		if to, ok := admin["to"].([]interface{}); ok {
+			for _, v := range to {
+				if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+					cfg.AdminTo = append(cfg.AdminTo, strings.TrimSpace(s))
+				}
+			}
+		}
+	}
+	if sub, ok := notif["submitter"].(map[string]interface{}); ok {
+		if enabled, ok := sub["enabled"].(bool); ok {
+			cfg.SubmitterEnabled = enabled
+		}
+	}
+	return cfg
+}
+
+// SendForSubmission sends the form's form-integrated email templates, split
+// by audience: admin-audience templates go to the configured admin
+// recipients, the rest to the submitter's email address, recorded from the
+// first email-type field in the submission. All failures are logged, never
+// returned: form submission must not fail because of email.
 func (u *EmailUsecase) SendForSubmission(f *fwform.Form, s *fwform.Submission) {
 	templates, err := u.repo.ListByForm(f.ContextID, f.ID)
 	if err != nil {
@@ -253,20 +294,62 @@ func (u *EmailUsecase) SendForSubmission(f *fwform.Form, s *fwform.Submission) {
 		return
 	}
 
+	cfg := parseNotificationConfig(f)
+
+	var adminTmpls, submitterTmpls []*email.EmailTemplate
+	for _, t := range templates {
+		if t.Audience == email.AudienceAdmin {
+			adminTmpls = append(adminTmpls, t)
+		} else {
+			submitterTmpls = append(submitterTmpls, t)
+		}
+	}
+
+	var contact *cd.Contact
+	if u.contactRepo != nil {
+		if to := submissionEmail(f, s); to != "" {
+			if c, err := u.contactRepo.FindByEmail(f.ContextID, to); err == nil {
+				contact = c
+			}
+		}
+	}
+
+	vars := BuildFormVariables(f, s, contact)
+
+	// Admin notifications: sent to every configured recipient.
+	if cfg.AdminEnabled && len(cfg.AdminTo) > 0 {
+		for _, tmpl := range adminTmpls {
+			subject, body, htmlBody, err := u.renderByID(tmpl, vars)
+			if err != nil {
+				log.Error().Err(err).Str("template", tmpl.Key).Msg("render form email template")
+				continue
+			}
+			job := &queue.EmailJob{
+				ContextID:  f.ContextID,
+				To:         cfg.AdminTo,
+				Subject:    subject,
+				Body:       body,
+				HTMLBody:   htmlBody,
+				MaxRetries: 3,
+			}
+			if err := u.queue.Enqueue(job); err != nil {
+				log.Error().Err(err).Str("template", tmpl.Key).Msg("enqueue form email")
+				continue
+			}
+			log.Info().Strs("to", cfg.AdminTo).Str("template", tmpl.Key).Msg("form admin email enqueued")
+		}
+	}
+
+	// Submitter notification: existing behavior, gated by the settings flag.
+	if !cfg.SubmitterEnabled {
+		return
+	}
 	to := submissionEmail(f, s)
 	if to == "" {
 		return
 	}
 
-	var contact *cd.Contact
-	if u.contactRepo != nil {
-		if c, err := u.contactRepo.FindByEmail(f.ContextID, to); err == nil {
-			contact = c
-		}
-	}
-
-	vars := BuildFormVariables(f, s, contact)
-	for _, tmpl := range templates {
+	for _, tmpl := range submitterTmpls {
 		subject, body, htmlBody, err := u.renderByID(tmpl, vars)
 		if err != nil {
 			log.Error().Err(err).Str("template", tmpl.Key).Msg("render form email template")

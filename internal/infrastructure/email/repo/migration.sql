@@ -19,6 +19,9 @@ CREATE INDEX IF NOT EXISTS idx_email_templates_context ON email_templates(contex
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'standalone';
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS form_id UUID;
 
+-- Audience for form-integrated templates: who receives the email (admin | submitter)
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'submitter';
+
 -- IMAP inbox (fetched per context by the poller)
 CREATE TABLE IF NOT EXISTS email_inbox (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),

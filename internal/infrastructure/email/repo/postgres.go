@@ -32,15 +32,19 @@ func (r *emailRepo) Create(t *email.EmailTemplate) error {
 	if kind == "" {
 		kind = email.TemplateKindStandalone
 	}
+	audience := t.Audience
+	if audience == "" {
+		audience = email.AudienceSubmitter
+	}
 
 	query := `
-		INSERT INTO email_templates (id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+		INSERT INTO email_templates (id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, audience, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
 		ON CONFLICT (context_id, key) DO NOTHING
 	`
 
 	result, err := r.pool.Exec(ctx, query,
-		t.ID, t.ContextID, t.Key, t.Subject, t.BodyText, t.BodyHTML, t.IsDefault, kind, t.FormID,
+		t.ID, t.ContextID, t.Key, t.Subject, t.BodyText, t.BodyHTML, t.IsDefault, kind, t.FormID, audience,
 	)
 	if err != nil {
 		return fmt.Errorf("create email template: %w", err)
@@ -57,7 +61,7 @@ func (r *emailRepo) Create(t *email.EmailTemplate) error {
 func (r *emailRepo) GetByID(id string) (*email.EmailTemplate, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, audience, created_at, updated_at
 		FROM email_templates
 		WHERE id = $1
 	`
@@ -65,7 +69,7 @@ func (r *emailRepo) GetByID(id string) (*email.EmailTemplate, error) {
 	t := &email.EmailTemplate{}
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
-		&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
+		&t.IsDefault, &t.Kind, &t.FormID, &t.Audience, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -81,7 +85,7 @@ func (r *emailRepo) GetByID(id string) (*email.EmailTemplate, error) {
 func (r *emailRepo) GetByKey(contextID, key string) (*email.EmailTemplate, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, audience, created_at, updated_at
 		FROM email_templates
 		WHERE context_id = $1 AND key = $2
 	`
@@ -89,7 +93,7 @@ func (r *emailRepo) GetByKey(contextID, key string) (*email.EmailTemplate, error
 	t := &email.EmailTemplate{}
 	err := r.pool.QueryRow(ctx, query, contextID, key).Scan(
 		&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
-		&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
+		&t.IsDefault, &t.Kind, &t.FormID, &t.Audience, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -105,7 +109,7 @@ func (r *emailRepo) GetByKey(contextID, key string) (*email.EmailTemplate, error
 func (r *emailRepo) List(contextID string) ([]*email.EmailTemplate, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, audience, created_at, updated_at
 		FROM email_templates
 		WHERE context_id = $1
 		ORDER BY key ASC
@@ -122,7 +126,7 @@ func (r *emailRepo) List(contextID string) ([]*email.EmailTemplate, error) {
 		t := &email.EmailTemplate{}
 		err := rows.Scan(
 			&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
-			&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
+			&t.IsDefault, &t.Kind, &t.FormID, &t.Audience, &t.CreatedAt, &t.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan email template: %w", err)
@@ -142,7 +146,7 @@ func (r *emailRepo) List(contextID string) ([]*email.EmailTemplate, error) {
 func (r *emailRepo) ListByForm(contextID, formID string) ([]*email.EmailTemplate, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, created_at, updated_at
+		SELECT id, context_id, key, subject, body_text, body_html, is_default, kind, form_id, audience, created_at, updated_at
 		FROM email_templates
 		WHERE context_id = $1 AND kind = $2 AND form_id = $3
 		ORDER BY key ASC
@@ -159,7 +163,7 @@ func (r *emailRepo) ListByForm(contextID, formID string) ([]*email.EmailTemplate
 		t := &email.EmailTemplate{}
 		err := rows.Scan(
 			&t.ID, &t.ContextID, &t.Key, &t.Subject, &t.BodyText, &t.BodyHTML,
-			&t.IsDefault, &t.Kind, &t.FormID, &t.CreatedAt, &t.UpdatedAt,
+			&t.IsDefault, &t.Kind, &t.FormID, &t.Audience, &t.CreatedAt, &t.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan email template: %w", err)
@@ -206,6 +210,14 @@ func (r *emailRepo) Update(t *email.EmailTemplate) error {
 	// form_id is always written (nullable) so it can be set or cleared.
 	setClauses = append(setClauses, fmt.Sprintf("form_id = $%d", argIndex))
 	args = append(args, t.FormID)
+	argIndex++
+	// audience is always written (non-null) so it can be changed on update.
+	audience := t.Audience
+	if audience == "" {
+		audience = email.AudienceSubmitter
+	}
+	setClauses = append(setClauses, fmt.Sprintf("audience = $%d", argIndex))
+	args = append(args, audience)
 	argIndex++
 
 	// If nothing to update, just touch updated_at

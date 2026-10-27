@@ -100,6 +100,7 @@ func (h *EmailHandler) Create(c *gin.Context) {
 		IsDefault: req.IsDefault,
 		Kind:      req.Kind,
 		FormID:    req.FormID,
+		Audience:  req.Audience,
 	}
 
 	if err := h.usecase.Repo().Create(tmpl); err != nil {
@@ -166,6 +167,13 @@ func (h *EmailHandler) Update(c *gin.Context) {
 	}
 	if req.FormID != nil {
 		existing.FormID = *req.FormID
+	}
+	if req.Audience != nil {
+		if err := ewemail.ValidateAudience(*req.Audience); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		existing.Audience = *req.Audience
 	}
 	// Final state must be consistent: form kind requires a form_id.
 	if existing.Kind == ewemail.TemplateKindForm && existing.FormID == nil {
@@ -375,6 +383,10 @@ func toTemplateResponse(t *ewemail.EmailTemplate) *ewemail.TemplateResponse {
 	if kind == "" {
 		kind = ewemail.TemplateKindStandalone
 	}
+	audience := t.Audience
+	if audience == "" {
+		audience = ewemail.AudienceSubmitter
+	}
 	return &ewemail.TemplateResponse{
 		ID:        t.ID,
 		ContextID: t.ContextID,
@@ -385,6 +397,7 @@ func toTemplateResponse(t *ewemail.EmailTemplate) *ewemail.TemplateResponse {
 		IsDefault: t.IsDefault,
 		Kind:      kind,
 		FormID:    t.FormID,
+		Audience:  audience,
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,
 	}

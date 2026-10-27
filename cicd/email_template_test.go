@@ -1441,6 +1441,199 @@ var _ = Describe("Form-integrated template send", func() {
 	})
 })
 
+var _ = Describe("Dual-audience form submission (admin + submitter)", func() {
+	var (
+		fRepo    domainform.Repository
+		fHandler *handler.FormHandler
+		engine   *gin.Engine
+		formID   string
+	)
+
+	BeforeEach(func() {
+		mockSMTP = support.NewMockSMTP()
+		mockSMTP.Start()
+		pool = db.Pool
+
+		testContext = support.NewTestContext()
+		settingsJSON, _ := json.Marshal(testContext["settings"])
+		_, err := pool.Exec(ctx,
+			`INSERT INTO contexts (id, slug, name, domain, is_active, settings, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+			testContext["id"], testContext["slug"], testContext["name"],
+			testContext["domain"], testContext["is_active"], settingsJSON,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		testContextID = testContext["id"].(string)
+
+		fRepo = form_repo.New(pool)
+		contactRepo := crepo.New(pool)
+		emailRepo = repo.New(pool)
+		emailQueue = email_infra.NewEmailQueue(pool)
+		emailUsecase = emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
+		fHandler = handler.NewFormHandlerWithEmail(fRepo, contactRepo, trepo.New(pool), emailUsecase)
+
+		engine = gin.New()
+		forms := engine.Group("/form")
+		forms.Use(ttracking.ContextMiddleware())
+		forms.POST("/submit/:slug", fHandler.SubmitForm)
+
+		formID = uuid.New().String()
+		err = fRepo.Create(&domainform.Form{
+			ID:        formID,
+			ContextID: testContextID,
+			Slug:      "contact-us",
+			Name:      "Contact Us",
+			Fields: []domainform.FormField{
+				{Slug: "email", Type: "email", Label: "Email", Required: false},
+				{Slug: "message", Type: "text", Label: "Message", Required: false},
+			},
+			Settings: map[string]interface{}{
+				"notifications": map[string]interface{}{
+					"admin": map[string]interface{}{
+						"enabled": true,
+						"to":      []interface{}{"admin@example.com"},
+					},
+					"submitter": map[string]interface{}{"enabled": true},
+				},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM email_jobs")
+		_, _ = pool.Exec(ctx, "DELETE FROM email_templates")
+		_, _ = pool.Exec(ctx, "DELETE FROM form_submissions WHERE context_id = $1", testContextID)
+		_, _ = pool.Exec(ctx, "DELETE FROM forms WHERE id = $1", formID)
+		_, _ = pool.Exec(ctx, "DELETE FROM contexts WHERE id = $1", testContextID)
+		mockSMTP.Clear()
+	})
+
+	submit := func(data map[string]interface{}) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		body, _ := json.Marshal(map[string]interface{}{"data": data})
+		req := httptest.NewRequest("POST", "/form/submit/contact-us", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Context-ID", testContextID)
+		engine.ServeHTTP(w, req)
+		return w
+	}
+
+	setFormSettings := func(settings map[string]interface{}) {
+		f, err := fRepo.GetByID(formID)
+		Expect(err).NotTo(HaveOccurred())
+		f.Settings = settings
+		Expect(fRepo.Update(f)).To(Succeed())
+	}
+
+	createTemplates := func(withAdmin, withSubmitter bool) {
+		formIDPtr := formID
+		if withAdmin {
+			Expect(emailRepo.Create(&email.EmailTemplate{
+				ContextID: testContextID,
+				Key:       "form_admin_notice",
+				Subject:   "New submission: {{ .form_name }}",
+				BodyText:  "New submission to {{ .form_name }}",
+				Kind:      email.TemplateKindForm,
+				FormID:    &formIDPtr,
+				Audience:  email.AudienceAdmin,
+			})).To(Succeed())
+		}
+		if withSubmitter {
+			Expect(emailRepo.Create(&email.EmailTemplate{
+				ContextID: testContextID,
+				Key:       "form_reply",
+				Subject:   "Re: {{ .form.message }}",
+				BodyText:  "Hi, thanks for reaching out",
+				Kind:      email.TemplateKindForm,
+				FormID:    &formIDPtr,
+			})).To(Succeed())
+		}
+	}
+
+	jobRecipients := func() [][]string {
+		rows, err := pool.Query(ctx,
+			"SELECT to_addresses FROM email_jobs WHERE context_id = $1", testContextID,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		defer rows.Close()
+		var out [][]string
+		for rows.Next() {
+			var to []string
+			Expect(rows.Scan(&to)).To(Succeed())
+			out = append(out, to)
+		}
+		return out
+	}
+
+	It("persists the template audience", func() {
+		formIDPtr := formID
+		Expect(emailRepo.Create(&email.EmailTemplate{
+			ContextID: testContextID,
+			Key:       "form_admin_persist",
+			Subject:   "s",
+			BodyText:  "b",
+			Kind:      email.TemplateKindForm,
+			FormID:    &formIDPtr,
+			Audience:  email.AudienceAdmin,
+		})).To(Succeed())
+
+		tpl, err := emailRepo.GetByKey(testContextID, "form_admin_persist")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(tpl.Audience).To(Equal(email.AudienceAdmin))
+	})
+
+	It("sends both admin and submitter emails on submission", func() {
+		createTemplates(true, true)
+
+		w := submit(map[string]interface{}{"email": "submitter@example.com", "message": "Hello"})
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		seen := map[string]bool{}
+		for _, to := range jobRecipients() {
+			for _, addr := range to {
+				seen[addr] = true
+			}
+		}
+		Expect(seen).To(HaveKey("admin@example.com"))
+		Expect(seen).To(HaveKey("submitter@example.com"))
+	})
+
+	It("sends only the admin email when the submitter notification is disabled", func() {
+		createTemplates(true, true)
+		setFormSettings(map[string]interface{}{
+			"notifications": map[string]interface{}{
+				"admin":     map[string]interface{}{"enabled": true, "to": []interface{}{"admin@example.com"}},
+				"submitter": map[string]interface{}{"enabled": false},
+			},
+		})
+
+		w := submit(map[string]interface{}{"email": "submitter@example.com", "message": "Hello"})
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		recipients := jobRecipients()
+		Expect(recipients).To(HaveLen(1))
+		Expect(recipients[0]).To(Equal([]string{"admin@example.com"}))
+	})
+
+	It("sends only the submitter email when the admin notification is disabled", func() {
+		createTemplates(true, true)
+		setFormSettings(map[string]interface{}{
+			"notifications": map[string]interface{}{
+				"admin":     map[string]interface{}{"enabled": false, "to": []interface{}{"admin@example.com"}},
+				"submitter": map[string]interface{}{"enabled": true},
+			},
+		})
+
+		w := submit(map[string]interface{}{"email": "submitter@example.com", "message": "Hello"})
+		Expect(w.Code).To(Equal(http.StatusCreated))
+
+		recipients := jobRecipients()
+		Expect(recipients).To(HaveLen(1))
+		Expect(recipients[0]).To(Equal([]string{"submitter@example.com"}))
+	})
+})
+
 var _ = Describe("Email inbox", func() {
 	var inboxRepo email.InboxRepository
 
