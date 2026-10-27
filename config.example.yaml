@@ -20,6 +20,11 @@ context:
   resolution: path
   default_path: /
 
+# Directory for uploaded and static files. Leave empty to disable file
+# uploads and static file serving.
+uploads:
+  dir: /var/lib/automata/uploads
+
 bff:
   port: "8082"
   api_backend_url: http://localhost:8080

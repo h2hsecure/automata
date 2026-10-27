@@ -1,0 +1,15 @@
+# Persistent storage for form file uploads and static files (the app's
+# uploads.dir). PVC so visitor-submitted files survive pod restarts and
+# redeployments.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "automata.fullname" . }}-uploads
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.automata.uploads.storage | default "5Gi" }}

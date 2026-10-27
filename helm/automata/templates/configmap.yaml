@@ -37,3 +37,7 @@ data:
     context:
       resolution: path
       default_path: /
+
+    # File upload / static file storage (empty dir disables uploads -> 501).
+    uploads:
+      dir: {{ .Values.automata.uploads.dir | default "/var/lib/automata/uploads" | quote }}

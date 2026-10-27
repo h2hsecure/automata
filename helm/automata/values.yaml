@@ -10,6 +10,11 @@ image:
 
 automata:
   replicaCount: 1
+  uploads:
+    # Pod-internal directory for form file uploads + static files.
+    # A PVC of `storage` size is created and mounted here.
+    dir: /var/lib/automata/uploads
+    storage: 5Gi
   resources:
     requests:
       cpu: 50m
@@ -29,18 +34,31 @@ bff:
       memory: 128Mi
 
 ingress:
+  # Renders a Traefik IngressRoute (traefik.io/v1alpha1) + a Middleware.
+  # Routes /snippet, /track, /form, /static -> tracking :8081 and / -> BFF :8082.
   enabled: true
   hostname: automata.home.arpa
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-  # Optional TLS termination. When non-empty, rendered into spec.tls.
-  # With cert-manager, pair with a cert-manager.io/issuer (or
-  # cluster-issuer) annotation so the cert is provisioned into secretName.
+  # Optional Traefik annotations for the IngressRoute (e.g.
+  # traefik.ingress.kubernetes.io/router.priority).
+  annotations: {}
+  # Max request body size for file uploads (Traefik default is 10 MiB).
+  maxBodySize: "10MiB"
+  # Optional TLS termination. secretName becomes spec.tls.secretName on the
+  # IngressRoute. hosts are ignored by Traefik (matching is on `hostname`)
+  # but are reused as dnsNames when certificate.enabled is true.
   # Example:
   # tls:
   #   - hosts: [example.com]
   #     secretName: automata-tls
   tls: []
+  # cert-manager does not watch Traefik IngressRoute resources, so TLS
+  # secrets cannot be provisioned via annotations. When enabled (and
+  # ingress.tls is non-empty), renders a Certificate that provisions the
+  # tls[].secretName secret. Requires cert-manager installed in-cluster.
+  certificate:
+    enabled: false
+    issuer: ""          # e.g. "letsencrypt-prod"
+    isClusterIssuer: true
 
 # Secrets live in values.local.yaml (gitignored) — never commit real values.
 secretKey: "change-this-in-production"

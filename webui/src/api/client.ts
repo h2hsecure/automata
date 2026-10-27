@@ -22,6 +22,7 @@ import type {
   InboxMessage,
   EmailStats,
   Activity,
+  StaticFile,
 } from '@/types/api'
 
 const client: AxiosInstance = axios.create({
@@ -452,6 +453,26 @@ export async function markInboxRead(contextId: string, messageId: string): Promi
 export async function getEmailStats(): Promise<EmailStats> {
   const { data } = await client.get('/context/email-stats')
   return data
+}
+
+// Static file endpoints (context-resolved)
+export async function listStaticFiles(): Promise<StaticFile[]> {
+  const { data } = await client.get('/context/static-files')
+  return data.files ?? []
+}
+
+export async function uploadStaticFile(file: File, name: string): Promise<StaticFile> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('name', name)
+  const { data } = await client.post('/context/static-files', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export async function deleteStaticFile(name: string): Promise<void> {
+  await client.delete(`/context/static-files/${encodeURIComponent(name)}`)
 }
 
 export default client

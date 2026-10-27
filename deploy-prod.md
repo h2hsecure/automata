@@ -56,11 +56,13 @@ kubectl -n automata create secret docker-registry ghcr-registry \
 ```yaml
 ingress:
   hostname: <PROD-DOMAIN>
-  annotations:
-    cert-manager.io/cluster-issuer: <your-issuer>  # or cert-manager.io/issuer: <name>
   tls:
     - hosts: [<PROD-DOMAIN>]
-      secretName: automata-tls
+      secretName: automata-tls   # existing Certificate/secret in the automata ns
+  certificate:
+    enabled: false               # cert already provisioned outside the chart
+  # Max upload size if you need more than the 10 MiB Traefik default:
+  # maxBodySize: "50MiB"
 secretKey: "<random 32+ chars>"
 cookieSecret: "<random 32+ chars>"
 adminEmail: admin@<PROD-DOMAIN>
@@ -70,10 +72,16 @@ postgresql:
     password: "<strong DB password>"
 ```
 
-The `tls` block + issuer annotation make cert-manager provision a
-certificate into the `automata-tls` secret, which the ingress terminates.
-(If your cluster only has a plain `Issuer` in the `automata` namespace, use
-`cert-manager.io/issuer` with that issuer's name.)
+The chart renders a Traefik `IngressRoute` (the cluster runs Traefik, not
+nginx) plus a `Middleware` limiting upload body size. With `ingress.tls`
+set, HTTP for the host is 301-redirected to HTTPS.
+
+TLS: the production `automata` namespace already has a ready
+`Certificate`/secret named `automata-tls`, so `certificate.enabled` stays
+false. If you ever need the chart to provision the cert itself (cert-manager
+does not watch IngressRoute resources), set `certificate.enabled: true`
+with `issuer` + `isClusterIssuer` and it renders a `Certificate` that
+writes the `tls[].secretName` secret.
 
 > **Secrets must be fresh.** The staging `secretKey`, `cookieSecret`,
 > admin password, and Postgres password are all public in git history —
@@ -98,18 +106,14 @@ kubectl -n automata rollout status statefulset/automata-postgresql
 kubectl -n automata get pods
 ```
 
-Then check health over the public domain:
+Then check health, the HTTP→HTTPS redirect, and TLS over the public domain:
 
 ```bash
-curl -s https://<PROD-DOMAIN>/api/health   # expect {"status":"ok"}
-```
-
-## 5) Verify TLS
-
-```bash
+curl -s https://<PROD-DOMAIN>/api/health        # expect {"status":"ok"}
+curl -sI http://<PROD-DOMAIN>/                  # expect 301 -> https
+curl -sI https://<PROD-DOMAIN>/api/health       # expect 200 over TLS
 # cert issued and ready (READY=True)
 kubectl -n automata get certificate automata-tls
-curl -sI https://<PROD-DOMAIN>/api/health   # expect 200 over TLS
 ```
 
 ## Notes

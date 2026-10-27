@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hekemen/automata/internal/domain/form"
 	"github.com/hekemen/automata/internal/domain/tracking"
+	"github.com/hekemen/automata/internal/infrastructure/storage"
 	contactuc "github.com/hekemen/automata/internal/usecase/contact"
 	emailusecase "github.com/hekemen/automata/internal/usecase/email"
 	uc "github.com/hekemen/automata/internal/usecase/form"
@@ -19,6 +20,22 @@ type FormHandler struct {
 	trackingRepo    tracking.Repository
 	emailUC         *emailusecase.EmailUsecase
 	webhookNotifier uc.WebhookNotifier
+	fileResolver    uc.FileResolver
+	fileStore       *storage.FileStore
+}
+
+// WithFileResolver attaches a resolver that turns upload tokens in file
+// field values into Submission.Files records.
+func (h *FormHandler) WithFileResolver(r uc.FileResolver) *FormHandler {
+	h.fileResolver = r
+	return h
+}
+
+// WithFileStore attaches the shared FileStore used to serve submission file
+// downloads. Without it, downloads respond 404.
+func (h *FormHandler) WithFileStore(store *storage.FileStore) *FormHandler {
+	h.fileStore = store
+	return h
 }
 
 func NewFormHandler(repo form.Repository) *FormHandler {
@@ -218,7 +235,7 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 		VisitorID: body.VisitorID,
 	}
 
-	sub, err := uc.SubmitForm(h.repo, contextID, submitInput)
+	sub, err := uc.SubmitForm(h.repo, contextID, submitInput, h.fileResolver)
 	if err != nil {
 		if err.Error() == "spam detected" {
 			c.JSON(http.StatusOK, gin.H{"status": "submitted"})
@@ -314,4 +331,59 @@ func (h *FormHandler) GetSubmission(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, submission)
+}
+
+// DownloadSubmissionFile serves a stored file attached to a submission.
+// Route: GET /context/forms/:id/submissions/:sid/files/:idx. Authenticated
+// and context-scoped; missing submissions, files, or a disabled store all
+// respond 404.
+func (h *FormHandler) DownloadSubmissionFile(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+	if h.fileStore == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+
+	submission, err := uc.GetSubmission(h.repo, contextID, c.Param("sid"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "submission not found"})
+		return
+	}
+
+	idx, err := strconv.Atoi(c.Param("idx"))
+	if err != nil || idx < 0 || idx >= len(submission.Files) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+
+	token := submission.Files[idx].URL
+	if token == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+	if _, err := h.fileStore.Open(token); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+	path, err := h.fileStore.Path(token)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+
+	// Serve with the original name and MIME type so the browser downloads
+	// with a sensible file name instead of the random store name.
+	if meta, err := h.fileStore.Meta(token); err == nil {
+		if meta.Name != "" {
+			c.Header("Content-Disposition", `attachment; filename="`+meta.Name+`"`)
+		}
+		if meta.Type != "" {
+			c.Header("Content-Type", meta.Type)
+		}
+	}
+	c.File(path)
 }

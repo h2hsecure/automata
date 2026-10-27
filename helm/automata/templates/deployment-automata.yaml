@@ -37,6 +37,8 @@ spec:
               mountPath: /root/config.yaml
               subPath: config.yaml
               readOnly: true
+            - name: uploads
+              mountPath: {{ .Values.automata.uploads.dir | default "/var/lib/automata/uploads" }}
           env:
             - name: AUTOMATA_DATABASE_PASSWORD
               valueFrom:
@@ -53,3 +55,6 @@ spec:
         - name: config
           configMap:
             name: {{ include "automata.fullname" . }}-config
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ include "automata.fullname" . }}-uploads

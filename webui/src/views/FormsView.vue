@@ -22,7 +22,7 @@ const isEdit = ref(false)
 const editingId = ref('')
 const formName = ref('')
 const formSlug = ref('')
-const formFields = ref<Array<{ name: string; type: string; required: boolean; label: string }>>([])
+const formFields = ref<Array<{ name: string; type: string; required: boolean; label: string; accept: string }>>([])
 const formError = ref('')
 
 const embedOpen = ref(false)
@@ -58,8 +58,8 @@ function openCreate() {
   formName.value = ''
   formSlug.value = ''
   formFields.value = [
-    { name: 'email', type: 'email', required: true, label: 'Email' },
-    { name: 'name', type: 'text', required: true, label: 'Full Name' },
+    { name: 'email', type: 'email', required: true, label: 'Email', accept: '' },
+    { name: 'name', type: 'text', required: true, label: 'Full Name', accept: '' },
   ]
   formError.value = ''
   modalOpen.value = true
@@ -76,13 +76,14 @@ function openEdit(f: Form) {
     type: fl.type,
     required: fl.required,
     label: fl.label,
+    accept: Array.isArray(fl.validation?.accept) ? (fl.validation.accept as string[]).join(', ') : '',
   }))
   formError.value = ''
   modalOpen.value = true
 }
 
 function addField() {
-  formFields.value.push({ name: '', type: 'text', required: false, label: 'New Field' })
+  formFields.value.push({ name: '', type: 'text', required: false, label: 'New Field', accept: '' })
 }
 
 function removeField(index: number) {
@@ -109,7 +110,10 @@ async function handleSave() {
         type: f.type,
         label: f.label,
         required: f.required,
-        validation: null,
+        validation:
+          f.type === 'file'
+            ? { accept: f.accept.split(',').map((s) => s.trim()).filter(Boolean) }
+            : null,
         order: i,
       })),
     }
@@ -278,7 +282,14 @@ onMounted(loadForms)
                   <option value="number">Number</option>
                   <option value="url">URL</option>
                   <option value="select">Select</option>
+                  <option value="file">File</option>
                 </select>
+                <Input
+                  v-if="field.type === 'file'"
+                  v-model="field.accept"
+                  label="Accepted types"
+                  placeholder="image/png, application/pdf"
+                />
                 <label class="flex items-center gap-2 text-sm pt-4">
                   <input
                     v-model="field.required"

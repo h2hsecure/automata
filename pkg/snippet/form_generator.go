@@ -22,6 +22,7 @@ func GenerateForm(contextID, slug string) (string, error) {
 	// it is served from the same origin that hosts the form endpoints.
 	definitionURL := "/form/definition/" + contextID + "/" + slug
 	submitURL := "/form/submit/" + slug
+	uploadURL := "/form/upload/" + contextID + "/" + slug
 
 	js := `/* Automata form snippet (self-rendering) */
 (function(){
@@ -29,6 +30,7 @@ var contextId=__AUTOMATA_CONTEXT_ID__;
 var slug=__AUTOMATA_FORM_SLUG__;
 var definitionUrl=__AUTOMATA_DEFINITION_URL__;
 var submitUrl=__AUTOMATA_SUBMIT_URL__;
+var uploadUrl=__AUTOMATA_UPLOAD_URL__;
 function _getCookie(n){var m=n+"=";var c=document.cookie.split(";");for(var i=0;i<c.length;i++){var v=c[i].trim();if(v.indexOf(m)===0)return v.substring(m.length,v.length)}return null}
 var visitorId=_getCookie("automata_visitor");
 function container(){
@@ -77,7 +79,13 @@ opt.textContent="Select\u2026";
 input.appendChild(opt);
 }else{
 input=document.createElement("input");
+if(f.type==="file"){
+input.type="file";
+var acc=(f.validation&&f.validation.accept||[]).join(",");
+if(acc)input.accept=acc;
+}else{
 input.type=f.type||"text";
+}
 }
 input.name=f.slug;
 if(f.required)input.required=true;
@@ -97,13 +105,28 @@ form.appendChild(btn);
 form.addEventListener("submit",function(e){
 e.preventDefault();
 var data={};
+var uploads=[];
 for(var j=0;j<fields.length;j++){
-var el=form.elements[fields[j].slug];
-if(el)data[fields[j].slug]=el.value;
+var f=fields[j];
+var el=form.elements[f.slug];
+if(!el)continue;
+if(el.files&&el.files.length){
+for(var k=0;k<el.files.length;k++){
+uploads.push({file:el.files[k],slug:f.slug});
+}
+}else{
+data[f.slug]=el.value;
+}
 }
 btn.disabled=true;
 status.textContent="Sending\u2026";
 status.style.color="#555";
+function fail(msg){
+status.textContent=msg;
+status.style.color="#dc2626";
+btn.disabled=false;
+}
+function doSubmit(){
 fetch(submitUrl,{
 method:"POST",
 headers:{"Content-Type":"application/json","X-Context-ID":contextId},
@@ -123,10 +146,35 @@ status.style.color="#dc2626";
 }
 btn.disabled=false;
 }).catch(function(){
-status.textContent="Sorry, something went wrong.";
-status.style.color="#dc2626";
-btn.disabled=false;
+fail("Sorry, something went wrong.");
 });
+}
+function uploadOne(i){
+if(i>=uploads.length){doSubmit();return;}
+var u=uploads[i];
+var fd=new FormData();
+fd.append("file",u.file);
+fetch(uploadUrl+"?field="+encodeURIComponent(u.slug),{
+method:"POST",
+headers:{"X-Context-ID":contextId},
+body:fd
+}).then(function(res){
+if(!res.ok){
+return res.json().catch(function(){return{};}).then(function(p){
+throw new Error(p.error||"upload failed");
+});
+}
+return res.json().then(function(p){
+if(!p.token)throw new Error("upload failed");
+data[u.slug]=p.token;
+});
+}).then(function(){
+uploadOne(i+1);
+}).catch(function(err){
+fail(err.message||"Sorry, something went wrong.");
+});
+}
+uploadOne(0);
 });
 wrap.appendChild(form);
 host.appendChild(wrap);
@@ -143,6 +191,7 @@ notAvailable();
 	js = strings.Replace(js, "__AUTOMATA_FORM_SLUG__", quote(slug), 1)
 	js = strings.Replace(js, "__AUTOMATA_DEFINITION_URL__", quote(definitionURL), 1)
 	js = strings.Replace(js, "__AUTOMATA_SUBMIT_URL__", quote(submitURL), 1)
+	js = strings.Replace(js, "__AUTOMATA_UPLOAD_URL__", quote(uploadURL), 1)
 
 	return js, nil
 }

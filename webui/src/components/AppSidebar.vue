@@ -10,6 +10,7 @@ import {
   X,
   Zap,
   Mail,
+  Paperclip,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { name: 'Contacts', path: '/contacts', icon: Users },
   { name: 'Forms', path: '/forms', icon: FileText },
+  { name: 'Static Files', path: '/static-files', icon: Paperclip },
   { name: 'Banners', path: '/banners', icon: Image },
   { name: 'Email', path: '/email', icon: Mail, adminOnly: true },
 ]

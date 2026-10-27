@@ -286,3 +286,15 @@ export interface EmailStats {
   contacts_reached: number;
   reached_7d: number;
 }
+
+// NOTE: the backend StaticFile domain struct has no json tags, so list
+// responses use Go's PascalCase field names.
+export interface StaticFile {
+  ID: string;
+  ContextID: string;
+  Name: string;
+  Token: string;
+  Mime: string;
+  Size: number;
+  CreatedAt: string;
+}

@@ -30,6 +30,8 @@ import (
 	geo_infra "github.com/hekemen/automata/internal/infrastructure/geo"
 	"github.com/hekemen/automata/internal/infrastructure/queue"
 	settings_repo "github.com/hekemen/automata/internal/infrastructure/settings/repo"
+	staticfile_repo "github.com/hekemen/automata/internal/infrastructure/staticfile/repo"
+	"github.com/hekemen/automata/internal/infrastructure/storage"
 	tracking_repo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
 	webhook_repo "github.com/hekemen/automata/internal/infrastructure/webhook/repo"
 	webhook_svc "github.com/hekemen/automata/internal/infrastructure/webhook"
@@ -99,6 +101,10 @@ func main() {
 		log.Fatal().Err(err).Msg("settings migration failed")
 	}
 
+	if err := staticfile_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("static file migration failed")
+	}
+
 	// Verify database connection
 	var contextCount int
 	pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM contexts").Scan(&contextCount)
@@ -113,6 +119,18 @@ func main() {
 	trackingRepo := tracking_repo.New(pool)
 	contactRepo := contact_repo.New(pool)
 	geoLookup := geo_infra.New()
+
+	// File upload storage (optional; enabled when uploads.dir is configured).
+	var fileStore *storage.FileStore
+	if dir := config.Get("uploads.dir"); dir != "" {
+		s, err := storage.New(dir)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to init file store")
+		}
+		fileStore = s
+		log.Info().Str("dir", dir).Msg("file upload storage enabled")
+	}
+	staticFileRepo := staticfile_repo.New(pool)
 
 	// Admin bootstrap: create admin user on first startup
 	if err := bootstrap.Run(pool, userRepo); err != nil {
@@ -140,7 +158,8 @@ func main() {
 	webhookSvc := webhook_svc.NewService(webhook_repo.New(pool), webhookQueue)
 
 	// Create handlers for tracking server
-	formHandler := handler.NewFormHandlerWithEmailAndWebhooks(formRepo, contactRepo, trackingRepo, emailUsecase, webhookSvc)
+	formHandler := handler.NewFormHandlerWithEmailAndWebhooks(formRepo, contactRepo, trackingRepo, emailUsecase, webhookSvc).
+		WithFileResolver(uploadFileResolver{store: fileStore})
 	bannerHandler := handler.NewBannerHandler(bannerRepo)
 	placementHandler := handler.NewPlacementHandler(bannerRepo)
 	campaignHandler := handler.NewCampaignHandler(bannerRepo)
@@ -158,6 +177,8 @@ func main() {
 	})
 
 	api.NewServer(adminEngine, pool, contextRepo, userRepo, authService, apiKeyRepo, "/api")
+	api.RegisterStaticFileRoutes(adminEngine, contextRepo, authService, staticFileRepo, fileStore, "/api")
+	api.RegisterSubmissionFileRoutes(adminEngine, contextRepo, authService, formRepo, fileStore, "/api")
 
 	webDir := os.Getenv("WEB_DIR")
 	if webDir == "" {
@@ -191,6 +212,8 @@ func main() {
 
 	// Tracking server (port 8081)
 	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, geoLookup, contactRepo)
+	tracking.RegisterUploadRoutes(trackingEngine, tracking.NewUploadHandler(fileStore, formRepo))
+	tracking.RegisterStaticRoutes(trackingEngine, tracking.NewStaticHandler(staticFileRepo, fileStore))
 
 	trackingPort := config.Get("server.tracking_port")
 	if trackingPort == "" {

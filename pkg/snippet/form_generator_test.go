@@ -43,3 +43,25 @@ func TestGenerateFormValidation(t *testing.T) {
 		t.Error("expected error for empty slug")
 	}
 }
+
+func TestGenerateFormFileFields(t *testing.T) {
+	js, err := GenerateForm("ctx-123", "contact")
+	if err != nil {
+		t.Fatalf("GenerateForm() error = %v", err)
+	}
+	for _, want := range []string{
+		`/form/upload/ctx-123/contact`,
+		`f.type==="file"`,
+		`input.type="file"`,
+		`f.validation&&f.validation.accept`,
+		`input.accept`,
+		`?field=`,
+		`FormData`,
+		`append("file"`,
+		`token`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("GenerateForm() missing %q", want)
+		}
+	}
+}

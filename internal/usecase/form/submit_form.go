@@ -16,8 +16,16 @@ type SubmitFormInput struct {
 	VisitorID string
 }
 
+// FileResolver resolves an upload token (the stored file name) into a
+// FileUpload record for a submission.
+type FileResolver interface {
+	Resolve(contextID, token string) (form.FileUpload, error)
+}
+
 // SubmitForm submits a form by slug, validating data against form fields.
-func SubmitForm(repo form.Repository, contextID string, input SubmitFormInput) (*form.Submission, error) {
+// When resolver is non-nil, tokens found in file-typed field values are
+// resolved into Submission.Files.
+func SubmitForm(repo form.Repository, contextID string, input SubmitFormInput, resolver FileResolver) (*form.Submission, error) {
 	if contextID == "" {
 		return nil, fmt.Errorf("contextID required")
 	}
@@ -35,12 +43,31 @@ func SubmitForm(repo form.Repository, contextID string, input SubmitFormInput) (
 		return nil, fmt.Errorf("spam detected")
 	}
 
+	files := input.Files
+	if resolver != nil {
+		for _, field := range f.Fields {
+			if field.Type != "file" {
+				continue
+			}
+			token, _ := input.Data[field.Slug].(string)
+			if token == "" {
+				continue
+			}
+			fu, err := resolver.Resolve(contextID, token)
+			if err != nil {
+				return nil, fmt.Errorf("resolve file upload: %w", err)
+			}
+			fu.Field = field.Slug
+			files = append(files, fu)
+		}
+	}
+
 	s := &form.Submission{
 		ID:       uuid.New().String(),
 		FormID:   f.ID,
 		ContextID: contextID,
 		Data:     input.Data,
-		Files:    input.Files,
+		Files:    files,
 	}
 
 	if err := repo.CreateSubmission(s); err != nil {

@@ -46,6 +46,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/FormsView.vue'),
       },
       {
+        path: 'static-files',
+        name: 'StaticFiles',
+        component: () => import('@/views/StaticFilesView.vue'),
+      },
+      {
         path: 'email',
         name: 'Email',
         component: () => import('@/views/EmailView.vue'),

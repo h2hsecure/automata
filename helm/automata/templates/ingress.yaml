@@ -1,59 +1,86 @@
 {{- if .Values.ingress.enabled -}}
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+# Body-size limit for form/static file uploads. Traefik's default is 10 MiB;
+# override with ingress.maxBodySize (e.g. "50MiB").
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
 metadata:
-  name: {{ include "automata.fullname" . }}
+  name: {{ include "automata.fullname" . }}-bodylimit
   labels:
     {{- include "automata.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.ingress.maxBodySize }}
+  maxBodySize: {{ .Values.ingress.maxBodySize | quote }}
+  {{- end }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "automata.fullname" . }}-route
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+  {{- if .Values.ingress.annotations }}
   annotations:
     {{- toYaml .Values.ingress.annotations | nindent 4 }}
+  {{- end }}
 spec:
-  rules:
-    - host: {{ .Values.ingress.hostname | quote }}
-      http:
-        paths:
-          # Tracking server (snippet, tracking events, public forms)
-          - path: /snippet
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "automata.fullname" . }}-automata
-                port:
-                  number: 8081
-          - path: /track
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "automata.fullname" . }}-automata
-                port:
-                  number: 8081
-          - path: /form
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "automata.fullname" . }}-automata
-                port:
-                  number: 8081
-          # Frontend + API proxy via BFF
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "automata.fullname" . }}-bff
-                port:
-                  number: 8082
-{{- if .Values.ingress.tls }}
-  tls:
-    {{- range .Values.ingress.tls }}
-    - hosts:
-        {{- if kindIs "string" .hosts }}
-        - {{ .hosts | quote }}
-        {{- else }}
-        {{- range .hosts }}
-        - {{ . | quote }}
-        {{- end }}
-        {{- end }}
-      secretName: {{ .secretName }}
+  entryPoints:
+    {{- if .Values.ingress.tls }}
+    # TLS configured: serve HTTPS only; the -route-http route below 301s all
+    # HTTP traffic for this host to HTTPS.
+    - websecure
+    {{- else }}
+    - web
+    - websecure
     {{- end }}
+  routes:
+    # Tracking server (snippet, tracking events, public forms, static files)
+    - kind: Rule
+      match: (Host(`{{ .Values.ingress.hostname }}`)) && (PathPrefix(`/snippet`) || PathPrefix(`/track`) || PathPrefix(`/form`) || PathPrefix(`/static`))
+      middlewares:
+        - name: {{ include "automata.fullname" . }}-bodylimit
+      services:
+        - name: {{ include "automata.fullname" . }}-automata
+          port: 8081
+    # Frontend + API proxy via BFF
+    - kind: Rule
+      match: (Host(`{{ .Values.ingress.hostname }}`)) && PathPrefix(`/`)
+      middlewares:
+        - name: {{ include "automata.fullname" . }}-bodylimit
+      services:
+        - name: {{ include "automata.fullname" . }}-bff
+          port: 8082
+  {{- if .Values.ingress.tls }}
+  tls:
+    secretName: {{ (index .Values.ingress.tls 0).secretName | quote }}
+  {{- end }}
+{{- if .Values.ingress.tls }}
+---
+# HTTP -> HTTPS: every request for this host on the web entrypoint is
+# redirected (301 permanent) to HTTPS. No service needed for redirectScheme.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "automata.fullname" . }}-redirect
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "automata.fullname" . }}-route-http
+  labels:
+    {{- include "automata.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`{{ .Values.ingress.hostname }}`) && PathPrefix(`/`)
+      middlewares:
+        - name: {{ include "automata.fullname" . }}-redirect
 {{- end }}
 {{- end }}

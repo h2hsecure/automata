@@ -189,7 +189,7 @@ func registerFormTools(s *mcp.Server, d Deps, contextID string) {
 			Slug:      in.FormID,
 			Data:      in.Data,
 			VisitorID: in.VisitorID,
-		})
+		}, nil)
 		if err != nil {
 			return nil, nil, err
 		}
