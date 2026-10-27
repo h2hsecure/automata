@@ -7,11 +7,20 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:49ba51c` |
-| Chart | `2026.10.27-49ba51c` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:7f659f8` |
+| Chart | `2026.10.27-7f659f8` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-`49ba51c` is CI-verified. New in this release: form submissions are now
-visible in the WebUI forms screen — each form row has a Submissions action
+`7f659f8` is CI-verified. New in this release: a fix for the
+production 404 after the Ingress→IngressRoute conversion — the
+body-limit middleware now uses Traefik v2's `requestBody.maxBodySize`
+(int64 bytes; a bare top-level `maxBodySize` made Traefik reject every
+router referencing it) and the HTTP→HTTPS redirect IngressRoute carries
+a placeholder BFF service, because this Traefik build rejects
+service-less routers. Default `ingress.maxBodySize` is 100 MiB
+(104857600 bytes), matching the old nginx Ingress's `proxy-body-size
+100M`; override in `values.prod.yaml` as an integer byte count. The
+previous release (`49ba51c`) introduced form submissions in the WebUI
+and dual-audience form-integrated emails — each form row has a Submissions action
 that opens a modal with one column per form field (labels from field
 slugs), attached files downloadable through the authenticated client,
 pagination (20 per page), and an empty state. Form-integrated email
@@ -104,8 +113,8 @@ writes the `tls[].secretName` secret.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.27-49ba51c -n automata \
-  -f values.prod.yaml --set image.tag=49ba51c
+  --version 2026.10.27-7f659f8 -n automata \
+  -f values.prod.yaml --set image.tag=7f659f8
 ```
 
 ## 4) Verify rollout
