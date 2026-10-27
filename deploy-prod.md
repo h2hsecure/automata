@@ -7,8 +7,8 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:7f659f8` |
-| Chart | `2026.10.27-7f659f8` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:51b532a` |
+| Chart | `2026.10.27-51b532a` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
 The release is CI-verified. New in this release: a fix for the
 production 404 after the Ingress→IngressRoute conversion — the
@@ -115,8 +115,8 @@ writes the `tls[].secretName` secret.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.27-7f659f8 -n automata \
-  -f values.prod.yaml --set image.tag=7f659f8
+  --version 2026.10.27-51b532a -n automata \
+  -f values.prod.yaml --set image.tag=51b532a
 ```
 
 ## 4) Verify rollout
