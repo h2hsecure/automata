@@ -10,13 +10,15 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 | Image | `ghcr.io/hekemen/automata:7f659f8` |
 | Chart | `2026.10.27-7f659f8` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-`7f659f8` is CI-verified. New in this release: a fix for the
+The release is CI-verified. New in this release: a fix for the
 production 404 after the Ingress→IngressRoute conversion — the
-body-limit middleware now uses Traefik v2's `requestBody.maxBodySize`
-(int64 bytes; a bare top-level `maxBodySize` made Traefik reject every
-router referencing it) and the HTTP→HTTPS redirect IngressRoute carries
-a placeholder BFF service, because this Traefik build rejects
-service-less routers. Default `ingress.maxBodySize` is 100 MiB
+body-limit middleware now uses Traefik **v3**'s `buffering.maxRequestBodyBytes`
+(int64 bytes; the production cluster runs Traefik v3, where v2's
+`requestBody.maxBodySize` was removed and is rejected with "invalid
+middleware type or middleware does not exist", which took down every
+router referencing the middleware). The HTTP→HTTPS redirect
+IngressRoute also carries a placeholder BFF service, because this
+Traefik build rejects service-less routers. Default `ingress.maxBodySize` is 100 MiB
 (104857600 bytes), matching the old nginx Ingress's `proxy-body-size
 100M`; override in `values.prod.yaml` as an integer byte count. The
 previous release (`49ba51c`) introduced form submissions in the WebUI
