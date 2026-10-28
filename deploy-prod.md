@@ -7,10 +7,10 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:cfc5fcf` |
-| Chart | `2026.10.28-cfc5fcf` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:2317fb6` |
+| Chart | `2026.10.28-2317fb6` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-The release is CI-verified. New in this release: the dashboard redesign —
+The release is CI-verified. New in this release: the forms submissions page — the submissions modal in the forms list is replaced by a dedicated page at `forms/:id/submissions` (same one-column-per-field layout, attached files stay downloadable, pagination preserved); each submission can now be deleted from that page via a new context-scoped `DELETE /context/forms/:id/submissions/:sid` endpoint (204 on success, 404 when the submission is missing or belongs to another context, 401 without a context), and form creation now seeds a default `company` field that maps to the contact's Company. Also in this release the repo moved to `github.com/h2hsecure/automata`: the Go module path and all CI/helm references changed, so the image and chart now live under `ghcr.io/h2hsecure/...` (pull with a token that has access to the new account's packages, or make the packages public). The previous release (`cfc5fcf`) introduced the dashboard redesign —
 an SVG world map of contact locations (last 90 days) with choropleth shading
 and per-country count badges, a reworked Top Pages chart (horizontal bars with
 rank, truncated URL, and count), the empty Events tab removed, and the Forms
@@ -123,8 +123,8 @@ writes the `tls[].secretName` secret.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.10.28-cfc5fcf -n automata \
-  -f values.prod.yaml --set image.tag=cfc5fcf
+  --version 2026.10.28-2317fb6 -n automata \
+  -f values.prod.yaml --set image.tag=2317fb6
 ```
 
 ## 4) Verify rollout
