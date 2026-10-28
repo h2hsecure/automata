@@ -5,7 +5,6 @@ import { Pencil, Trash2, Plus, ExternalLink, Code2, Copy, Check, Eye } from 'luc
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import DataTable from '@/components/DataTable.vue'
-import Badge from '@/components/Badge.vue'
 import Modal from '@/components/Modal.vue'
 import Input from '@/components/Input.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'

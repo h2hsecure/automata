@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   })),
   listSubmissions: vi.fn(async () => ({ data: [] as any[], total: 0, page: 1, limit: 20 })),
   deleteSubmission: vi.fn(async () => {}),
+  downloadSubmissionFile: vi.fn(async () => new Blob(['file'])),
 }))
 
 vi.mock('@/api/client', () => mocks)
@@ -135,5 +136,32 @@ describe('FormSubmissionsView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/forms')
+  })
+
+  it('downloads attached files through the authenticated client', async () => {
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
+    try {
+      mocks.listSubmissions.mockResolvedValue({
+        data: [
+          makeSubmission({
+            Files: [{ field: 'attachment', name: 'a.pdf', size: 1, type: 'application/pdf', url: '/x' }],
+          }),
+        ],
+        total: 1,
+        page: 1,
+        limit: 20,
+      })
+      await mountView()
+
+      const fileBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('a.pdf')
+      )!
+      fileBtn.click()
+      await flushPromises()
+
+      expect(mocks.downloadSubmissionFile).toHaveBeenCalledWith('form-1', 'sub-1', 0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
