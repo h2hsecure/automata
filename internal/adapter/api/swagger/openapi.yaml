@@ -813,9 +813,12 @@ paths:
         - { name: limit, in: query, schema: { type: integer, default: 50 } }
         - { name: search, in: query, schema: { type: string } }
         - { name: hidden, in: query, description: Filter by hidden state (e.g. "true"), schema: { type: string } }
+        - { name: since, in: query, description: Only contacts updated at/after this time (RFC3339), schema: { type: string, format: date-time } }
       responses:
         "200":
           description: Paginated contacts
+        "400":
+          description: Invalid since parameter
           content:
             application/json:
               schema:

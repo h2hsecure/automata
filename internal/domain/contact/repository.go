@@ -12,6 +12,9 @@ type FilterOptions struct {
 	// Hidden filters on the hidden flag: nil = no filter, true = hidden
 	// only, false = exclude hidden contacts.
 	Hidden *bool
+	// Since, when set, limits results to contacts updated at or after this
+	// time (inclusive).
+	Since *time.Time
 	// ContextID scopes the query to a single context; empty = no scope.
 	ContextID string
 }

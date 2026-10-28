@@ -263,6 +263,12 @@ func buildListWhere(filters ct.FilterOptions) (string, []interface{}, int, error
 		argIndex++
 	}
 
+	if filters.Since != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("updated_at >= $%d", argIndex))
+		args = append(args, *filters.Since)
+		argIndex++
+	}
+
 	if len(filters.Tags) > 0 {
 		if filters.ContextID == "" {
 			return "", nil, 0, fmt.Errorf("tag filter requires a context scope")

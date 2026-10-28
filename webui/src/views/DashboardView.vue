@@ -13,29 +13,23 @@ import {
   BarChart3,
   Mail,
   Send,
+  ChevronRight,
 } from 'lucide-vue-next'
-import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
-import DataTable from '@/components/DataTable.vue'
 import Badge from '@/components/Badge.vue'
+import WorldMapChart from '@/components/WorldMapChart.vue'
 import {
   listContacts,
   listForms,
   listBanners,
   getDashboardStats,
-  getTrackingEvents,
   getEmailStats,
 } from '@/api/client'
-import { usePagination } from '@/composables/usePagination'
 import { useAuthStore } from '@/stores/auth'
-import type { TrackingEvent, EmailStats } from '@/types/api'
+import { aggregateContacts, type CountryStat } from '@/lib/worldMap'
+import type { Contact, EmailStats } from '@/types/api'
 
 const authStore = useAuthStore()
-const tab = ref<'overview' | 'events'>('overview')
-const tabs = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'events', label: 'Events' },
-] as const
 
 const loading = ref(true)
 const stats = ref({
@@ -60,25 +54,9 @@ const maxPageViews = computed(() =>
   Math.max(1, ...pageViewsChart.value.map((item) => item.count))
 )
 
-// Events tab
-const events = ref<TrackingEvent[]>([])
-const eventsLoading = ref(false)
-const eventsPagination = usePagination()
-const {
-  page: eventsPage,
-  limit: eventsLimit,
-  total: eventsTotal,
-  goToPage: eventsGoToPage,
-  setTotal: setEventsTotal,
-} = eventsPagination
-
-const eventColumns = [
-  { key: 'Type', label: 'Type' },
-  { key: 'URL', label: 'URL' },
-  { key: 'EventName', label: 'Event' },
-  { key: 'Referrer', label: 'Referrer' },
-  { key: 'CreatedAt', label: 'Time' },
-]
+// World map: contact locations from the last 90 days (includes hidden)
+const MAP_WINDOW_DAYS = 90
+const mapCountries = ref<CountryStat[]>([])
 
 async function loadOverview() {
   loading.value = true
@@ -126,31 +104,38 @@ async function loadOverview() {
   }
 }
 
-async function loadEvents() {
-  eventsLoading.value = true
+// Fetches all contacts updated in the last 90 days (paginated) and
+// aggregates them by country for the world map. Non-critical: an empty map
+// is fine if the call fails.
+async function loadMapData() {
+  const since = new Date(Date.now() - MAP_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const pageSize = 100
+  let page = 1
+  let total = 0
+  const collected: Contact[] = []
   try {
-    const response = await getTrackingEvents(eventsPage.value, eventsLimit.value)
-    events.value = response.data || []
-    setEventsTotal(response.total || 0)
-  } finally {
-    eventsLoading.value = false
+    do {
+      const res = await listContacts(page, pageSize, '', authStore.currentContextId, undefined, since)
+      collected.push(...res.data)
+      total = res.total || 0
+      page += 1
+    } while (collected.length < total && page <= 50)
+  } catch {
+    return
   }
+  mapCountries.value = aggregateContacts(collected)
 }
 
-function loadActiveTab() {
-  if (tab.value === 'overview') loadOverview()
-  else loadEvents()
-}
-
-onMounted(loadActiveTab)
-
-watch(tab, loadActiveTab)
+onMounted(() => {
+  loadOverview()
+  loadMapData()
+})
 
 watch(
   () => authStore.currentContextId,
   () => {
-    eventsPagination.reset()
-    loadActiveTab()
+    loadOverview()
+    loadMapData()
   }
 )
 </script>
@@ -162,26 +147,9 @@ watch(
         <h1 class="text-2xl font-bold">Dashboard</h1>
         <p class="text-muted-foreground">Overview of your marketing automation platform</p>
       </div>
-      <div class="flex gap-1 rounded-lg bg-muted p-1">
-        <button
-          v-for="t in tabs"
-          :key="t.id"
-          :class="[
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            tab === t.id
-              ? 'bg-card text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-          ]"
-          @click="tab = t.id"
-        >
-          {{ t.label }}
-        </button>
-      </div>
     </div>
 
-    <!-- Overview tab -->
-    <template v-if="tab === 'overview'">
-      <!-- Stats Grid -->
+    <!-- Stats Grid -->
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <!-- Visitors -->
         <Card>
@@ -231,34 +199,50 @@ watch(
 
         <!-- Forms -->
         <Card>
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-muted-foreground">Forms</p>
-              <p class="text-2xl font-bold">{{ stats.totalForms }}</p>
+          <router-link
+            to="/forms"
+            class="group -mx-1 -my-1 block rounded-lg p-1 transition hover:bg-primary/5 hover:ring-1 hover:ring-primary/30"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-muted-foreground">Forms</p>
+                <p class="text-2xl font-bold">{{ stats.totalForms }}</p>
+              </div>
+              <div class="rounded-lg bg-amber-100 dark:bg-amber-900/30 p-3">
+                <FileText class="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              </div>
             </div>
-            <div class="rounded-lg bg-amber-100 dark:bg-amber-900/30 p-3">
-              <FileText class="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            <div class="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+              Active forms
+              <ChevronRight
+                class="h-4 w-4 opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-100"
+              />
             </div>
-          </div>
-          <div class="mt-2 text-sm text-muted-foreground">
-            Active forms
-          </div>
+          </router-link>
         </Card>
 
         <!-- Banners -->
         <Card>
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-muted-foreground">Banners</p>
-              <p class="text-2xl font-bold">{{ stats.totalBanners }}</p>
+          <router-link
+            to="/banners"
+            class="group -mx-1 -my-1 block rounded-lg p-1 transition hover:bg-primary/5 hover:ring-1 hover:ring-primary/30"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-muted-foreground">Banners</p>
+                <p class="text-2xl font-bold">{{ stats.totalBanners }}</p>
+              </div>
+              <div class="rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3">
+                <Image class="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
             </div>
-            <div class="rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3">
-              <Image class="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            <div class="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+              Active banners
+              <ChevronRight
+                class="h-4 w-4 opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-100"
+              />
             </div>
-          </div>
-          <div class="mt-2 text-sm text-muted-foreground">
-            Active banners
-          </div>
+          </router-link>
         </Card>
 
         <!-- Email Queue -->
@@ -294,28 +278,43 @@ watch(
         </Card>
       </div>
 
+      <!-- Contact Locations Map -->
+      <Card title="Contact Locations" description="Countries with contact activity in the last 90 days">
+        <p
+          v-if="mapCountries.length === 0"
+          class="py-8 text-center text-sm text-muted-foreground"
+        >
+          No geo data for the last 90 days.
+        </p>
+        <WorldMapChart v-else :countries="mapCountries" />
+      </Card>
+
       <!-- Charts Row -->
       <div class="grid gap-4 lg:grid-cols-3">
-        <!-- Page Views Chart -->
-        <Card class="lg:col-span-2" title="Page Views" description="Top pages by view count">
-          <p v-if="!loading && pageViewsChart.length === 0" class="mt-4 py-8 text-center text-sm text-muted-foreground">
-            No page view data yet.
-          </p>
-          <div v-else-if="!loading" class="mt-4 flex items-end gap-2 h-48">
+        <!-- Top Pages -->
+        <Card class="lg:col-span-2" title="Top Pages" description="Most visited pages by view count">
+          <div class="mt-4 space-y-3">
+            <p v-if="pageViewsChart.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+              No page view data yet.
+            </p>
             <div
-              v-for="item in pageViewsChart"
-              :key="item.label"
-              class="flex-1 flex flex-col items-center gap-1 group"
+              v-for="(page, index) in pageViewsChart"
+              :key="page.label"
+              class="flex items-center gap-3"
             >
-              <span class="text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                {{ item.count }}
+              <span class="w-8 text-sm font-medium text-muted-foreground">
+                #{{ index + 1 }}
               </span>
-              <div
-                class="w-full rounded-t bg-primary opacity-80 hover:opacity-100 transition-all cursor-pointer"
-                :style="{ height: `${(item.count / maxPageViews) * 100}%` }"
-                :title="`${item.label}: ${item.count}`"
-              />
-              <span class="text-xs text-muted-foreground truncate w-full text-center">{{ item.label }}</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate" :title="page.label">{{ page.label }}</p>
+                <div class="mt-1 h-2 w-full rounded-full bg-muted">
+                  <div
+                    class="h-2 rounded-full bg-primary"
+                    :style="{ width: `${(page.count / maxPageViews) * 100}%` }"
+                  />
+                </div>
+              </div>
+              <Badge variant="info">{{ page.count }}</Badge>
             </div>
           </div>
         </Card>
@@ -351,34 +350,6 @@ watch(
         </Card>
       </div>
 
-      <!-- Top Pages -->
-      <Card title="Top Pages" description="Most visited pages">
-        <div class="mt-4 space-y-3">
-          <p v-if="pageViewsChart.length === 0" class="py-4 text-center text-sm text-muted-foreground">
-            No page view data yet.
-          </p>
-          <div
-            v-for="(page, index) in pageViewsChart"
-            :key="page.label"
-            class="flex items-center gap-3"
-          >
-            <span class="text-sm font-medium text-muted-foreground w-8">
-              #{{ index + 1 }}
-            </span>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium truncate">{{ page.label }}</p>
-              <div class="mt-1 h-2 w-full rounded-full bg-muted">
-                <div
-                  class="h-2 rounded-full bg-primary"
-                  :style="{ width: `${(page.count / maxPageViews) * 100}%` }"
-                />
-              </div>
-            </div>
-            <Badge variant="info">{{ page.count }}</Badge>
-          </div>
-        </div>
-      </Card>
-
       <!-- Top Referrers -->
       <Card title="Top Referrers" description="Where your visitors come from">
         <div class="mt-4 space-y-3">
@@ -399,51 +370,5 @@ watch(
           </div>
         </div>
       </Card>
-    </template>
-
-    <!-- Events tab -->
-    <Card v-else-if="tab === 'events'" title="Events Log" description="Recent tracking events">
-      <DataTable
-        :columns="eventColumns"
-        :data="events"
-        :loading="eventsLoading"
-        empty-text="No events found."
-      >
-        <template #Type="{ row }: { row: TrackingEvent }">
-          <Badge :variant="row.Type === 'pageview' ? 'info' : 'success'">
-            {{ row.Type }}
-          </Badge>
-        </template>
-        <template #URL="{ row }: { row: TrackingEvent }">
-          <span class="text-sm truncate block max-w-[200px]">{{ row.URL }}</span>
-        </template>
-        <template #EventName="{ row }: { row: TrackingEvent }">
-          {{ row.EventName || '-' }}
-        </template>
-        <template #Referrer="{ row }: { row: TrackingEvent }">
-          {{ row.Referrer || 'direct' }}
-        </template>
-        <template #CreatedAt="{ row }: { row: TrackingEvent }">
-          {{ new Date(row.CreatedAt).toLocaleString() }}
-        </template>
-      </DataTable>
-
-      <div
-        v-if="eventsTotal > 0"
-        class="flex items-center justify-between border-t px-4 py-3"
-      >
-        <p class="text-sm text-muted-foreground">
-          Showing {{ (eventsPage - 1) * eventsLimit + 1 }}-{{ Math.min(eventsPage * eventsLimit, eventsTotal) }} of {{ eventsTotal }}
-        </p>
-        <div class="flex gap-1">
-          <Button variant="outline" size="sm" :disabled="eventsPage <= 1" @click="eventsGoToPage(eventsPage - 1)">
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" :disabled="eventsPage >= Math.ceil(eventsTotal / eventsLimit)" @click="eventsGoToPage(eventsPage + 1)">
-            Next
-          </Button>
-        </div>
-      </div>
-    </Card>
   </div>
 </template>

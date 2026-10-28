@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -76,6 +77,16 @@ func (h *ContactHandler) List(c *gin.Context) {
 		hidden = &b
 	}
 
+	var since *time.Time
+	if s := c.Query("since"); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid since parameter, use RFC3339 format"})
+			return
+		}
+		since = &t
+	}
+
 	page := 1
 	if p := c.Query("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
@@ -104,6 +115,7 @@ func (h *ContactHandler) List(c *gin.Context) {
 			Company: company,
 			Search: search,
 			Hidden: hidden,
+			Since:  since,
 		},
 	}
 

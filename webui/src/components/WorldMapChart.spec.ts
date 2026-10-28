@@ -1,0 +1,48 @@
+import { describe, it, expect, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import WorldMapChart from './WorldMapChart.vue'
+import { colorForCount } from '@/lib/worldMap'
+
+vi.mock('@/assets/world-countries.json', () => ({
+  default: {
+    US: { name: 'United States', d: 'M0 0L10 0L10 10Z', cx: 10, cy: 20 },
+    FR: { name: 'France', d: 'M20 0L30 0L30 10Z', cx: 25, cy: 30 },
+  },
+}))
+
+describe('WorldMapChart', () => {
+  it('renders one path per country in the world file', () => {
+    const wrapper = mount(WorldMapChart, { props: { countries: [] } })
+    expect(wrapper.find('path[data-code="US"]').exists()).toBe(true)
+    expect(wrapper.find('path[data-code="FR"]').exists()).toBe(true)
+  })
+
+  it('fills countries by contact count and shows a number badge', () => {
+    const wrapper = mount(WorldMapChart, {
+      props: {
+        countries: [
+          { code: 'US', count: 5, cities: ['New York'] },
+          { code: 'FR', count: 1, cities: [] },
+        ],
+      },
+    })
+
+    const us = wrapper.find('path[data-code="US"]')
+    const fr = wrapper.find('path[data-code="FR"]')
+    expect(us.attributes('fill')).toBe(colorForCount(5, 5))
+    expect(fr.attributes('fill')).toBe(colorForCount(1, 5))
+
+    // number badge at the US centroid
+    const badges = wrapper.findAll('.map-badge text')
+    expect(badges.map((b) => b.text())).toContain('5')
+    expect(badges.map((b) => b.text())).toContain('1')
+    expect(wrapper.find('circle.map-badge-dot').attributes('cx')).toBe('10')
+  })
+
+  it('leaves countries without data at the neutral color', () => {
+    const wrapper = mount(WorldMapChart, {
+      props: { countries: [{ code: 'US', count: 3, cities: [] }] },
+    })
+    expect(wrapper.find('path[data-code="FR"]').attributes('fill')).toBe('#e2e8f0')
+  })
+})

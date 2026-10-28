@@ -23,7 +23,7 @@ const { page, limit, total, goToPage, setTotal } = usePagination()
 const contacts = ref<Contact[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
-const showHidden = ref(false)
+const hiddenFilter = ref<'all' | 'hidden' | 'visible'>('all')
 const searchDebounce = ref<ReturnType<typeof setTimeout> | null>(null)
 
 // Modal state
@@ -53,7 +53,8 @@ const columns = [
 async function loadContacts() {
   loading.value = true
   try {
-    const response = await listContacts(page.value, limit.value, searchQuery.value, authStore.currentContextId, showHidden.value ? undefined : false)
+    const hiddenParam = hiddenFilter.value === 'all' ? undefined : hiddenFilter.value === 'hidden'
+    const response = await listContacts(page.value, limit.value, searchQuery.value, authStore.currentContextId, hiddenParam)
     contacts.value = response.data || []
     setTotal(response.total || 0)
   } finally {
@@ -74,8 +75,8 @@ function handleSearch() {
   loadContacts()
 }
 
-function toggleHidden() {
-  showHidden.value = !showHidden.value
+function setHiddenFilter(value: 'all' | 'hidden' | 'visible') {
+  hiddenFilter.value = value
   page.value = 1
   loadContacts()
 }
@@ -152,14 +153,30 @@ onMounted(loadContacts)
           @search="handleSearch"
         />
       </div>
-      <button
-        type="button"
-        class="px-3 py-2 text-sm rounded-md border transition-colors"
-        :class="showHidden ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-input hover:text-foreground'"
-        @click="toggleHidden"
+      <div
+        role="group"
+        aria-label="Filter by hidden state"
+        class="flex gap-1 rounded-md bg-muted p-1"
       >
-        {{ showHidden ? 'Showing hidden visitors' : 'Show hidden visitors' }}
-      </button>
+        <button
+          v-for="option in [
+            { id: 'all', label: 'All' },
+            { id: 'hidden', label: 'Hidden only' },
+            { id: 'visible', label: 'Visible only' },
+          ] as const"
+          :key="option.id"
+          type="button"
+          class="rounded px-3 py-1.5 text-sm font-medium transition-colors"
+          :class="
+            hiddenFilter === option.id
+              ? 'bg-card text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          "
+          @click="setHiddenFilter(option.id)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
     </div>
 
     <!-- Table -->
