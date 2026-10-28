@@ -40,6 +40,7 @@ func (r *uploadTestRepo) GetSubmission(id string) (*form.Submission, error) {
 func (r *uploadTestRepo) ListSubmissions(formID string, opts form.ListSubmissionsOptions) ([]*form.Submission, int64, error) {
 	return nil, 0, nil
 }
+func (r *uploadTestRepo) DeleteSubmission(id string) error { return nil }
 
 var errNotFound = errors.New("not found")
 

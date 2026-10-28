@@ -191,6 +191,19 @@ func (r *repo) Delete(id string) error {
 	return nil
 }
 
+func (r *repo) DeleteSubmission(id string) error {
+	ctx := context.Background()
+	query := `DELETE FROM form_submissions WHERE id = $1`
+	result, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete submission: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("submission not found: %w", sql.ErrNoRows)
+	}
+	return nil
+}
+
 func (r *repo) CreateSubmission(s *form.Submission) error {
 	ctx := context.Background()
 	dataJSON, err := json.Marshal(s.Data)

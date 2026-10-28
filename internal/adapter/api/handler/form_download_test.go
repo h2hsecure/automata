@@ -45,6 +45,8 @@ func (r *downloadFakeRepo) ListSubmissions(formID string, opts form.ListSubmissi
 	return nil, 0, nil
 }
 
+func (r *downloadFakeRepo) DeleteSubmission(id string) error { return nil }
+
 func newDownloadContext(t *testing.T, sid, idx string) (*gin.Context, *httptest.ResponseRecorder) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)

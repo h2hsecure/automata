@@ -315,6 +315,23 @@ func (h *FormHandler) ListSubmissions(c *gin.Context) {
 	})
 }
 
+func (h *FormHandler) DeleteSubmission(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
+	id := c.Param("sid")
+
+	if err := uc.DeleteSubmission(h.repo, contextID, id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "submission not found"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 func (h *FormHandler) GetSubmission(c *gin.Context) {
 	contextID := c.GetString("context_id")
 	if contextID == "" {

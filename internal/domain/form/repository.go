@@ -11,6 +11,7 @@ type Repository interface {
 	CreateSubmission(s *Submission) error
 	GetSubmission(id string) (*Submission, error)
 	ListSubmissions(formID string, opts ListSubmissionsOptions) ([]*Submission, int64, error)
+	DeleteSubmission(id string) error
 }
 
 // ListSubmissionsOptions holds pagination options for listing submissions.

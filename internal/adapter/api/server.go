@@ -229,6 +229,7 @@ func NewServer(
 		api.DELETE("/context/forms/:id", middleware.AuthMiddleware(authService), formHandler.Delete)
 		api.GET("/context/forms/:id/submissions", middleware.AuthMiddleware(authService), formHandler.ListSubmissions)
 		api.GET("/context/forms/:id/submissions/:sid", middleware.AuthMiddleware(authService), formHandler.GetSubmission)
+		api.DELETE("/context/forms/:id/submissions/:sid", middleware.AuthMiddleware(authService), formHandler.DeleteSubmission)
 	}
 
 	// Banner routes (context-resolved)

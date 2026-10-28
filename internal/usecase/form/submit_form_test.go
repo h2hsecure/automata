@@ -32,6 +32,7 @@ func (r *submitTestRepo) CreateSubmission(s *domain.Submission) error {
 func (r *submitTestRepo) ListSubmissions(formID string, opts domain.ListSubmissionsOptions) ([]*domain.Submission, int64, error) {
 	return nil, 0, nil
 }
+func (r *submitTestRepo) DeleteSubmission(id string) error { return nil }
 func (r *submitTestRepo) GetSubmission(id string) (*domain.Submission, error) {
 	return nil, nil
 }
