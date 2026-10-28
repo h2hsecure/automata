@@ -7,12 +7,20 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:51b532a` |
-| Chart | `2026.10.27-51b532a` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/hekemen/automata:cfc5fcf` |
+| Chart | `2026.10.28-cfc5fcf` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
 
-The release is CI-verified. New in this release: a fix for the
-production 404 after the Ingress→IngressRoute conversion — the
-body-limit middleware now uses Traefik **v3**'s `buffering.maxRequestBodyBytes`
+The release is CI-verified. New in this release: the dashboard redesign —
+an SVG world map of contact locations (last 90 days) with choropleth shading
+and per-country count badges, a reworked Top Pages chart (horizontal bars with
+rank, truncated URL, and count), the empty Events tab removed, and the Forms
+and Banners cards now navigate to their pages; hidden contacts are always shown
+in the contacts list and can be filtered (all / hidden / visible). The map is a
+bundled static asset (no runtime chart dependency) and the dashboard fetches
+contacts via a new `since` query param on `GET /context/contacts`. The previous
+release (`51b532a`) fixed the production 404 after the Ingress→IngressRoute
+conversion — the body-limit middleware now uses Traefik **v3**'s
+`buffering.maxRequestBodyBytes`
 (int64 bytes; the production cluster runs Traefik v3, where v2's
 `requestBody.maxBodySize` was removed and is rejected with "invalid
 middleware type or middleware does not exist", which took down every
@@ -115,8 +123,8 @@ writes the `tls[].secretName` secret.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
-  --version 2026.10.27-51b532a -n automata \
-  -f values.prod.yaml --set image.tag=51b532a
+  --version 2026.10.28-cfc5fcf -n automata \
+  -f values.prod.yaml --set image.tag=cfc5fcf
 ```
 
 ## 4) Verify rollout
