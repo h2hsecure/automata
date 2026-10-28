@@ -69,6 +69,7 @@ function openCreate() {
   formFields.value = [
     { name: 'email', type: 'email', required: true, label: 'Email', accept: '' },
     { name: 'name', type: 'text', required: true, label: 'Full Name', accept: '' },
+    { name: 'company', type: 'text', required: false, label: 'Company', accept: '' },
   ]
   notifAdminEnabled.value = true
   notifAdminTo.value = ''

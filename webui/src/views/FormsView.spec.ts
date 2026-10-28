@@ -97,14 +97,14 @@ describe('FormsView file fields', () => {
     nameInput.dispatchEvent(new Event('input'))
     await flushPromises()
 
-    // Add a third field.
+    // Add a field (defaults are email, name, company).
     bodyButtons().find((b) => b.textContent?.includes('Add Field'))!.click()
     await flushPromises()
 
     // Field rows are the flex boxes; the notifications section is not.
     const rows = document.body.querySelectorAll('div.flex.rounded-md.border')
-    expect(rows.length).toBe(3)
-    const third = rows[2]
+    expect(rows.length).toBe(4)
+    const third = rows[3]
 
     // Label + name inputs in the row.
     const inputs = third.querySelectorAll('input[type="text"]')
@@ -137,6 +137,27 @@ describe('FormsView file fields', () => {
     const field = payload.fields.find((f: any) => f.slug === 'attachment')
     expect(field.type).toBe('file')
     expect(field.validation).toEqual({ accept: ['image/png', 'application/pdf'] })
+  })
+})
+
+describe('FormsView create defaults', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.listForms.mockResolvedValue([])
+  })
+
+  it('defaults new forms to email, name, and company fields', async () => {
+    await mountView()
+    bodyButtons().find((b) => b.textContent?.includes('Create Form'))!.click()
+    await flushPromises()
+
+    // Field rows are the flex boxes; the notifications section is not.
+    const rows = document.body.querySelectorAll('div.flex.rounded-md.border')
+    expect(rows.length).toBe(3)
+    const names = Array.from(rows).map((r) =>
+      (r.querySelectorAll('input[type="text"]')[1] as HTMLInputElement).value
+    )
+    expect(names).toEqual(['email', 'name', 'company'])
   })
 })
 
