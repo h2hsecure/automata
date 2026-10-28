@@ -7,13 +7,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/domain/contact"
-	"github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/internal/domain/tracking"
-	"github.com/hekemen/automata/internal/infrastructure/webhook"
-	bannerusecase "github.com/hekemen/automata/internal/usecase/banner"
-	emailusecase "github.com/hekemen/automata/internal/usecase/email"
+	"github.com/h2hsecure/automata/internal/domain/auth"
+	"github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
+	"github.com/h2hsecure/automata/internal/infrastructure/webhook"
+	bannerusecase "github.com/h2hsecure/automata/internal/usecase/banner"
+	emailusecase "github.com/h2hsecure/automata/internal/usecase/email"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

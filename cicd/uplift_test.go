@@ -1,10 +1,10 @@
 package cicd_test
 
 import (
-	"github.com/hekemen/automata/cicd/support"
-	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
-	trepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
-	formuc "github.com/hekemen/automata/internal/usecase/form"
+	"github.com/h2hsecure/automata/cicd/support"
+	crepo "github.com/h2hsecure/automata/internal/infrastructure/contact/repo"
+	trepo "github.com/h2hsecure/automata/internal/infrastructure/tracking/repo"
+	formuc "github.com/h2hsecure/automata/internal/usecase/form"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

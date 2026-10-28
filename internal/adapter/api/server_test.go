@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
+	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

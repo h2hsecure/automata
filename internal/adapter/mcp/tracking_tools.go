@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	tdomain "github.com/hekemen/automata/internal/domain/tracking"
-	tuc "github.com/hekemen/automata/internal/usecase/tracking"
+	tdomain "github.com/h2hsecure/automata/internal/domain/tracking"
+	tuc "github.com/h2hsecure/automata/internal/usecase/tracking"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

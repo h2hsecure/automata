@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/pkg/snippet"
+	"github.com/h2hsecure/automata/pkg/snippet"
 )
 
 // SnippetHandler serves the JavaScript banner snippet.

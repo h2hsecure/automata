@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	ct "github.com/hekemen/automata/internal/domain/contact"
-	tracking "github.com/hekemen/automata/internal/domain/tracking"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
+	tracking "github.com/h2hsecure/automata/internal/domain/tracking"
 )
 
 type fakeContactRepo struct {

@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	webui_cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
+	webui_cookie "github.com/h2hsecure/automata/internal/infrastructure/webui/cookie"
 	"github.com/rs/zerolog/log"
 )
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/email"
+	"github.com/h2hsecure/automata/internal/domain/email"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

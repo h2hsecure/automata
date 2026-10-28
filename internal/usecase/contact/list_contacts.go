@@ -3,7 +3,7 @@ package contact
 import (
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // ListOptions holds the options for listing contacts.

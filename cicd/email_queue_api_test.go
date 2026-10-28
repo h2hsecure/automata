@@ -11,10 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/cicd/support"
-	bhandler "github.com/hekemen/automata/internal/adapter/api/handler"
-	mailsmtp "github.com/hekemen/automata/internal/infrastructure/email/smtp"
-	"github.com/hekemen/automata/internal/infrastructure/queue"
+	"github.com/h2hsecure/automata/cicd/support"
+	bhandler "github.com/h2hsecure/automata/internal/adapter/api/handler"
+	mailsmtp "github.com/h2hsecure/automata/internal/infrastructure/email/smtp"
+	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

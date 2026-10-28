@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // UpdateInput holds the input parameters for updating a contact.

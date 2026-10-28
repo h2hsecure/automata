@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hekemen/automata/internal/infrastructure/contact"
+	"github.com/h2hsecure/automata/internal/infrastructure/contact"
 	"github.com/jackc/pgx/v5/pgxpool"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

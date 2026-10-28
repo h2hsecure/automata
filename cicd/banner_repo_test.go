@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/hekemen/automata/cicd/support"
+	"github.com/h2hsecure/automata/cicd/support"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

@@ -1,6 +1,6 @@
 package webui
 
-import "github.com/hekemen/automata/internal/domain/context"
+import "github.com/h2hsecure/automata/internal/domain/context"
 
 // UserRepository is an alias to the existing context.UserRepository
 // interface so the webui package doesn't need its own dependency on

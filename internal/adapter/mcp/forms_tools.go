@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/hekemen/automata/internal/domain/form"
-	formusecase "github.com/hekemen/automata/internal/usecase/form"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	formusecase "github.com/h2hsecure/automata/internal/usecase/form"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

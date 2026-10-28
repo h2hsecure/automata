@@ -9,8 +9,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	domainauth "github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/domain/context"
+	domainauth "github.com/h2hsecure/automata/internal/domain/auth"
+	"github.com/h2hsecure/automata/internal/domain/context"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )

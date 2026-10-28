@@ -6,10 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	ct "github.com/hekemen/automata/internal/domain/contact"
-	geodomain "github.com/hekemen/automata/internal/domain/geo"
-	"github.com/hekemen/automata/internal/domain/tracking"
-	trackingUsecase "github.com/hekemen/automata/internal/usecase/tracking"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
+	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
+	trackingUsecase "github.com/h2hsecure/automata/internal/usecase/tracking"
 	"github.com/rs/zerolog/log"
 )
 

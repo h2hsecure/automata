@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	contact "github.com/hekemen/automata/internal/domain/contact"
-	contactusecase "github.com/hekemen/automata/internal/usecase/contact"
-	csvimport "github.com/hekemen/automata/pkg/import"
+	contact "github.com/h2hsecure/automata/internal/domain/contact"
+	contactusecase "github.com/h2hsecure/automata/internal/usecase/contact"
+	csvimport "github.com/h2hsecure/automata/pkg/import"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

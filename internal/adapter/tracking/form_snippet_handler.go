@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/pkg/snippet"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/pkg/snippet"
 )
 
 // FormSnippetHandler serves public form definition and self-rendering snippet endpoints.

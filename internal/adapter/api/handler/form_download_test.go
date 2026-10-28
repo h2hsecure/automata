@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/internal/infrastructure/storage"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/infrastructure/storage"
 )
 
 // downloadFakeRepo returns a fixed submission from GetSubmission.

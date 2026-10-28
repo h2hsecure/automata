@@ -7,11 +7,11 @@ import (
 	"net/http/httptest"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/cicd/support"
-	"github.com/hekemen/automata/internal/adapter/api/middleware"
-	domainauth "github.com/hekemen/automata/internal/domain/auth"
-	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
-	ctxrepo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	"github.com/h2hsecure/automata/cicd/support"
+	"github.com/h2hsecure/automata/internal/adapter/api/middleware"
+	domainauth "github.com/h2hsecure/automata/internal/domain/auth"
+	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
+	ctxrepo "github.com/h2hsecure/automata/internal/infrastructure/context/repo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

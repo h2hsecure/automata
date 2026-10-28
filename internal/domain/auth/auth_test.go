@@ -3,7 +3,7 @@ package auth_test
 import (
 	"testing"
 
-	"github.com/hekemen/automata/internal/infrastructure/auth"
+	"github.com/h2hsecure/automata/internal/infrastructure/auth"
 )
 
 func TestHashPasswordRoundTrip(t *testing.T) {

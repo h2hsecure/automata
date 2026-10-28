@@ -42,7 +42,7 @@ deploy-staging:
 	# (package is automata-chart/automata). Works with helm 3 and 4.
 	# Note: `helm repo add` does not support OCI registries, so the
 	# oci:// reference is passed straight to helm upgrade.
-	helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
+	helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
 		--version $(CHART) -n automata \
 		-f helm/automata/values.local.yaml --set image.tag=$(IMG)
 

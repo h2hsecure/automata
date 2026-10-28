@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // MergeContacts merges one contact into another, keeping the keepID contact and deleting mergeIntoID.

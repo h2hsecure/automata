@@ -2,13 +2,13 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/adapter/api/handler"
-	"github.com/hekemen/automata/internal/adapter/api/middleware"
-	"github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/domain/context"
-	"github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/internal/domain/staticfile"
-	"github.com/hekemen/automata/internal/infrastructure/storage"
+	"github.com/h2hsecure/automata/internal/adapter/api/handler"
+	"github.com/h2hsecure/automata/internal/adapter/api/middleware"
+	"github.com/h2hsecure/automata/internal/domain/auth"
+	"github.com/h2hsecure/automata/internal/domain/context"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/domain/staticfile"
+	"github.com/h2hsecure/automata/internal/infrastructure/storage"
 )
 
 // RegisterStaticFileRoutes registers the authenticated, context-resolved

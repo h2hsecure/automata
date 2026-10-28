@@ -7,8 +7,8 @@ import (
 	"fmt"
 	_ "embed"
 
-	"github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/internal/infrastructure/database"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/infrastructure/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

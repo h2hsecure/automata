@@ -3,8 +3,8 @@ package email
 import (
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/contact"
-	"github.com/hekemen/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/form"
 )
 
 // BuildContactVariables builds template variables from a contact for

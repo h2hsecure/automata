@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/cicd/support"
-	"github.com/hekemen/automata/internal/domain/config"
-	"github.com/hekemen/automata/internal/infrastructure/config/repo"
+	"github.com/h2hsecure/automata/cicd/support"
+	"github.com/h2hsecure/automata/internal/domain/config"
+	"github.com/h2hsecure/automata/internal/infrastructure/config/repo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

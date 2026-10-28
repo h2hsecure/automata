@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/webhook"
-	"github.com/hekemen/automata/internal/infrastructure/queue"
+	"github.com/h2hsecure/automata/internal/domain/webhook"
+	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 )
 
 // fakeRepo is an in-memory webhook.Repository for service tests.

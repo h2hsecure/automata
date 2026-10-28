@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // fakeContactRepo is an in-memory contact.Repository for handler tests.

@@ -3,7 +3,7 @@ package contact
 import (
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // GetContact retrieves a contact by ID after verifying it belongs to the context.

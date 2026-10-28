@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hekemen/automata/internal/infrastructure/config"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	"github.com/rs/zerolog/log"
 )
 

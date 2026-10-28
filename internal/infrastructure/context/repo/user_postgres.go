@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	domainctx "github.com/hekemen/automata/internal/domain/context"
+	domainctx "github.com/h2hsecure/automata/internal/domain/context"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

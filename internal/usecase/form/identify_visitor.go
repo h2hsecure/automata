@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	ct "github.com/hekemen/automata/internal/domain/contact"
-	tracking "github.com/hekemen/automata/internal/domain/tracking"
-	contact "github.com/hekemen/automata/internal/usecase/contact"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
+	tracking "github.com/h2hsecure/automata/internal/domain/tracking"
+	contact "github.com/h2hsecure/automata/internal/usecase/contact"
 )
 
 // IdentifyVisitor creates a contact from form data (email dedupe built in)

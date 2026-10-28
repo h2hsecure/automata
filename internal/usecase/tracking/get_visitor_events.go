@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/tracking"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
 )
 
 // GetVisitorEvents retrieves a paginated list of events for a specific visitor.

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/settings"
-	"github.com/hekemen/automata/internal/infrastructure/database"
+	"github.com/h2hsecure/automata/internal/domain/settings"
+	"github.com/h2hsecure/automata/internal/infrastructure/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

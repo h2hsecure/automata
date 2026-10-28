@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/staticfile"
-	"github.com/hekemen/automata/internal/infrastructure/storage"
+	"github.com/h2hsecure/automata/internal/domain/staticfile"
+	"github.com/h2hsecure/automata/internal/infrastructure/storage"
 )
 
 // StaticHandler serves public, unauthenticated static files linked to a

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/pkg/validation"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/pkg/validation"
 )
 
 // SubmitFormInput holds the input for submitting a form.

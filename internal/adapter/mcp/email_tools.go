@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	edomain "github.com/hekemen/automata/internal/domain/email"
+	edomain "github.com/h2hsecure/automata/internal/domain/email"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

@@ -15,9 +15,9 @@ import (
 	imapclient "github.com/emersion/go-imap/client"
 	"github.com/rs/zerolog/log"
 
-	appcontext "github.com/hekemen/automata/internal/domain/context"
-	"github.com/hekemen/automata/internal/domain/email"
-	mailsmtp "github.com/hekemen/automata/internal/infrastructure/email/smtp"
+	appcontext "github.com/h2hsecure/automata/internal/domain/context"
+	"github.com/h2hsecure/automata/internal/domain/email"
+	mailsmtp "github.com/h2hsecure/automata/internal/infrastructure/email/smtp"
 )
 
 const (

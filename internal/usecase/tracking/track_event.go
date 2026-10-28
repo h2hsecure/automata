@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	ct "github.com/hekemen/automata/internal/domain/contact"
-	geodomain "github.com/hekemen/automata/internal/domain/geo"
-	"github.com/hekemen/automata/internal/domain/tracking"
-	"github.com/hekemen/automata/pkg/ua"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
+	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
+	"github.com/h2hsecure/automata/pkg/ua"
 	"github.com/rs/zerolog/log"
 )
 

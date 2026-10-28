@@ -1,8 +1,8 @@
 package cicd_test
 
 import (
-	"github.com/hekemen/automata/cicd/support"
-	mailsmtp "github.com/hekemen/automata/internal/infrastructure/email/smtp"
+	"github.com/h2hsecure/automata/cicd/support"
+	mailsmtp "github.com/h2hsecure/automata/internal/infrastructure/email/smtp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

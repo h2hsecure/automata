@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/hekemen/automata/cicd/support"
-	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
-	ctxrepo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	"github.com/h2hsecure/automata/cicd/support"
+	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
+	ctxrepo "github.com/h2hsecure/automata/internal/infrastructure/context/repo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

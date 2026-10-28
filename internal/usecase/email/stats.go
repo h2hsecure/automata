@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	cd "github.com/hekemen/automata/internal/domain/contact"
+	cd "github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // EmailStats aggregates dashboard metrics for a context's email activity.

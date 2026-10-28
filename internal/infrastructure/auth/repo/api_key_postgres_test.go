@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	domainauth "github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/infrastructure/auth/repo"
+	domainauth "github.com/h2hsecure/automata/internal/domain/auth"
+	"github.com/h2hsecure/automata/internal/infrastructure/auth/repo"
 	"github.com/jackc/pgx/v5/pgxpool"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

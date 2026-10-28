@@ -3,7 +3,7 @@ package form
 import (
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/domain/form"
 )
 
 // UpdateForm updates an existing form, verifying context ownership.

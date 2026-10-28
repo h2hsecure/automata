@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/config"
+	"github.com/h2hsecure/automata/internal/domain/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

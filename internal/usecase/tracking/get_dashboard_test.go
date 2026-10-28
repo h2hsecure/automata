@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/tracking"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
 )
 
 type fakeDashRepo struct {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/tracking"
-	"github.com/hekemen/automata/pkg/ua"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
+	"github.com/h2hsecure/automata/pkg/ua"
 )
 
 // GetDashboardOptions holds options for the GetDashboard use case.

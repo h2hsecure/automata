@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hekemen/automata/internal/infrastructure/config"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 )
 
 func TestConfigGetDefault(t *testing.T) {

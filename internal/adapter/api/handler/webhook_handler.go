@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	ehhook "github.com/hekemen/automata/internal/domain/webhook"
-	"github.com/hekemen/automata/internal/infrastructure/webhook"
+	ehhook "github.com/h2hsecure/automata/internal/domain/webhook"
+	"github.com/h2hsecure/automata/internal/infrastructure/webhook"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

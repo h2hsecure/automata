@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hekemen/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/domain/form"
 )
 
 const emailRegex = `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`

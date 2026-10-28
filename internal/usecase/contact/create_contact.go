@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	ct "github.com/hekemen/automata/internal/domain/contact"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // CreateInput holds the input parameters for creating a contact.

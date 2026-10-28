@@ -38,7 +38,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: hekemen
+          username: h2hsecure
           password: ${{ secrets.GHCR_PAT }}
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -46,7 +46,7 @@ jobs:
           context: .
           push: true
           registry-server: ghcr.io
-          registry-username: hekemen
+          registry-username: h2hsecure
           registry-password: ${{ secrets.GHCR_PAT }}
           tags: ghcr.io/${{ github.repository_owner }}/automata:${{ steps.sha.outputs.short }}
       - name: Package and push helm chart
@@ -62,7 +62,7 @@ jobs:
           # (runner has helm 3, which does not auto-resolve at install time).
           helm dependency update "${WORK}/chart"
           helm package "${WORK}/chart" --destination "${WORK}"
-          echo "${{ secrets.GHCR_PAT }}" | helm registry login ghcr.io -u hekemen --password-stdin
-          helm push "${WORK}/automata-${VERSION}.tgz" oci://ghcr.io/hekemen/automata-chart
-          echo "Published ghcr.io/hekemen/automata:${SHA} and chart version ${VERSION}"
+          echo "${{ secrets.GHCR_PAT }}" | helm registry login ghcr.io -u h2hsecure --password-stdin
+          helm push "${WORK}/automata-${VERSION}.tgz" oci://ghcr.io/h2hsecure/automata-chart
+          echo "Published ghcr.io/h2hsecure/automata:${SHA} and chart version ${VERSION}"
           echo "Deploy: make deploy-staging IMG=${SHA} CHART=${VERSION}"

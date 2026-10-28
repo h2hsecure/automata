@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/settings"
+	"github.com/h2hsecure/automata/internal/domain/settings"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

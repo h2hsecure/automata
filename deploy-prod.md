@@ -7,8 +7,8 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/hekemen/automata:cfc5fcf` |
-| Chart | `2026.10.28-cfc5fcf` (OCI: `oci://ghcr.io/hekemen/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:cfc5fcf` |
+| Chart | `2026.10.28-cfc5fcf` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
 The release is CI-verified. New in this release: the dashboard redesign —
 an SVG world map of contact locations (last 90 days) with choropleth shading
@@ -75,10 +75,10 @@ helm registry login ghcr.io
 ```bash
 kubectl create namespace automata
 kubectl -n automata create secret docker-registry ghcr-registry \
-  --docker-server=ghcr.io --docker-username=hekemen --docker-password="$GHCR_PAT"
+  --docker-server=ghcr.io --docker-username=h2hsecure --docker-password="$GHCR_PAT"
 ```
 
-`GHCR_PAT` is a GitHub token with read/push on `ghcr.io/hekemen/automata`
+`GHCR_PAT` is a GitHub token with read/push on `ghcr.io/h2hsecure/automata`
 (the same one used for staging works).
 
 ## 2) Create `values.prod.yaml` (do NOT commit)
@@ -122,7 +122,7 @@ writes the `tls[].secretName` secret.
 ## 3) Deploy
 
 ```bash
-helm upgrade -i automata oci://ghcr.io/hekemen/automata-chart/automata \
+helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
   --version 2026.10.28-cfc5fcf -n automata \
   -f values.prod.yaml --set image.tag=cfc5fcf
 ```

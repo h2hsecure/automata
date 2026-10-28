@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	bdomain "github.com/hekemen/automata/internal/domain/banner"
+	bdomain "github.com/h2hsecure/automata/internal/domain/banner"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

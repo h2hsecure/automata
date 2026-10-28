@@ -3,7 +3,7 @@ package contact
 import (
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/contact"
 )
 
 // GetActivity retrieves activities for a contact with optional type filtering.

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	domain "github.com/hekemen/automata/internal/domain/form"
+	domain "github.com/h2hsecure/automata/internal/domain/form"
 )
 
 type submitTestRepo struct {

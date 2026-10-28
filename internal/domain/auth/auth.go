@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/context"
+	"github.com/h2hsecure/automata/internal/domain/context"
 )
 
 // ErrDuplicateKey is returned when an API key name already exists in a context.

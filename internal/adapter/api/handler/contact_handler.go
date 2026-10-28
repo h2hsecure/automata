@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/contact"
-	uc "github.com/hekemen/automata/internal/usecase/contact"
+	"github.com/h2hsecure/automata/internal/domain/contact"
+	uc "github.com/h2hsecure/automata/internal/usecase/contact"
 )
 
 type ContactHandler struct {

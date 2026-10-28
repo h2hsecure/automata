@@ -1,4 +1,4 @@
-module github.com/hekemen/automata
+module github.com/h2hsecure/automata
 
 go 1.26.5
 

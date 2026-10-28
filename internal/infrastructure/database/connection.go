@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hekemen/automata/internal/infrastructure/config"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

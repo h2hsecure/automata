@@ -1,8 +1,8 @@
 package cicd_test
 
 import (
-	"github.com/hekemen/automata/cicd/support"
-	"github.com/hekemen/automata/pkg/snippet"
+	"github.com/h2hsecure/automata/cicd/support"
+	"github.com/h2hsecure/automata/pkg/snippet"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

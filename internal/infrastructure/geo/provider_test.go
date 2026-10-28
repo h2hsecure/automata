@@ -3,7 +3,7 @@ package geo
 import (
 	"testing"
 
-	geodomain "github.com/hekemen/automata/internal/domain/geo"
+	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
 )
 
 // TestNew returns a non-nil lookup backed by the embedded GeoLite2-City

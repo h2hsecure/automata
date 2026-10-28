@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	csvimport "github.com/hekemen/automata/pkg/import"
+	csvimport "github.com/h2hsecure/automata/pkg/import"
 )
 
 // ImportCSVInput holds the input parameters for importing contacts from CSV.

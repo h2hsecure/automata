@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	domainctx "github.com/hekemen/automata/internal/domain/context"
-	"github.com/hekemen/automata/internal/infrastructure/context/repo"
+	domainctx "github.com/h2hsecure/automata/internal/domain/context"
+	"github.com/h2hsecure/automata/internal/infrastructure/context/repo"
 	"github.com/jackc/pgx/v5/pgxpool"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

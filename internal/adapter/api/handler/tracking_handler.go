@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/tracking"
-	trackingUsecase "github.com/hekemen/automata/internal/usecase/tracking"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
+	trackingUsecase "github.com/h2hsecure/automata/internal/usecase/tracking"
 )
 
 // TrackingHandler handles dashboard and events API endpoints.

@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/cicd/support"
-	bhandler "github.com/hekemen/automata/internal/adapter/api/handler"
-	crepo "github.com/hekemen/automata/internal/infrastructure/contact/repo"
-	ctxrepo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	"github.com/h2hsecure/automata/cicd/support"
+	bhandler "github.com/h2hsecure/automata/internal/adapter/api/handler"
+	crepo "github.com/h2hsecure/automata/internal/infrastructure/contact/repo"
+	ctxrepo "github.com/h2hsecure/automata/internal/infrastructure/context/repo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

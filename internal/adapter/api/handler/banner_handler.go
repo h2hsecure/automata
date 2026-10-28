@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	bdomain "github.com/hekemen/automata/internal/domain/banner"
-	bannerUsecase "github.com/hekemen/automata/internal/usecase/banner"
+	bdomain "github.com/h2hsecure/automata/internal/domain/banner"
+	bannerUsecase "github.com/h2hsecure/automata/internal/usecase/banner"
 )
 
 // BannerHandler handles banner CRUD API endpoints.

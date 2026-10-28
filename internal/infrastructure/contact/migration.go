@@ -5,7 +5,7 @@ import (
 	"embed"
 	"fmt"
 
-	"github.com/hekemen/automata/internal/infrastructure/database"
+	"github.com/h2hsecure/automata/internal/infrastructure/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

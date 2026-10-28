@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	bdomain "github.com/hekemen/automata/internal/domain/banner"
+	bdomain "github.com/h2hsecure/automata/internal/domain/banner"
 )
 
 // BannerUsecase handles banner business logic.

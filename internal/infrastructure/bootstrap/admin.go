@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	ctxdomain "github.com/hekemen/automata/internal/domain/context"
+	ctxdomain "github.com/h2hsecure/automata/internal/domain/context"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/context"
+	"github.com/h2hsecure/automata/internal/domain/context"
 )
 
 type ContextUserHandler struct {

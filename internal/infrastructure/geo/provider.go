@@ -9,7 +9,7 @@ import (
 
 	geoip2 "github.com/oschwald/geoip2-golang"
 
-	geodomain "github.com/hekemen/automata/internal/domain/geo"
+	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
 )
 
 //go:embed data/GeoLite2-City.mmdb

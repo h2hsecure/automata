@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/settings"
+	"github.com/h2hsecure/automata/internal/domain/settings"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

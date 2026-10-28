@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	domainauth "github.com/hekemen/automata/internal/domain/auth"
-	domainwebui "github.com/hekemen/automata/internal/domain/webui"
-	webui_cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
+	domainauth "github.com/h2hsecure/automata/internal/domain/auth"
+	domainwebui "github.com/h2hsecure/automata/internal/domain/webui"
+	webui_cookie "github.com/h2hsecure/automata/internal/infrastructure/webui/cookie"
 	"github.com/rs/zerolog/log"
 )
 

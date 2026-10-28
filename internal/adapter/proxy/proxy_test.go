@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/context"
+	"github.com/h2hsecure/automata/internal/domain/context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

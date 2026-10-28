@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/domain/context"
+	"github.com/h2hsecure/automata/internal/domain/auth"
+	"github.com/h2hsecure/automata/internal/domain/context"
 )
 
 // fakeAuthService implements auth.AuthService for handler tests.

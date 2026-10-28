@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 
 	"github.com/gin-gonic/gin"
-	apiadapter "github.com/hekemen/automata/internal/adapter/api"
-	ctxrepo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	apiadapter "github.com/h2hsecure/automata/internal/adapter/api"
+	ctxrepo "github.com/h2hsecure/automata/internal/infrastructure/context/repo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

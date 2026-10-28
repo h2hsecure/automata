@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	whook "github.com/hekemen/automata/internal/domain/webhook"
-	"github.com/hekemen/automata/internal/infrastructure/webhook"
+	whook "github.com/h2hsecure/automata/internal/domain/webhook"
+	"github.com/h2hsecure/automata/internal/infrastructure/webhook"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

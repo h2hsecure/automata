@@ -3,7 +3,7 @@ package form
 import (
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/domain/form"
 )
 
 // ListSubmissions returns submissions for a form with optional pagination,

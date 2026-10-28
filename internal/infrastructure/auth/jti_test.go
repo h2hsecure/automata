@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	domainctx "github.com/hekemen/automata/internal/domain/context"
+	domainctx "github.com/h2hsecure/automata/internal/domain/context"
 )
 
 // stubUserRepo is a minimal UserRepository stub for login tests.

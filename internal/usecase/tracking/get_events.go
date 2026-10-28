@@ -3,7 +3,7 @@ package tracking
 import (
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/tracking"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
 )
 
 // GetEvents retrieves events for a context with the given filter options.

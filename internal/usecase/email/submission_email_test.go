@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/contact"
-	dmemail "github.com/hekemen/automata/internal/domain/email"
-	fwform "github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/internal/infrastructure/queue"
+	"github.com/h2hsecure/automata/internal/domain/contact"
+	dmemail "github.com/h2hsecure/automata/internal/domain/email"
+	fwform "github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 )
 
 // --- fakes ---

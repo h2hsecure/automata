@@ -2,7 +2,7 @@ package banner
 
 import (
 	"github.com/gin-gonic/gin"
-	bdomain "github.com/hekemen/automata/internal/domain/banner"
+	bdomain "github.com/h2hsecure/automata/internal/domain/banner"
 )
 
 // NewBannerServer creates a Gin engine with banner serving routes registered.

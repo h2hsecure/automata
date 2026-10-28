@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hekemen/automata/cicd/support"
-	"github.com/hekemen/automata/internal/infrastructure/queue"
+	"github.com/h2hsecure/automata/cicd/support"
+	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

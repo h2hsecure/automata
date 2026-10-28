@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/auth"
+	"github.com/h2hsecure/automata/internal/domain/auth"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

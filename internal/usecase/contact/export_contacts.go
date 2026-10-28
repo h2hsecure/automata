@@ -3,8 +3,8 @@ package contact
 import (
 	"fmt"
 
-	"github.com/hekemen/automata/internal/domain/contact"
-	"github.com/hekemen/automata/pkg/export"
+	"github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/pkg/export"
 )
 
 // ExportContacts retrieves contacts for a context, converts them to CSV,

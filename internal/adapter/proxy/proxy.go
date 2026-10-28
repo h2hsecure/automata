@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	domainctx "github.com/hekemen/automata/internal/domain/context"
+	domainctx "github.com/h2hsecure/automata/internal/domain/context"
 )
 type Proxy struct {
 	contextRepo domainctx.Repository

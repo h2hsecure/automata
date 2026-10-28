@@ -11,11 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/auth"
-	"github.com/hekemen/automata/internal/domain/context"
-	infraauth "github.com/hekemen/automata/internal/infrastructure/auth"
-	auth_repo "github.com/hekemen/automata/internal/infrastructure/auth/repo"
-	cookie "github.com/hekemen/automata/internal/infrastructure/webui/cookie"
+	"github.com/h2hsecure/automata/internal/domain/auth"
+	"github.com/h2hsecure/automata/internal/domain/context"
+	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
+	auth_repo "github.com/h2hsecure/automata/internal/infrastructure/auth/repo"
+	cookie "github.com/h2hsecure/automata/internal/infrastructure/webui/cookie"
 	"github.com/rs/zerolog/log"
 )
 

@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	ewemail "github.com/hekemen/automata/internal/domain/email"
-	"github.com/hekemen/automata/internal/usecase/email"
+	ewemail "github.com/h2hsecure/automata/internal/domain/email"
+	"github.com/h2hsecure/automata/internal/usecase/email"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

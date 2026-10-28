@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/cicd/support"
-	"github.com/hekemen/automata/pkg/snippet"
+	"github.com/h2hsecure/automata/cicd/support"
+	"github.com/h2hsecure/automata/pkg/snippet"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/jackc/pgx/v5/pgxpool"

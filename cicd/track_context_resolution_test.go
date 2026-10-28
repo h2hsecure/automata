@@ -7,11 +7,11 @@ import (
 	"net/http/httptest"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/cicd/support"
-	ttracking "github.com/hekemen/automata/internal/adapter/tracking"
-	tdomain "github.com/hekemen/automata/internal/domain/tracking"
-	trepo "github.com/hekemen/automata/internal/infrastructure/tracking/repo"
-	"github.com/hekemen/automata/pkg/snippet"
+	"github.com/h2hsecure/automata/cicd/support"
+	ttracking "github.com/h2hsecure/automata/internal/adapter/tracking"
+	tdomain "github.com/h2hsecure/automata/internal/domain/tracking"
+	trepo "github.com/h2hsecure/automata/internal/infrastructure/tracking/repo"
+	"github.com/h2hsecure/automata/pkg/snippet"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

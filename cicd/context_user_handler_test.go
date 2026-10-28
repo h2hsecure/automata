@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/cicd/support"
-	bhandler "github.com/hekemen/automata/internal/adapter/api/handler"
-	ctxrepo "github.com/hekemen/automata/internal/infrastructure/context/repo"
+	"github.com/h2hsecure/automata/cicd/support"
+	bhandler "github.com/h2hsecure/automata/internal/adapter/api/handler"
+	ctxrepo "github.com/h2hsecure/automata/internal/infrastructure/context/repo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

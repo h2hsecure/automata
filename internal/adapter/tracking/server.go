@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/adapter/api/handler"
-	geodomain "github.com/hekemen/automata/internal/domain/geo"
+	"github.com/h2hsecure/automata/internal/adapter/api/handler"
+	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
 )
 
 // NewServer creates a new tracking server with public-facing endpoints.

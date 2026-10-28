@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/settings"
+	"github.com/h2hsecure/automata/internal/domain/settings"
 )
 
 type SettingsHandler struct {

@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hekemen/automata/internal/domain/form"
-	uc "github.com/hekemen/automata/internal/usecase/form"
+	"github.com/h2hsecure/automata/internal/domain/form"
+	uc "github.com/h2hsecure/automata/internal/usecase/form"
 )
 
 // fakeFormRepo is an in-memory form.Repository for handler tests.

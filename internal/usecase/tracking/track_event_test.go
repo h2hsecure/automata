@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	ct "github.com/hekemen/automata/internal/domain/contact"
-	geodomain "github.com/hekemen/automata/internal/domain/geo"
-	"github.com/hekemen/automata/internal/domain/tracking"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
+	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
+	"github.com/h2hsecure/automata/internal/domain/tracking"
 )
 
 // fakeContactRepo records created contacts and activities.

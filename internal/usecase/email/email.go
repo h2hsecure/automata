@@ -8,10 +8,10 @@ import (
 	"text/template"
 
 	"github.com/google/uuid"
-	cd "github.com/hekemen/automata/internal/domain/contact"
-	"github.com/hekemen/automata/internal/domain/email"
-	fwform "github.com/hekemen/automata/internal/domain/form"
-	"github.com/hekemen/automata/internal/infrastructure/queue"
+	cd "github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/h2hsecure/automata/internal/domain/email"
+	fwform "github.com/h2hsecure/automata/internal/domain/form"
+	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

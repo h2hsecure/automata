@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hekemen/automata/internal/domain/banner"
-	"github.com/hekemen/automata/internal/infrastructure/database"
+	"github.com/h2hsecure/automata/internal/domain/banner"
+	"github.com/h2hsecure/automata/internal/infrastructure/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

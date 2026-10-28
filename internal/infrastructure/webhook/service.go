@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hekemen/automata/internal/domain/webhook"
-	"github.com/hekemen/automata/internal/infrastructure/queue"
+	"github.com/h2hsecure/automata/internal/domain/webhook"
+	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
