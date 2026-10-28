@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { Pencil, Trash2, Plus, ExternalLink, Code2, Copy, Check, Inbox, Paperclip } from 'lucide-vue-next'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Pencil, Trash2, Plus, ExternalLink, Code2, Copy, Check, Eye } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -10,10 +11,10 @@ import Input from '@/components/Input.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
-import { usePagination } from '@/composables/usePagination'
-import { listForms, deleteForm, createForm, updateForm, listSubmissions, downloadSubmissionFile } from '@/api/client'
-import type { Form, FormInput, Submission } from '@/types/api'
+import { listForms, deleteForm, createForm, updateForm } from '@/api/client'
+import type { Form, FormInput } from '@/types/api'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
 const forms = ref<Form[]>([])
@@ -108,78 +109,8 @@ function parseEmailList(raw: string): string[] {
     .filter(Boolean)
 }
 
-// --- Submissions modal ---
-const subModalOpen = ref(false)
-const subForm = ref<Form | null>(null)
-const subRows = ref<Array<Record<string, any>>>([])
-const subsLoading = ref(false)
-const {
-  page: subPage,
-  limit: subLimit,
-  total: subTotal,
-  goToPage: subGoToPage,
-  setTotal: subSetTotal,
-  reset: subReset,
-} = usePagination(1, 20)
-
-const subColumns = computed(() => [
-  ...(subForm.value?.Fields ?? []).map((f) => ({ key: f.slug, label: f.label })),
-  { key: 'files', label: 'Files' },
-  { key: 'created', label: 'Created' },
-])
-
-// Flatten Data into slug-keyed cells so the default DataTable rendering works.
-function flattenSubmission(sub: Submission): Record<string, any> {
-  const row: Record<string, any> = {
-    ID: sub.ID,
-    Files: sub.Files ?? [],
-    created: sub.CreatedAt,
-  }
-  for (const f of subForm.value?.Fields ?? []) {
-    row[f.slug] = sub.Data?.[f.slug] ?? ''
-  }
-  return row
-}
-
-async function openSubmissions(f: Form) {
-  subForm.value = f
-  subRows.value = []
-  subReset()
-  subModalOpen.value = true
-  await loadSubmissions()
-}
-
-async function loadSubmissions() {
-  if (!subForm.value) return
-  subsLoading.value = true
-  try {
-    const res = await listSubmissions(subForm.value.ID, subPage.value, subLimit.value)
-    subRows.value = res.data.map(flattenSubmission)
-    subSetTotal(res.total)
-  } finally {
-    subsLoading.value = false
-  }
-}
-
-watch(() => subPage.value, loadSubmissions)
-
-// The file route is Bearer-authenticated, so downloads go through the axios
-// client and trigger a browser save via an object URL.
-async function downloadFile(row: Record<string, any>, index: number) {
-  if (!subForm.value) return
-  try {
-    const blob = await downloadSubmissionFile(subForm.value.ID, row.ID, index)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = row.Files[index]?.name || 'download'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch {
-    // handled
-  }
+function openSubmissions(f: Form) {
+  router.push({ name: 'FormSubmissions', params: { id: f.ID } })
 }
 
 function addField() {
@@ -330,7 +261,7 @@ onMounted(loadForms)
               title="Submissions"
               @click="openSubmissions(row)"
             >
-              <Inbox class="h-4 w-4" />
+              <Eye class="h-4 w-4" />
             </button>
             <button
               class="p-1.5 rounded hover:bg-muted"
@@ -461,64 +392,6 @@ onMounted(loadForms)
           <Button :loading="loading" @click="handleSave">
             {{ isEdit ? 'Save' : 'Create' }}
           </Button>
-        </div>
-      </template>
-    </Modal>
-
-    <!-- Submissions Modal -->
-    <Modal :open="subModalOpen" title="Submissions" @close="subModalOpen = false">
-      <div class="space-y-3">
-        <DataTable
-          :columns="subColumns"
-          :data="subRows"
-          :loading="subsLoading"
-          empty-text="No submissions yet."
-        >
-          <template #files="{ row }: { row: any }">
-            <div v-if="row.Files?.length" class="flex flex-wrap gap-1">
-              <button
-                v-for="(file, i) in row.Files"
-                :key="i"
-                class="flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"
-                @click="downloadFile(row, i)"
-              >
-                <Paperclip class="h-3 w-3" />
-                {{ file.name }}
-              </button>
-            </div>
-            <span v-else class="text-muted-foreground">-</span>
-          </template>
-          <template #created="{ row }: { row: any }">
-            {{ new Date(row.created).toLocaleDateString() }}
-          </template>
-        </DataTable>
-        <div v-if="subTotal > 0" class="flex items-center justify-between">
-          <span class="text-sm text-muted-foreground">
-            Showing {{ (subPage - 1) * subLimit + 1 }}-{{ Math.min(subPage * subLimit, subTotal) }} of {{ subTotal }}
-          </span>
-          <div class="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              :disabled="subPage <= 1"
-              @click="subGoToPage(subPage - 1)"
-            >
-              Prev
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              :disabled="subPage >= Math.ceil(subTotal / subLimit)"
-              @click="subGoToPage(subPage + 1)"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end">
-          <Button variant="outline" @click="subModalOpen = false">Close</Button>
         </div>
       </template>
     </Modal>

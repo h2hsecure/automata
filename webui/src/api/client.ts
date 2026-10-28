@@ -196,6 +196,10 @@ export async function getSubmission(formId: string, submissionId: string): Promi
   return response.data
 }
 
+export async function deleteSubmission(formId: string, submissionId: string): Promise<void> {
+  await client.delete(`/context/forms/${formId}/submissions/${submissionId}`)
+}
+
 // Downloads a stored file attached to a submission. The route is
 // Bearer-authenticated, so the link must go through this client rather than
 // a plain <a href>.
