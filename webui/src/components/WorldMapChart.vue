@@ -40,30 +40,27 @@ function tooltipOf(code: string): string {
         <title>{{ tooltipOf(code) }}</title>
       </path>
     </g>
-    <g
-      v-for="stat in countries"
-      v-show="worldCountries[stat.code]"
-      :key="stat.code"
-      class="map-badge"
-    >
-      <circle
-        class="map-badge-dot"
-        :cx="worldCountries[stat.code].cx"
-        :cy="worldCountries[stat.code].cy"
-        r="9"
-        fill="white"
-        stroke="#0f172a"
-        stroke-width="1"
-      />
-      <text
-        :x="worldCountries[stat.code].cx"
-        :y="worldCountries[stat.code].cy"
-        text-anchor="middle"
-        dominant-baseline="central"
-        class="fill-slate-900 text-[10px] font-bold"
-      >
-        {{ stat.count }}
-      </text>
-    </g>
+    <template v-for="stat in countries" :key="stat.code">
+      <g v-if="worldCountries[stat.code]" class="map-badge">
+        <circle
+          class="map-badge-dot"
+          :cx="worldCountries[stat.code].cx"
+          :cy="worldCountries[stat.code].cy"
+          r="9"
+          fill="white"
+          stroke="#0f172a"
+          stroke-width="1"
+        />
+        <text
+          :x="worldCountries[stat.code].cx"
+          :y="worldCountries[stat.code].cy"
+          text-anchor="middle"
+          dominant-baseline="central"
+          class="fill-slate-900 text-[10px] font-bold"
+        >
+          {{ stat.count }}
+        </text>
+      </g>
+    </template>
   </svg>
 </template>

@@ -45,4 +45,36 @@ describe('WorldMapChart', () => {
     })
     expect(wrapper.find('path[data-code="FR"]').attributes('fill')).toBe('#e2e8f0')
   })
+
+  it('does not crash and keeps rendering the map when a contact country is missing from the world file', () => {
+    // HK is a real ISO code that is not present in the (mocked) world file —
+    // mirrors the production case where a GeoCountryCode has no map entry.
+    expect(() =>
+      mount(WorldMapChart, {
+        props: {
+          countries: [
+            { code: 'US', count: 4, cities: [] },
+            { code: 'HK', count: 1, cities: [] },
+          ],
+        },
+      }),
+    ).not.toThrow()
+
+    const wrapper = mount(WorldMapChart, {
+      props: {
+        countries: [
+          { code: 'US', count: 4, cities: [] },
+          { code: 'HK', count: 1, cities: [] },
+        ],
+      },
+    })
+
+    // The map itself still renders with its country paths...
+    expect(wrapper.find('svg').exists()).toBe(true)
+    expect(wrapper.find('path[data-code="US"]').exists()).toBe(true)
+    expect(wrapper.find('path[data-code="FR"]').exists()).toBe(true)
+    // ...and the known country gets its badge, while the unknown one is skipped.
+    expect(wrapper.findAll('.map-badge').length).toBe(1)
+    expect(wrapper.findAll('.map-badge text').map((b) => b.text())).toContain('4')
+  })
 })
