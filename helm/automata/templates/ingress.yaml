@@ -1,27 +1,60 @@
 {{- if .Values.ingress.enabled -}}
-# Body-size limit for form/static file uploads. Traefik's default is 10 MiB;
-# override with ingress.maxBodySize (integer bytes; e.g. 52428800 = 50 MiB).
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
+# Gateway API (gateway.networking.k8s.io/v1) — replaces the old Traefik
+# IngressRoute + Middleware pair. Binds to the GatewayClass named in
+# ingress.gatewayClass (default: traefik; `kubectl get gatewayclass`).
+#
+# Routing (unchanged from the old IngressRoute):
+#   /snippet, /track, /form/, /static/ -> tracking service :8081
+#   /                                   -> BFF service :8082
+#
+# Upload body limit: every rule carries a RequestBodyLimit filter
+# (ingress.maxBodySize, int64 bytes; default 104857600 = 100 MiB) — the
+# Gateway API equivalent of the old Traefik `buffering.maxRequestBodyBytes`
+# middleware.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
 metadata:
-  name: {{ include "automata.fullname" . }}-bodylimit
+  name: {{ include "automata.fullname" . }}
   labels:
     {{- include "automata.labels" . | nindent 4 }}
+  {{- if .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+  {{- end }}
 spec:
-  {{- if .Values.ingress.maxBodySize }}
-  # Traefik v3: the limit lives under `buffering.maxRequestBodyBytes` as an
-  # int64 byte count (v2's `requestBody.maxBodySize` was removed; using it
-  # makes Traefik reject the middleware with "invalid middleware type or
-  # middleware does not exist", which takes down every router that
-  # references it).
-  buffering:
-    # `int` keeps large byte counts as plain decimal (Helm would otherwise
-    # print 104857600 as 1.048576e+08).
-    maxRequestBodyBytes: {{ .Values.ingress.maxBodySize | int }}
+  gatewayClassName: {{ .Values.ingress.gatewayClass }}
+  {{- if .Values.ingress.tls }}
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hosts:
+        - {{ .Values.ingress.hostname | quote }}
+      tls:
+        certificateRefs:
+          - kind: Secret
+            name: {{ (index .Values.ingress.tls 0).secretName | quote }}
+    # HTTP listener so the -route-http HTTPRoute can 301 to HTTPS.
+    - name: http
+      protocol: HTTP
+      port: 80
+      hosts:
+        - {{ .Values.ingress.hostname | quote }}
+  {{- else }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hosts:
+        - {{ .Values.ingress.hostname | quote }}
   {{- end }}
 ---
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+# Trailing slashes on /form/ and /static/ are intentional: the bare prefixes
+# would also match the admin SPA routes /forms and /static-files (and
+# /forms/:id/submissions) and 404 them. /snippet and /track have no
+# colliding SPA routes, so they stay bare.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: {{ include "automata.fullname" . }}-route
   labels:
@@ -31,77 +64,65 @@ metadata:
     {{- toYaml .Values.ingress.annotations | nindent 4 }}
   {{- end }}
 spec:
-  entryPoints:
-    {{- if .Values.ingress.tls }}
-    # TLS configured: serve HTTPS only; the -route-http route below 301s all
-    # HTTP traffic for this host to HTTPS.
-    - websecure
-    {{- else }}
-    - web
-    - websecure
-    {{- end }}
-  routes:
-    # Tracking server (snippet, tracking events, public forms, static files).
-    # Trailing slashes on /form and /static are intentional: the bare prefixes
-    # would also match the admin SPA routes /forms and /static-files (and
-    # /forms/:id/submissions) and 404 them. Every tracking route is
-    # /form/<something> or /static/<contextID>/<name>; /track and /snippet
-    # have no colliding SPA routes, so they stay bare.
-    - kind: Rule
-      match: (Host(`{{ .Values.ingress.hostname }}`)) && (PathPrefix(`/snippet`) || PathPrefix(`/track`) || PathPrefix(`/form/`) || PathPrefix(`/static/`))
-      middlewares:
-        - name: {{ include "automata.fullname" . }}-bodylimit
-      services:
-        - name: {{ include "automata.fullname" . }}-automata
+  hostnames:
+    - {{ .Values.ingress.hostname | quote }}
+  parentRefs:
+    - name: {{ include "automata.fullname" . }}
+  rules:
+    {{- range list "/snippet" "/track" "/form/" "/static/" }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ . }}
+      filters:
+        - type: RequestBodyLimit
+          # `value` is the Gateway API v1.0 field name (v1.1 renames it to
+          # `bodySize`; `value` remains supported).
+          value: {{ $.Values.ingress.maxBodySize | int }}
+      backendRefs:
+        - name: {{ include "automata.fullname" $ }}-automata
           port: 8081
-    # Frontend + API proxy via BFF
-    - kind: Rule
-      match: (Host(`{{ .Values.ingress.hostname }}`)) && PathPrefix(`/`)
-      middlewares:
-        - name: {{ include "automata.fullname" . }}-bodylimit
-      services:
-        - name: {{ include "automata.fullname" . }}-bff
+          protocol: HTTP
+    {{- end }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestBodyLimit
+          value: {{ $.Values.ingress.maxBodySize | int }}
+      backendRefs:
+        - name: {{ include "automata.fullname" $ }}-bff
           port: 8082
-  {{- if .Values.ingress.tls }}
-  tls:
-    secretName: {{ (index .Values.ingress.tls 0).secretName | quote }}
-  {{- end }}
+          protocol: HTTP
 {{- if .Values.ingress.tls }}
 ---
-# HTTP -> HTTPS: every request for this host on the web entrypoint is
-# redirected (301 permanent) to HTTPS. No service needed for redirectScheme.
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: {{ include "automata.fullname" . }}-redirect
-  labels:
-    {{- include "automata.labels" . | nindent 4 }}
-spec:
-  redirectScheme:
-    scheme: https
-    permanent: true
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+# HTTP -> HTTPS: every request for this host on port 80 is 301-redirected to
+# HTTPS. Redirect-only routes need no backendRef (unlike the old Traefik
+# build, which required a placeholder service on service-less routers).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: {{ include "automata.fullname" . }}-route-http
   labels:
     {{- include "automata.labels" . | nindent 4 }}
+  {{- if .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+  {{- end }}
 spec:
-  entryPoints:
-    - web
-  routes:
-    - kind: Rule
-      match: Host(`{{ .Values.ingress.hostname }}`) && PathPrefix(`/`)
-      middlewares:
-        - name: {{ include "automata.fullname" . }}-redirect
-      services:
-        # Placeholder: the redirectScheme middleware terminates the request
-        # before it reaches any service. Some Traefik builds reject routers
-        # that have neither a service nor child routers
-        # ("router must have either a service or child routers"), so the
-        # BFF is listed to satisfy the check — it is never contacted.
-        - name: {{ include "automata.fullname" . }}-bff
-          port: 8082
+  hostnames:
+    - {{ .Values.ingress.hostname | quote }}
+  parentRefs:
+    - name: {{ include "automata.fullname" . }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          scheme: https
+          statusCode: 301
 {{- end }}
 {{- end }}

@@ -1,4 +1,4 @@
-.PHONY: build test cicd-tests cicd-tests-ci cicd-tests-verbose cicd-tests-race cicd-tests-full local up down clean deploy-staging geoip-update
+.PHONY: build test cicd-tests cicd-tests-ci cicd-tests-verbose cicd-tests-race cicd-tests-full helm-lint local up down clean deploy-staging geoip-update
 
 build:
 	go build -o automata ./cmd/automata
@@ -20,6 +20,18 @@ cicd-tests-race:
 
 cicd-tests-full:
 	go test ./cicd/... -count=1 -timeout 120s -v -ginkgo.v -ginkgo.trace
+
+# Lint the Helm chart and render it (no-TLS and TLS+certificate variants)
+# to catch template regressions.
+helm-lint:
+	helm lint helm/automata
+	helm template automata helm/automata --namespace automata > /dev/null
+	helm template automata helm/automata --namespace automata \
+		--set ingress.tls[0].hosts=m.example.com \
+		--set ingress.tls[0].secretName=automata-tls \
+		--set ingress.certificate.enabled=true \
+		--set ingress.certificate.clusterIssuer=letsencrypt-prod \
+		> /dev/null
 
 test: cicd-tests
 

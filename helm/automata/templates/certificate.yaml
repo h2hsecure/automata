@@ -1,9 +1,10 @@
-{{- if and .Values.ingress.enabled .Values.ingress.tls .Values.ingress.certificate.enabled .Values.ingress.certificate.issuer -}}
+{{- if and .Values.ingress.enabled .Values.ingress.tls .Values.ingress.certificate.enabled .Values.ingress.certificate.clusterIssuer -}}
 {{- /*
-cert-manager does not watch Traefik IngressRoute resources, so the TLS
-secret cannot be provisioned via ingress annotations. This Certificate
-provisions the secret named in ingress.tls[].secretName, which the
-IngressRoute references in spec.tls.secretName.
+cert-manager does not watch Gateway resources, so the TLS secret cannot be
+provisioned via annotations. This Certificate provisions the secret named in
+ingress.tls[].secretName, which the Gateway references in
+spec.listeners[].tls.certificateRefs. The issuer is always a ClusterIssuer,
+named in ingress.certificate.clusterIssuer (e.g. "letsencrypt-prod").
 */}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -26,6 +27,6 @@ spec:
     - {{ . | quote }}
     {{- end }}
   issuerRef:
-    name: {{ .Values.ingress.certificate.issuer }}
-    kind: {{ ternary "ClusterIssuer" "Issuer" .Values.ingress.certificate.isClusterIssuer }}
+    name: {{ .Values.ingress.certificate.clusterIssuer }}
+    kind: ClusterIssuer
 {{- end }}

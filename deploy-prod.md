@@ -86,11 +86,13 @@ kubectl -n automata create secret docker-registry ghcr-registry \
 ```yaml
 ingress:
   hostname: <PROD-DOMAIN>
+  gatewayClass: traefik        # kubectl get gatewayclass (default in chart)
   tls:
     - hosts: [<PROD-DOMAIN>]
       secretName: automata-tls   # existing Certificate/secret in the automata ns
   certificate:
     enabled: false               # cert already provisioned outside the chart
+    # clusterIssuer: letsencrypt-prod   # only if certificate.enabled: true
   # Max upload size, in bytes (int64) — chart default is 104857600 (100 MiB):
   # maxBodySize: 52428800   # 50 MiB
 secretKey: "<random 32+ chars>"
@@ -102,16 +104,19 @@ postgresql:
     password: "<strong DB password>"
 ```
 
-The chart renders a Traefik `IngressRoute` (the cluster runs Traefik, not
-nginx) plus a `Middleware` limiting upload body size. With `ingress.tls`
-set, HTTP for the host is 301-redirected to HTTPS.
+The chart renders Gateway API objects (`gateway.networking.k8s.io/v1`)
+bound to the GatewayClass named in `ingress.gatewayClass` — a `Gateway`
+(TLS listeners + cert refs when `ingress.tls` is set) and `HTTPRoute`s
+whose rules carry `RequestBodyLimit` filters for the upload size limit.
+With `ingress.tls` set, HTTP for the host is 301-redirected to HTTPS via
+a redirect-only `HTTPRoute` on the port-80 listener.
 
 TLS: the production `automata` namespace already has a ready
 `Certificate`/secret named `automata-tls`, so `certificate.enabled` stays
 false. If you ever need the chart to provision the cert itself (cert-manager
-does not watch IngressRoute resources), set `certificate.enabled: true`
-with `issuer` + `isClusterIssuer` and it renders a `Certificate` that
-writes the `tls[].secretName` secret.
+does not watch Gateway resources), set `certificate.enabled: true` with
+`clusterIssuer` (e.g. `letsencrypt-prod`) and it renders a `Certificate`
+that writes the `tls[].secretName` secret.
 
 > **Secrets must be fresh.** The staging `secretKey`, `cookieSecret`,
 > admin password, and Postgres password are all public in git history —

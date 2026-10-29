@@ -34,34 +34,37 @@ bff:
       memory: 128Mi
 
 ingress:
-  # Renders a Traefik IngressRoute (traefik.io/v1alpha1) + a Middleware.
+  # Renders a Gateway + HTTPRoutes (gateway.networking.k8s.io/v1), bound to
+  # the GatewayClass named in `gatewayClass` (the cluster runs Traefik).
   # Routes /snippet, /track, /form, /static -> tracking :8081 and / -> BFF :8082.
   enabled: true
   hostname: automata.home.arpa
-  # Optional Traefik annotations for the IngressRoute (e.g.
-  # traefik.ingress.kubernetes.io/router.priority).
+  # Name of the GatewayClass the Gateway binds to
+  # (`kubectl get gatewayclass`; Traefik's default is "traefik").
+  gatewayClass: traefik
+  # Optional annotations for the Gateway + HTTPRoutes.
   annotations: {}
   # Max request body size for file uploads, as an integer byte count,
-  # rendered as Traefik v3's `buffering.maxRequestBodyBytes` (v2's
-  # `requestBody.maxBodySize` was removed in v3).
+  # rendered as a RequestBodyLimit filter on every HTTPRoute rule.
   # Default below is 100 MiB, matching the old nginx Ingress's 100M limit.
   maxBodySize: 104857600
-  # Optional TLS termination. secretName becomes spec.tls.secretName on the
-  # IngressRoute. hosts are ignored by Traefik (matching is on `hostname`)
-  # but are reused as dnsNames when certificate.enabled is true.
+  # Optional TLS termination. secretName becomes the Gateway listener's
+  # tls.certificateRefs secret. hosts are ignored by the gateway (matching is
+  # on `hostname`) but are reused as dnsNames when certificate.enabled is
+  # true.
   # Example:
   # tls:
   #   - hosts: [example.com]
   #     secretName: automata-tls
   tls: []
-  # cert-manager does not watch Traefik IngressRoute resources, so TLS
-  # secrets cannot be provisioned via annotations. When enabled (and
-  # ingress.tls is non-empty), renders a Certificate that provisions the
-  # tls[].secretName secret. Requires cert-manager installed in-cluster.
+  # cert-manager does not watch Gateway resources, so TLS secrets cannot be
+  # provisioned via annotations. When enabled (and ingress.tls is non-empty),
+  # renders a Certificate that provisions the tls[].secretName secret via the
+  # ClusterIssuer named in `clusterIssuer`. Requires cert-manager installed
+  # in-cluster.
   certificate:
     enabled: false
-    issuer: ""          # e.g. "letsencrypt-prod"
-    isClusterIssuer: true
+    clusterIssuer: ""   # e.g. "letsencrypt-prod"
 
 # Secrets live in values.local.yaml (gitignored) — never commit real values.
 secretKey: "change-this-in-production"
