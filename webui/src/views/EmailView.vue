@@ -41,7 +41,7 @@ const tab = ref<'templates' | 'inbox'>('templates')
 // --- Templates tab ---
 const templates = ref<EmailTemplate[]>([])
 const forms = ref<Form[]>([])
-const loading = ref(false)
+const loading = ref(true)
 
 const modalOpen = ref(false)
 const isEdit = ref(false)

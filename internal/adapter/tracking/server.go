@@ -3,6 +3,7 @@ package tracking
 import (
 	"net/http"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/adapter/api/handler"
 	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
@@ -15,6 +16,9 @@ import (
 // skip them.
 func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHandler, placementHandler *handler.PlacementHandler, campaignHandler *handler.CampaignHandler, trackingRepo Repository, geoLookup geodomain.Lookup, contactRepo ...ContactRepository) *gin.Engine {
 	r := gin.Default()
+
+	// Compress responses for clients that accept gzip (JSON, JS, HTML).
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	trackHandler := &TrackHandler{repo: trackingRepo, geoLookup: geoLookup}
 	if len(contactRepo) > 0 && contactRepo[0] != nil {

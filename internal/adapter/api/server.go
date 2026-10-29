@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/adapter/api/handler"
 	"github.com/h2hsecure/automata/internal/adapter/api/middleware"
@@ -45,6 +46,9 @@ func NewServer(
 	if prefix == "" {
 		prefix = "/api"
 	}
+
+	// Compress responses for clients that accept gzip (JSON, JS, HTML).
+	parent.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	api := parent.Group(prefix)
 

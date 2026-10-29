@@ -69,6 +69,35 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
+describe('FormsView loading state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows the table loading row before the form list resolves, not the empty state', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const auth = useAuthStore(pinia)
+    auth.currentContextId = 'ctx-1'
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/forms', component: FormsView },
+        { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/forms')
+    await router.isReady()
+    wrapper = mount(FormsView, {
+      attachTo: document.body,
+      global: { plugins: [pinia, router] },
+    })
+    // listForms has not resolved yet: loading row, no empty text
+    expect(document.body.textContent).toContain('Loading...')
+    expect(document.body.textContent).not.toContain('No forms found.')
+  })
+})
+
 describe('FormsView file fields', () => {
   beforeEach(() => {
     vi.clearAllMocks()

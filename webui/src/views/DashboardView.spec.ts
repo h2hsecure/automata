@@ -55,6 +55,28 @@ describe('DashboardView', () => {
     document.body.innerHTML = ''
   })
 
+  it('shows loading states before API data resolves, not empty states', () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const auth = useAuthStore(pinia)
+    auth.currentContextId = 'ctx-1'
+    const wrapper = mount(DashboardView, {
+      attachTo: document.body,
+      global: {
+        plugins: [pinia],
+        stubs: {
+          'router-link': { props: ['to'], template: '<a :href="to"><slot /></a>' },
+        },
+      },
+    })
+    // mounted, but the API promises have not resolved yet
+    expect(wrapper.text()).toContain('Loading…')
+    expect(wrapper.text()).not.toContain('No geo data')
+    expect(wrapper.text()).not.toContain('No page view data yet')
+    expect(wrapper.text()).not.toContain('No device data yet')
+    expect(wrapper.text()).not.toContain('No referrer data yet')
+  })
+
   it('renders a contact locations map card with the last 90 days of contacts', async () => {
     const wrapper = await mountView()
     expect(wrapper.text()).toContain('Contact Locations')

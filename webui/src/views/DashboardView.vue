@@ -57,6 +57,7 @@ const maxPageViews = computed(() =>
 // World map: contact locations from the last 90 days (includes hidden)
 const MAP_WINDOW_DAYS = 90
 const mapCountries = ref<CountryStat[]>([])
+const mapLoading = ref(true)
 
 async function loadOverview() {
   loading.value = true
@@ -108,6 +109,7 @@ async function loadOverview() {
 // aggregates them by country for the world map. Non-critical: an empty map
 // is fine if the call fails.
 async function loadMapData() {
+  mapLoading.value = true
   const since = new Date(Date.now() - MAP_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
   const pageSize = 100
   let page = 1
@@ -122,6 +124,8 @@ async function loadMapData() {
     } while (collected.length < total && page <= 50)
   } catch {
     return
+  } finally {
+    mapLoading.value = false
   }
   mapCountries.value = aggregateContacts(collected)
 }
@@ -150,7 +154,20 @@ watch(
     </div>
 
     <!-- Stats Grid -->
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-if="loading" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          v-for="i in 5"
+          :key="i"
+          class="rounded-lg border border-border bg-card p-6"
+        >
+          <div class="animate-pulse space-y-3">
+            <div class="h-3 w-24 rounded bg-muted" />
+            <div class="h-7 w-16 rounded bg-muted" />
+            <div class="h-3 w-32 rounded bg-muted" />
+          </div>
+        </div>
+      </div>
+      <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <!-- Visitors -->
         <Card>
           <div class="flex items-center justify-between">
@@ -281,7 +298,13 @@ watch(
       <!-- Contact Locations Map -->
       <Card title="Contact Locations" description="Countries with contact activity in the last 90 days">
         <p
-          v-if="mapCountries.length === 0"
+          v-if="mapLoading"
+          class="py-8 text-center text-sm text-muted-foreground"
+        >
+          Loading…
+        </p>
+        <p
+          v-else-if="mapCountries.length === 0"
           class="py-8 text-center text-sm text-muted-foreground"
         >
           No geo data for the last 90 days.
@@ -294,7 +317,10 @@ watch(
         <!-- Top Pages -->
         <Card class="lg:col-span-2" title="Top Pages" description="Most visited pages by view count">
           <div class="mt-4 space-y-3">
-            <p v-if="pageViewsChart.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+            <p v-if="loading" class="py-4 text-center text-sm text-muted-foreground">
+              Loading…
+            </p>
+            <p v-else-if="pageViewsChart.length === 0" class="py-4 text-center text-sm text-muted-foreground">
               No page view data yet.
             </p>
             <div
@@ -322,7 +348,10 @@ watch(
         <!-- Device Breakdown -->
         <Card title="Devices" description="Visitor device breakdown">
           <div class="mt-4 space-y-3">
-            <p v-if="deviceBreakdown.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+            <p v-if="loading" class="py-4 text-center text-sm text-muted-foreground">
+              Loading…
+            </p>
+            <p v-else-if="deviceBreakdown.length === 0" class="py-4 text-center text-sm text-muted-foreground">
               No device data yet.
             </p>
             <div
@@ -353,7 +382,10 @@ watch(
       <!-- Top Referrers -->
       <Card title="Top Referrers" description="Where your visitors come from">
         <div class="mt-4 space-y-3">
-          <p v-if="referrers.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+          <p v-if="loading" class="py-4 text-center text-sm text-muted-foreground">
+            Loading…
+          </p>
+          <p v-else-if="referrers.length === 0" class="py-4 text-center text-sm text-muted-foreground">
             No referrer data yet.
           </p>
           <div

@@ -17,7 +17,7 @@ import type { Banner, BannerInput } from '@/types/api'
 const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
 const banners = ref<Banner[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const modalOpen = ref(false)
 const isEdit = ref(false)
 const editingId = ref('')

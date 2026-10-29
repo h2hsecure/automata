@@ -429,6 +429,27 @@ var _ = Describe("HTTP Integration Tests - Tracking", func() {
 		})
 	})
 
+	Describe("Gzip compression", func() {
+		It("compresses JSON responses when the client accepts gzip", func() {
+			req := httptest.NewRequest("GET", "/track/banner/list", nil)
+			req.Header.Set("X-Context-ID", support.NewTestContextID())
+			req.Header.Set("Accept-Encoding", "gzip")
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Header().Get("Content-Encoding")).To(Equal("gzip"))
+		})
+
+		It("does not compress when the client does not accept gzip", func() {
+			req := httptest.NewRequest("GET", "/track/banner/list", nil)
+			req.Header.Set("X-Context-ID", support.NewTestContextID())
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Header().Get("Content-Encoding")).To(BeEmpty())
+		})
+	})
+
 	Describe("GET /snippet/:id.js", func() {
 		It("should serve a snippet for any context ID", func() {
 			req := httptest.NewRequest("GET", "/snippet/nonexistent.js", nil)

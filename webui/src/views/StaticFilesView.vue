@@ -15,7 +15,7 @@ import type { StaticFile } from '@/types/api'
 const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
 const files = ref<StaticFile[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const uploadFile = ref<File | null>(null)
 const uploadName = ref('')
 const uploading = ref(false)
