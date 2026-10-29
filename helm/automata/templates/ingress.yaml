@@ -41,9 +41,14 @@ spec:
     - websecure
     {{- end }}
   routes:
-    # Tracking server (snippet, tracking events, public forms, static files)
+    # Tracking server (snippet, tracking events, public forms, static files).
+    # Trailing slashes on /form and /static are intentional: the bare prefixes
+    # would also match the admin SPA routes /forms and /static-files (and
+    # /forms/:id/submissions) and 404 them. Every tracking route is
+    # /form/<something> or /static/<contextID>/<name>; /track and /snippet
+    # have no colliding SPA routes, so they stay bare.
     - kind: Rule
-      match: (Host(`{{ .Values.ingress.hostname }}`)) && (PathPrefix(`/snippet`) || PathPrefix(`/track`) || PathPrefix(`/form`) || PathPrefix(`/static`))
+      match: (Host(`{{ .Values.ingress.hostname }}`)) && (PathPrefix(`/snippet`) || PathPrefix(`/track`) || PathPrefix(`/form/`) || PathPrefix(`/static/`))
       middlewares:
         - name: {{ include "automata.fullname" . }}-bodylimit
       services:
