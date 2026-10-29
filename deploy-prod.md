@@ -85,10 +85,10 @@ kubectl -n automata create secret docker-registry ghcr-registry \
 
 ```yaml
 ingress:
-  hostname: <PROD-DOMAIN>
+  hostname: m.h2hsecure.com
   gatewayClass: traefik        # kubectl get gatewayclass (default in chart)
   tls:
-    - hosts: [<PROD-DOMAIN>]
+    - hosts: [m.h2hsecure.com]
       secretName: automata-tls   # existing Certificate/secret in the automata ns
   certificate:
     enabled: false               # cert already provisioned outside the chart
