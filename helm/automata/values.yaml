@@ -57,11 +57,11 @@ ingress:
   #   - hosts: [example.com]
   #     secretName: automata-tls
   tls: []
-  # cert-manager does not watch Gateway resources, so TLS secrets cannot be
-  # provisioned via annotations. When enabled (and ingress.tls is non-empty),
-  # renders a Certificate that provisions the tls[].secretName secret via the
-  # ClusterIssuer named in `clusterIssuer`. Requires cert-manager installed
-  # in-cluster.
+  # cert-manager does not watch Gateway resources, so the TLS secret is
+  # provisioned by a chart-rendered Certificate (not annotations).
+  # REQUIRED when ingress.tls is non-empty: enabled must be true and
+  # clusterIssuer must name the ClusterIssuer (e.g. "letsencrypt-prod").
+  # Requires cert-manager installed in-cluster.
   certificate:
     enabled: false
     clusterIssuer: ""   # e.g. "letsencrypt-prod"

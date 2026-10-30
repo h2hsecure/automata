@@ -91,8 +91,8 @@ ingress:
     - hosts: [m.h2hsecure.com]
       secretName: automata-tls   # existing Certificate/secret in the automata ns
   certificate:
-    enabled: false               # cert already provisioned outside the chart
-    # clusterIssuer: letsencrypt-prod   # only if certificate.enabled: true
+    enabled: true                # REQUIRED when ingress.tls is set
+    clusterIssuer: letsencrypt-prod
   # Max upload size, in bytes (int64) — chart default is 104857600 (100 MiB):
   # maxBodySize: 52428800   # 50 MiB
 secretKey: "<random 32+ chars>"
@@ -111,12 +111,14 @@ whose rules carry `RequestBodyLimit` filters for the upload size limit.
 With `ingress.tls` set, HTTP for the host is 301-redirected to HTTPS via
 a redirect-only `HTTPRoute` on the port-80 listener.
 
-TLS: the production `automata` namespace already has a ready
-`Certificate`/secret named `automata-tls`, so `certificate.enabled` stays
-false. If you ever need the chart to provision the cert itself (cert-manager
-does not watch Gateway resources), set `certificate.enabled: true` with
-`clusterIssuer` (e.g. `letsencrypt-prod`) and it renders a `Certificate`
-that writes the `tls[].secretName` secret.
+TLS: `ingress.tls` requires `certificate.enabled: true` + `clusterIssuer`
+(e.g. `letsencrypt-prod`) — cert-manager does not watch Gateway resources,
+so the chart renders a `Certificate` that writes the `tls[].secretName`
+secret. Before the first upgrade with this, delete the out-of-chart
+`Certificate` named `automata-tls`
+(`kubectl -n automata delete certificate automata-tls`) so Helm can own the
+object — the `automata-tls` secret itself is kept and cert-manager adopts
+it (no re-issue, no TLS blip).
 
 > **Secrets must be fresh.** The staging `secretKey`, `cookieSecret`,
 > admin password, and Postgres password are all public in git history —

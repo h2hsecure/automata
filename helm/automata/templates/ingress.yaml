@@ -1,4 +1,12 @@
 {{- if .Values.ingress.enabled -}}
+{{- if .Values.ingress.tls -}}
+{{- if not .Values.ingress.certificate.enabled -}}
+{{- fail "ingress.tls is set, so ingress.certificate.enabled must be true: the chart provisions the TLS secret via a cert-manager Certificate (cert-manager does not watch Gateway resources)" -}}
+{{- end -}}
+{{- if not .Values.ingress.certificate.clusterIssuer -}}
+{{- fail "ingress.certificate.enabled=true requires ingress.certificate.clusterIssuer (e.g. \"letsencrypt-prod\")" -}}
+{{- end -}}
+{{- end -}}
 # Gateway API (gateway.networking.k8s.io/v1) — replaces the old Traefik
 # IngressRoute + Middleware pair. Binds to the GatewayClass named in
 # ingress.gatewayClass (default: traefik; `kubectl get gatewayclass`).

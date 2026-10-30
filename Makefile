@@ -32,6 +32,11 @@ helm-lint:
 		--set ingress.certificate.enabled=true \
 		--set ingress.certificate.clusterIssuer=letsencrypt-prod \
 		> /dev/null
+	# invariant: TLS without certificate.enabled must fail the render
+	@! helm template automata helm/automata --namespace automata \
+		--set ingress.tls[0].hosts=m.example.com \
+		--set ingress.tls[0].secretName=automata-tls \
+		> /dev/null 2>&1
 
 test: cicd-tests
 
