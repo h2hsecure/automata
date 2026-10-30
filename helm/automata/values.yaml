@@ -45,7 +45,8 @@ ingress:
   # Optional annotations for the Gateway + HTTPRoutes.
   annotations: {}
   # Max request body size for file uploads, as an integer byte count,
-  # rendered as a RequestBodyLimit filter on every HTTPRoute rule.
+  # applied via an ExtensionRef filter on every HTTPRoute rule pointing at a
+  # Traefik Middleware (Gateway API has no standard body-limit filter).
   # Default below is 100 MiB, matching the old nginx Ingress's 100M limit.
   maxBodySize: 104857600
   # Optional TLS termination. secretName becomes the Gateway listener's

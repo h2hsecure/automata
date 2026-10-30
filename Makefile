@@ -1,4 +1,4 @@
-.PHONY: build test cicd-tests cicd-tests-ci cicd-tests-verbose cicd-tests-race cicd-tests-full helm-lint local up down clean deploy-staging geoip-update
+.PHONY: build test cicd-tests cicd-tests-ci cicd-tests-verbose cicd-tests-race cicd-tests-full helm-lint helm-validate local up down clean deploy-staging geoip-update
 
 build:
 	go build -o automata ./cmd/automata
@@ -21,9 +21,11 @@ cicd-tests-race:
 cicd-tests-full:
 	go test ./cicd/... -count=1 -timeout 120s -v -ginkgo.v -ginkgo.trace
 
-# Lint the Helm chart and render it (no-TLS and TLS+certificate variants)
-# to catch template regressions.
-helm-lint:
+# Lint the Helm chart, render it (no-TLS and TLS+certificate variants) and
+# server-side validate both renders against real CRD schemas (needs a
+# reachable cluster, e.g. local k3s) to catch template regressions and
+# invented CRD fields/types that client-side checks cannot see.
+helm-lint: helm-validate
 	helm lint helm/automata
 	helm template automata helm/automata --namespace automata > /dev/null
 	helm template automata helm/automata --namespace automata \
@@ -37,6 +39,9 @@ helm-lint:
 		--set ingress.tls[0].hosts=m.example.com \
 		--set ingress.tls[0].secretName=automata-tls \
 		> /dev/null 2>&1
+
+helm-validate:
+	@bash scripts/helm-validate.sh
 
 test: cicd-tests
 

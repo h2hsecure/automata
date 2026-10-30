@@ -107,7 +107,8 @@ postgresql:
 The chart renders Gateway API objects (`gateway.networking.k8s.io/v1`)
 bound to the GatewayClass named in `ingress.gatewayClass` — a `Gateway`
 (TLS listeners + cert refs when `ingress.tls` is set) and `HTTPRoute`s
-whose rules carry `RequestBodyLimit` filters for the upload size limit.
+whose rules carry `ExtensionRef` filters (pointing at a Traefik `Middleware`)
+for the upload size limit — Gateway API has no standard body-limit filter.
 With `ingress.tls` set, HTTP for the host is 301-redirected to HTTPS via
 a redirect-only `HTTPRoute` on the port-80 listener.
 
@@ -125,6 +126,41 @@ it (no re-issue, no TLS blip).
 > do NOT reuse them in production.
 >
 > Generate with: `openssl rand -hex 32`
+
+## 2.5) Gateway API CRDs (one-time, before the first Gateway-based deploy)
+
+The prod cluster's `gateway.networking.k8s.io` CRDs are owned by the
+`traefik-crd` helm release (old generation — the `helm upgrade` of this
+chart fails on `HTTPRoute` with `Unsupported value: "RequestBodyLimit"` /
+pruned fields until they are refreshed). `kubectl apply` of upstream CRDs
+does not stick, because the next touch of that release re-applies its
+bundled ones. Refresh via the release:
+
+```bash
+# (check first: does the main traefik release also render CRDs?)
+helm get manifest traefik -n kube-system | grep -c CustomResourceDefinition
+
+helm repo add traefik https://traefik.github.io/charts
+helm upgrade traefik-crd traefik/traefik-crds \
+  --set gatewayAPI=true -n kube-system
+```
+
+Verify the refresh took effect — the v1 HTTPRoute filter enum must list 7
+types (includes `CORS`):
+
+```bash
+kubectl get crd httproutes.gateway.networking.k8s.io -o json | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+v = [v for v in d['spec']['versions'] if v['name'] == 'v1'][0]
+f = v['schema']['openAPIV3Schema']['properties']['spec']['properties']['rules']['items']['properties']['filters']['items']['properties']['type']
+print(sorted(f['enum']))
+"
+```
+
+If the `traefik` main release *does* render CRDs too, upgrade its release
+to the current traefik chart as well (it depends on `traefik-crds`) so the
+two releases do not fight over the CRDs.
 
 ## 3) Deploy
 
