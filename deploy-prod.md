@@ -130,20 +130,40 @@ it (no re-issue, no TLS blip).
 ## 2.5) Gateway API CRDs (one-time, before the first Gateway-based deploy)
 
 The prod cluster's `gateway.networking.k8s.io` CRDs are owned by the
-`traefik-crd` helm release (old generation — the `helm upgrade` of this
-chart fails on `HTTPRoute` with `Unsupported value: "RequestBodyLimit"` /
-pruned fields until they are refreshed). `kubectl apply` of upstream CRDs
-does not stick, because the next touch of that release re-applies its
-bundled ones. Refresh via the release:
+`traefik-crd` helm release (old generation). They must be refreshed to the
+current Gateway API before this chart's `Gateway`/`HTTPRoute` objects are
+accepted.
+
+The obvious path — upgrading that release to the `traefik-crds` chart — is
+broken: the chart renders a ~1.27 MiB manifest, which exceeds Helm's
+1 MiB release-secret limit (`Secret ... is invalid: data: Too long`). It
+breaks any release carrying those CRDs, so the CRDs have to be applied
+out-of-band with kubectl instead:
 
 ```bash
-# (check first: does the main traefik release also render CRDs?)
+# (check first: does the main traefik release also render CRDs? If so, the
+# same "never upgrade" drift rule below applies to it too)
 helm get manifest traefik -n kube-system | grep -c CustomResourceDefinition
 
-helm repo add traefik https://traefik.github.io/charts
-helm upgrade traefik-crd traefik/traefik-crds \
-  --set gatewayAPI=true -n kube-system
+curl -sfL https://traefik.github.io/charts/traefik-crds/traefik-crds-1.18.0.tgz -o /tmp/tc.tgz
+tar xzf /tmp/tc.tgz -C /tmp
+kubectl apply -f /tmp/traefik-crds/crds-files/gatewayAPI/gateway-standard-install.yaml
+kubectl apply -f /tmp/traefik-crds/crds-files/traefik/
 ```
+
+Then neutralize the stale release so it can never roll the schemas back.
+If the live CRDs carry `helm.sh/resource-policy: keep` (check:
+`kubectl get crd gateways.gateway.networking.k8s.io -o jsonpath='{.metadata.annotations.helm\.sh/resource-policy}'`),
+delete the release — it removes the release and its history without
+touching the CRDs:
+
+```bash
+helm delete traefik-crd -n kube-system
+```
+
+If the annotation is empty, leave the release alone and treat both
+`traefik-crd` (and `traefik`, if it renders CRDs) as frozen — the CRDs are
+kubectl-managed from now on.
 
 Verify the refresh took effect — the v1 HTTPRoute filter enum must list 7
 types (includes `CORS`):
