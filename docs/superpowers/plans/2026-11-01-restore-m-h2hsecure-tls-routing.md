@@ -1,142 +1,104 @@
-# Restore m.h2hsecure.com TLS + routing (post-nginx-migration)
+# Restore m.h2hsecure.com TLS + routing (post-nginx-migration) — DONE
 
-## Context
+## Context (corrected topology)
 
-`m.h2hsecure.com` has been dead since 2026-10-30. Root cause (confirmed): the
-nginx-based reverse-proxy migration remapped Traefik's entrypoints off 80/443.
-The working website Gateways prove the new scheme:
+`m.h2hsecure.com` was dead since 2026-10-30. Root cause (confirmed): the
+edge migration moved Traefik's entrypoints off 80/443. The working website
+Gateways proved the new scheme:
 
-- HTTP  → port **8000**
-- HTTPS → port **8443** (TLS Terminate, e.g. secret `h2hsecure-tls`)
+- HTTP → port **8000**
+- HTTPS → port **8443** (TLS terminate, e.g. secret `h2hsecure-tls`)
 
-The automata chart hardcodes Gateway listeners on 443/80 →
-`PortUnavailable` ("no matching entryPoint for port 443 and protocol HTTPS")
-→ Gateway `PROGRAMMED` empty → HTTPRoute `NotAllowedByListeners`.
+The automata chart hardcoded Gateway listeners on 443/80 → `PortUnavailable`
+→ Gateway `PROGRAMMED` empty → HTTPRoutes `NotAllowedByListeners`.
 
-Traefik LB: `152.53.254.200` (svc ports 80:30834, 443:32238, 2222:30946;
-entrypoints 8000/8443 not on the svc — the edge nginx on the VM reaches them
-some other way; see Task 3, open question).
+**Corrected edge model (supersedes the original plan's Task 3):** there is
+**no VM-level edge nginx**. Traefik is the edge: the LB service
+(`152.53.254.200`) maps external 80/443 → Traefik entrypoints 8000/8443
+(documented in the website's `DEPLOYMENT.md`). The "nginx reverse proxy in
+the project" is the website's **in-pod nginx front**
+(`h2hsecure.github.io/charts/h2hsecure/templates/tracking.yaml`), which
+proxies `/snippet|track|form|banner` → `automata-automata.automata.svc:8081`
+via lazy DNS and bypasses the Gateway entirely. It was never affected.
 
-The HEAD-404 fix is already deployed (`b2746ec`). This plan is routing/TLS only.
+The m.* cert error (CN=`*.pdaccess.com`) = Traefik serving its default
+certificate because no Programmed listener matched the SNI.
 
-## Tasks
+## What shipped
 
-### Task 1 — Chart: configurable Gateway listener ports
+### 1. Chart: configurable Gateway listener ports — `1f3e2e0` ✅
 
-Files: `helm/automata/values.yaml`, `helm/automata/templates/ingress.yaml`
+`helm/automata/values.yaml` + `templates/ingress.yaml`: `ingress.httpPort`
+(default 80) / `ingress.httpsPort` (default 443); prod `values.prod.yaml`
+sets **8000/8443**. `deploy-prod.md` documents them as REQUIRED on the prod
+cluster.
 
-1. `values.yaml`, under `ingress:` (after `gatewayClass`):
+### 2. Prod re-upgrade — chart `2026.11.02-1f3e2e0`, image `b2746ec` ✅
 
-   ```yaml
-     # Gateway listener ports. The cluster's Traefik entrypoints were moved
-     # off 80/443 (edge nginx migration): HTTP on 8000, HTTPS on 8443.
-     # Defaults keep classic 80/443 for clusters where Traefik listens there.
-     httpPort: 80
-     httpsPort: 443
-   ```
+User ran the helm upgrade on the cluster machine. Verified in-cluster:
+Gateway `PROGRAMMED=True`, both HTTPRoutes attached. External probes:
 
-2. `templates/ingress.yaml` — three hardcoded port lines:
-   - line ~51 (HTTPS listener, tls branch): `port: 443` →
-     `port: {{ .Values.ingress.httpsPort | int }}`
-   - line ~60 (HTTP listener, tls branch): `port: 80` →
-     `port: {{ .Values.ingress.httpPort | int }}`
-   - line ~66 (HTTP listener, non-tls branch): `port: 80` →
-     `port: {{ .Values.ingress.httpPort | int }}`
+- SNI `m.h2hsecure.com` → **CN=m.h2hsecure.com** (Let's Encrypt, valid to
+  Jan 21 2027) — was the `*.pdaccess.com` default ✅
+- `GET /api/health` → **200** ✅
+- `GET /snippet/422adc7a-….js` → **200** (JS) ✅
+- `HEAD /snippet/….js` → **200** — the `b2746ec` tracking fix confirmed live ✅
+- `HEAD /api/health` → **404** ❌ (latent bug, see §4)
+- `http://m.h2hsecure.com/` → **200, no 301** ❌ (latent bug, see §4)
 
-   The `-route-http` redirect route stays as-is (it targets the HTTP listener
-   by parentRef, no port in the route).
+### 3. Task 3 (edge nginx server block) — VOID ✅
 
-3. Verify (helm template, no cluster needed):
+Voided: no edge nginx exists (see corrected topology). Nothing to do.
 
-   ```bash
-   helm template t helm/automata | grep -A3 "kind: Gateway" | grep port   # → 443/80 defaults
-   helm template t helm/automata --set ingress.httpPort=8000 --set ingress.httpsPort=8443 \
-     --set ingress.tls[0].hosts=m.h2hsecure.com --set ingress.tls[0].secretName=automata-tls \
-     --set ingress.certificate.enabled=true --set ingress.certificate.clusterIssuer=letsencrypt-prod \
-     | grep -B2 "port: 8"   # → 8443 + 8000
-   ```
+### 4. Latent bugs exposed by the restored routing — `670e91e`
 
-4. Commit: `helm: make Gateway listener ports configurable (ingress.httpPort/httpsPort)`
+Both predate the port fix; the restored routing simply made them visible.
 
-### Task 2 — Ship chart + prod re-upgrade (user's machine)
+**a. HTTP→HTTPS 301 silently lost (Gateway route tiebreak).**
+`automata-route` and `automata-route-http` both referenced the Gateway
+without `sectionName`, so both bound to both listeners. On the HTTP
+listener they tied on host+path; Gateway API has no route priority, and
+Traefik's deterministic router tiebreak (shorter router name sorts first)
+let the main route win — plain HTTP served content. Fix: scope each route
+to its listener via `parentRefs[].sectionName` (main → `https`,
+redirect → `http`), making the redirect the sole route on the HTTP port.
 
-1. Push → CI publishes chart `YYYY.MM.DD-<newsha>` (image tag unchanged: `b2746ec`).
-2. Update `deploy-prod.md`:
-   - "Current release" table: chart row → new version (image stays `b2746ec`).
-   - Section 2 `values.prod.yaml` example: add under `ingress:`
+**b. HEAD 404 on the non-tracking health routes (gin ≥ 1.12).**
+`b2746ec` fixed the tracking server only; the same HEAD→GET gap existed on
+`api` (`/api/health`), `cmd/bff` (`/health`), `cmd/automata` (admin
+`/health`), and the standalone `webui` server. Fix: explicit `HEAD`
+registration at all four sites + route-registration test in
+`internal/adapter/api/server_test.go`.
 
-     ```yaml
-     # Traefik entrypoints were moved off 80/443 (edge nginx migration):
-     # httpPort: 8000
-     # httpsPort: 8443
-     ```
+### 5. TLS renewal — no action needed ✅
 
-     with a one-line note that these are REQUIRED on the prod cluster (chart
-     defaults 80/443 are rejected with `PortUnavailable` there).
-   - Section 3 helm command: `--version <new chart version>`, `--set image.tag=b2746ec` unchanged.
-   - Commit + push (runbook doc, CI re-run harmless) — or amend into Task 1's push.
-3. User (cluster machine): add `httpPort: 8000` + `httpsPort: 8443` to
-   `values.prod.yaml`, then:
+`letsencrypt-prod` ClusterIssuer solver is `http01` **ingress** class
+`traefik` (not a gatewayHTTPRoute solver). cert-manager creates a
+short-lived challenge Ingress; the existing `automata-tls` cert was issued
+via this exact path, proving LB 80 → entrypoint 8000 → Traefik ingress
+route → challenge pod works. No parentRef gap exists for the second
+Gateway, and our HTTPRoutes don't claim `/.well-known/acme-challenge/*`.
+Renewal window opens ~mid-Dec (cert expires Jan 21 2027).
 
-   ```bash
-   helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-     --version <new-chart-version> -n automata \
-     -f values.prod.yaml --set image.tag=b2746ec
-   ```
-
-4. Verify in-cluster (user runs, pastes back):
-
-   ```bash
-   kubectl -n automata get gateway automata
-   kubectl -n automata get gateway automata -o jsonpath='{.status.conditions}' | python3 -m json.tool
-   kubectl -n automata get httproute automata-route automata-route-http
-   ```
-
-   Success: Gateway `PROGRAMMED=True`, listeners `Accepted=True` (no
-   `PortUnavailable`), both HTTPRoutes `Accepted=True` on both parents.
-
-### Task 3 — Edge nginx: m.h2hsecure.com server block (user's VM)
-
-Blocked on open question: **how does the existing working
-`www.h2hsecure.com` nginx block reach Traefik's 8443 entrypoint?**
-(LB svc doesn't expose 8443 — it must be hostPort, direct node/pod port, or a
-side service.) Ask the user to paste the working `www.h2hsecure.com` server
-block + upstream.
-
-Then deliver a mirrored config:
-
-- HTTP :80 `server` for `m.h2hsecure.com` → proxy to Traefik upstream port 8000
-  (Traefik's `-route-http` does the 301 to HTTPS).
-- HTTPS :443 `server` for `m.h2hsecure.com`:
-  - real cert for `m.h2hsecure.com` (currently SNI serves default
-    `*.pdaccess.com` — no m.* cert at the edge; user must obtain one, e.g.
-    certbot on the VM, mirroring how `www.h2hsecure.com`'s cert was obtained);
-  - `proxy_pass` to the same Traefik upstream as the website, port **8443**,
-    SNI `m.h2hsecure.com` (`proxy_ssl_server_name on; proxy_set_header Host $host;`).
-- Reload nginx, no other hostnames touched.
-
-### Task 4 — External verification (text/HTTP only, no images)
+## Final verification (after `670e91e` deploy) — run 2026-11-02, all green
 
 ```bash
-# SNI serves a real m.* cert, not the *.pdaccess.com default
-openssl s_client -connect 152.53.254.200:443 -servername m.h2hsecure.com </dev/null 2>/dev/null | openssl x509 -noout -subject
-
-# health (also proves new-image routing end-to-end)
-curl -sI https://m.h2hsecure.com/api/health        # 200
-curl -sI -X HEAD https://m.h2hsecure.com/api/health  # 200 (HEAD canary, b2746ec)
-curl -s https://m.h2hsecure.com/snippet/422adc7a-5b07-49a5-bd00-c6a44d61a172.js | head -5  # 200 JS
-
-# http → 301
-curl -sI http://m.h2hsecure.com/                   # 301 Location: https://...
+curl -sI http://m.h2hsecure.com/                            # 301 -> https
+curl -s -o /dev/null -w '%{http_code}\n' -X HEAD https://m.h2hsecure.com/api/health   # 200
+curl -s -o /dev/null -w '%{http_code}\n' -X HEAD https://m.h2hsecure.com/health       # 200
+curl -sI https://m.h2hsecure.com/api/health                 # 200 (regression)
+curl -sI https://m.h2hsecure.com/snippet/422adc7a-5b07-49a5-bd00-c6a44d61a172.js      # 200
 ```
 
-All four green = done.
+Results: 301 → `https://m.h2hsecure.com/`; `HEAD /api/health` 200; `HEAD /health` 200;
+regressions all 200 (including `HEAD /snippet` 200); SNI `CN=m.h2hsecure.com`
+(LE, valid to 2027-01-21); `www.h2hsecure.com` in-pod nginx snippet 200
+(`server: nginx/1.31.8`) — website untouched.
 
 ## Risks / notes
 
-- No pod changes: `helm upgrade` re-renders only Gateway/HTTPRoute objects
-  (ports changed); expect no pod restarts, no data impact, Postgres untouched.
-- Rollback = helm upgrade back to chart `2026.11.01-b2746ec` (restores 80/443,
-  i.e. the broken state — only useful if the nginx work breaks something else).
-- Pre-existing unrelated test failures (`TestContextMiddleware`, proxy build)
-  must not be "fixed" as part of this; they predate the change.
+- `670e91e` upgrade: re-renders 2 HTTPRoutes (no churn) + pod rollout on
+  the new image. Rollback = previous chart version + `--set image.tag=b2746ec`.
+- Pre-existing unrelated failures (`TestContextMiddleware` in
+  `internal/adapter/api`, build failure in `internal/adapter/proxy`)
+  predate this work and were deliberately left untouched.

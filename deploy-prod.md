@@ -7,10 +7,10 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:b2746ec` |
-| Chart | `2026.11.01-b2746ec` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:670e91e` |
+| Chart | `2026.11.02-670e91e` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-The release is CI-verified. New in this release: the tracking server now accepts `HEAD` on all public GET routes — gin v1.12.0 no longer auto-maps HEAD to GET, so `HEAD /api/health` and `HEAD /snippet/:id.js` returned 404 while `GET` returned 200; `HEAD /api/health` answering 200 (section 4) is the deploy canary for this fix. The previous release (`2317fb6`) introduced the forms submissions page — the submissions modal in the forms list is replaced by a dedicated page at `forms/:id/submissions` (same one-column-per-field layout, attached files stay downloadable, pagination preserved); each submission can now be deleted from that page via a new context-scoped `DELETE /context/forms/:id/submissions/:sid` endpoint (204 on success, 404 when the submission is missing or belongs to another context, 401 without a context), and form creation now seeds a default `company` field that maps to the contact's Company. Also in this release the repo moved to `github.com/h2hsecure/automata`: the Go module path and all CI/helm references changed, so the image and chart now live under `ghcr.io/h2hsecure/...` (pull with a token that has access to the new account's packages, or make the packages public). The previous release (`cfc5fcf`) introduced the dashboard redesign —
+The release is CI-verified. New in this release: (1) the Gateway HTTPRoutes are scoped to their listeners via `parentRefs.sectionName` — the HTTP listener (port 8000) now serves exclusively the 301 redirect to HTTPS; previously both routes bound to every listener and, with no Gateway API route priority, Traefik's deterministic router tiebreak let the main route win on plain HTTP; (2) `HEAD` is accepted on the public `/health` routes of the api (`/api/health`), bff, admin, and standalone webui servers — gin v1.12 no longer auto-maps HEAD to GET (the tracking server got the same fix in `b2746ec`). Deploy canaries: `http://m.h2hsecure.com/` → 301 to HTTPS and `HEAD https://m.h2hsecure.com/api/health` → 200. The previous release (`1f3e2e0`) made the Gateway listener ports configurable (`ingress.httpPort`/`ingress.httpsPort`; REQUIRED `8000`/`8443` on the prod cluster — see section 2) and restored `m.h2hsecure.com` TLS + routing after the Traefik entrypoint remap. The release before that (`b2746ec`) added `HEAD` support to the tracking server's public GET routes. The previous release (`2317fb6`) introduced the forms submissions page — the submissions modal in the forms list is replaced by a dedicated page at `forms/:id/submissions` (same one-column-per-field layout, attached files stay downloadable, pagination preserved); each submission can now be deleted from that page via a new context-scoped `DELETE /context/forms/:id/submissions/:sid` endpoint (204 on success, 404 when the submission is missing or belongs to another context, 401 without a context), and form creation now seeds a default `company` field that maps to the contact's Company. Also in this release the repo moved to `github.com/h2hsecure/automata`: the Go module path and all CI/helm references changed, so the image and chart now live under `ghcr.io/h2hsecure/...` (pull with a token that has access to the new account's packages, or make the packages public). The previous release (`cfc5fcf`) introduced the dashboard redesign —
 an SVG world map of contact locations (last 90 days) with choropleth shading
 and per-country count badges, a reworked Top Pages chart (horizontal bars with
 rank, truncated URL, and count), the empty Events tab removed, and the Forms
@@ -192,8 +192,8 @@ two releases do not fight over the CRDs.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.01-b2746ec -n automata \
-  -f values.prod.yaml --set image.tag=b2746ec
+  --version 2026.11.02-670e91e -n automata \
+  -f values.prod.yaml --set image.tag=670e91e
 ```
 
 ## 4) Verify rollout
@@ -211,6 +211,7 @@ Then check health, the HTTP→HTTPS redirect, and TLS over the public domain:
 curl -s https://<PROD-DOMAIN>/api/health        # expect {"status":"ok"}
 curl -sI http://<PROD-DOMAIN>/                  # expect 301 -> https
 curl -sI https://<PROD-DOMAIN>/api/health       # expect 200 over TLS
+curl -sI -X HEAD https://<PROD-DOMAIN>/api/health   # expect 200 (gin 1.12: HEAD is not auto-mapped to GET)
 # cert issued and ready (READY=True)
 kubectl -n automata get certificate automata-tls
 ```
