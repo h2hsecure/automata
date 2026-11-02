@@ -11,8 +11,8 @@ import Textarea from '@/components/Textarea.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
-import { listBanners, createBanner, updateBanner, deleteBanner } from '@/api/client'
-import type { Banner, BannerInput } from '@/types/api'
+import { listBanners, createBanner, updateBanner, deleteBanner, listBannerDecisions } from '@/api/client'
+import type { Banner, BannerInput, BannerButton, BannerDecision } from '@/types/api'
 
 const authStore = useAuthStore()
 const { confirmStore, show, confirm } = useConfirm()
@@ -27,7 +27,23 @@ const bannerContentType = ref('html')
 const bannerContent = ref('')
 const bannerLinkUrl = ref('')
 const bannerStatus = ref('active')
+const bannerPosition = ref('')
+const bannerButtons = ref<BannerButton[]>([])
 const formError = ref('')
+
+// Decisions modal state
+const decisionsModalOpen = ref(false)
+const decisionsBanner = ref<Banner | null>(null)
+const decisions = ref<BannerDecision[]>([])
+const decisionCounts = ref<Record<string, number>>({})
+const decisionsLoading = ref(false)
+
+const decisionColumns = [
+  { key: 'visitor_id', label: 'Visitor' },
+  { key: 'action', label: 'Action' },
+  { key: 'ip_hash', label: 'IP Hash' },
+  { key: 'created_at', label: 'Decided At' },
+]
 
 const columns = [
   { key: 'name', label: 'Name' },
@@ -47,6 +63,29 @@ async function loadBanners() {
   }
 }
 
+function addButtonRow() {
+  bannerButtons.value.push({ label: '', action: '', link_url: '', dismisses: false })
+}
+
+function removeButtonRow(index: number) {
+  bannerButtons.value.splice(index, 1)
+}
+
+async function openDecisions(b: Banner) {
+  decisionsBanner.value = b
+  decisionsModalOpen.value = true
+  decisionsLoading.value = true
+  decisions.value = []
+  decisionCounts.value = {}
+  try {
+    const data = await listBannerDecisions(b.ID)
+    decisions.value = data.decisions ?? []
+    decisionCounts.value = data.counts ?? {}
+  } finally {
+    decisionsLoading.value = false
+  }
+}
+
 watch(
   () => authStore.currentContextId,
   () => loadBanners()
@@ -61,6 +100,8 @@ function openCreate() {
   bannerContent.value = ''
   bannerLinkUrl.value = ''
   bannerStatus.value = 'active'
+  bannerPosition.value = ''
+  bannerButtons.value = []
   formError.value = ''
   modalOpen.value = true
 }
@@ -74,6 +115,8 @@ function openEdit(b: Banner) {
   bannerContent.value = b.Content
   bannerLinkUrl.value = b.LinkURL
   bannerStatus.value = b.IsActive ? 'active' : 'inactive'
+  bannerPosition.value = b.Position ?? ''
+  bannerButtons.value = (b.Buttons ?? []).map((btn) => ({ ...btn }))
   formError.value = ''
   modalOpen.value = true
 }
@@ -91,6 +134,10 @@ async function handleSave() {
       content: bannerContent.value,
       link_url: bannerLinkUrl.value,
       placements: bannerPlacement.value ? [bannerPlacement.value] : [],
+      position: bannerPosition.value,
+      buttons: bannerButtons.value.filter(
+        (b) => b.label.trim() || b.action.trim()
+      ),
     }
     if (isEdit.value) {
       data.is_active = bannerStatus.value === 'active'
@@ -169,6 +216,13 @@ onMounted(loadBanners)
           <div class="flex gap-1">
             <button
               class="p-1.5 rounded hover:bg-muted"
+              @click="openDecisions(row)"
+              aria-label="View decisions"
+            >
+              <BarChart3 class="h-4 w-4" />
+            </button>
+            <button
+              class="p-1.5 rounded hover:bg-muted"
               @click="openEdit(row)"
             >
               <Pencil class="h-4 w-4" />
@@ -204,6 +258,45 @@ onMounted(loadBanners)
           </select>
         </div>
 
+        <div>
+          <label class="text-sm font-medium mb-1 block">Position</label>
+          <select
+            v-model="bannerPosition"
+            class="h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            <option value="">Legacy (placement injection)</option>
+            <option value="top">Top bar</option>
+            <option value="bottom">Bottom bar</option>
+            <option value="fullpage">Full page</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium mb-1 block">
+            Buttons
+            <span class="text-slate-400 font-normal">(optional — used by the banner snippet)</span>
+          </label>
+          <div class="space-y-2">
+            <div v-for="(btn, i) in bannerButtons" :key="i" class="grid grid-cols-12 gap-2 items-end">
+              <div class="col-span-4"><Input v-model="btn.label" placeholder="Accept" :label="i === 0 ? 'Label' : ''" /></div>
+              <div class="col-span-3"><Input v-model="btn.action" placeholder="accept" :label="i === 0 ? 'Action' : ''" /></div>
+              <div class="col-span-3"><Input v-model="btn.link_url" placeholder="/cookie-policy" :label="i === 0 ? 'Link URL' : ''" /></div>
+              <div class="col-span-2 flex items-center gap-3">
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" v-model="btn.dismisses" class="rounded border-slate-300" />
+                  <span v-if="i === 0">Dismisses</span>
+                </label>
+                <button class="p-1.5 rounded hover:bg-muted text-destructive" @click="removeButtonRow(i)" :aria-label="'Remove button ' + (i + 1)">
+                  <Trash2 class="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" @click="addButtonRow">
+              <Plus class="mr-1 h-4 w-4" /> Add button
+            </Button>
+          </div>
+        </div>
+
         <Textarea
           v-model="bannerContent"
           label="Content"
@@ -234,6 +327,35 @@ onMounted(loadBanners)
           </Button>
         </div>
       </template>
+    </Modal>
+
+    <!-- Decisions modal -->
+    <Modal :open="decisionsModalOpen" :title="'Decisions — ' + (decisionsBanner?.Name ?? '')" @close="decisionsModalOpen = false">
+      <div class="space-y-4">
+        <div v-if="decisionsLoading" class="text-sm text-muted-foreground py-4 text-center">Loading decisions…</div>
+        <template v-else>
+          <div class="flex flex-wrap gap-2">
+            <Badge v-for="(count, action) in decisionCounts" :key="action" variant="info">
+              {{ action }}: {{ count }}
+            </Badge>
+            <span v-if="Object.keys(decisionCounts).length === 0" class="text-sm text-muted-foreground">
+              No decisions recorded yet.
+            </span>
+          </div>
+          <DataTable
+            :columns="decisionColumns"
+            :data="decisions"
+            empty-text="No decisions yet."
+          >
+            <template #action="{ row }: { row: BannerDecision }">
+              <Badge variant="default">{{ row.Action }}</Badge>
+            </template>
+            <template #created_at="{ row }: { row: BannerDecision }">
+              {{ new Date(row.CreatedAt).toLocaleString() }}
+            </template>
+          </DataTable>
+        </template>
+      </div>
     </Modal>
 
     <ConfirmDialog />

@@ -112,6 +112,25 @@ export interface Submission {
   CreatedAt: string;
 }
 
+export interface BannerButton {
+  id?: string;
+  label: string;
+  action: string;
+  link_url?: string;
+  dismisses: boolean;
+}
+
+export interface BannerDecision {
+  ID: string;
+  ContextID: string;
+  BannerID: string;
+  VisitorID: string;
+  Action: string;
+  IPHash: string;
+  UserAgent: string;
+  CreatedAt: string;
+}
+
 export interface Banner {
   ID: string;
   ContextID: string;
@@ -131,6 +150,8 @@ export interface Banner {
   ABVariants: unknown[];
   Impressions: number;
   Clicks: number;
+  Position: string;
+  Buttons: BannerButton[];
   CreatedAt: string;
   UpdatedAt: string;
 }
@@ -150,6 +171,8 @@ export interface BannerInput {
   is_active?: boolean;
   ab_test?: boolean;
   ab_variants?: unknown[];
+  position?: string;
+  buttons?: BannerButton[];
 }
 
 export interface Placement {

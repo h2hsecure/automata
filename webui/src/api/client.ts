@@ -6,6 +6,7 @@ import type {
   FormInput,
   Banner,
   BannerInput,
+  BannerDecision,
   ApiKey,
   Context,
   ContextInput,
@@ -241,6 +242,17 @@ export async function updateBanner(id: string, data: BannerInput): Promise<Banne
 
 export async function deleteBanner(id: string): Promise<void> {
   await client.delete(`/context/banners/${id}`)
+}
+
+export async function listBannerDecisions(
+  bannerId: string,
+  offset = 0,
+  limit = 50,
+): Promise<{ decisions: BannerDecision[]; counts: Record<string, number>; total: number }> {
+  const response = await client.get(`/context/banners/${bannerId}/decisions`, {
+    params: { offset, limit },
+  })
+  return response.data
 }
 
 // Placement endpoints
