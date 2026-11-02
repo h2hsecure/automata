@@ -225,6 +225,7 @@ func main() {
 	tracking.RegisterUploadRoutes(trackingEngine, tracking.NewUploadHandler(fileStore, formRepo))
 	tracking.RegisterStaticRoutes(trackingEngine, tracking.NewStaticHandler(staticFileRepo, fileStore))
 	tracking.RegisterPageRoutes(trackingEngine, tracking.NewPageServeHandler(pageRepo))
+	tracking.RegisterBannerPublicRoutes(trackingEngine, tracking.NewBannerPublicHandler(bannerRepo, pageRepo))
 
 	trackingPort := config.Get("server.tracking_port")
 	if trackingPort == "" {
