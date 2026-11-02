@@ -3,8 +3,8 @@ package repo
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	_ "embed"
+	"fmt"
 
 	"github.com/h2hsecure/automata/internal/domain/page"
 	"github.com/h2hsecure/automata/internal/infrastructure/database"
@@ -131,7 +131,9 @@ func (r *repo) Delete(id string) error {
 	return nil
 }
 
-func (r *repo) scanPage(row interface{ Scan(dest ...interface{}) error }) (*page.Page, error) {
+func (r *repo) scanPage(row interface {
+	Scan(dest ...interface{}) error
+}) (*page.Page, error) {
 	p := &page.Page{}
 	err := row.Scan(
 		&p.ID, &p.ContextID, &p.Slug, &p.Title, &p.Content,

@@ -20,6 +20,7 @@ import (
 	crepo "github.com/h2hsecure/automata/internal/infrastructure/contact/repo"
 	email_repo "github.com/h2hsecure/automata/internal/infrastructure/email/repo"
 	formRepo "github.com/h2hsecure/automata/internal/infrastructure/form/repo"
+	pageRepo "github.com/h2hsecure/automata/internal/infrastructure/page/repo"
 	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 	settingsrepo "github.com/h2hsecure/automata/internal/infrastructure/settings/repo"
 	trackingRepo "github.com/h2hsecure/automata/internal/infrastructure/tracking/repo"
@@ -165,6 +166,7 @@ func NewServer(
 	formRepo := formRepo.New(pool)
 	trackingRepo := trackingRepo.New(pool)
 	bannerRepo := bannerRepo.New(pool)
+	pageRepo := pageRepo.New(pool)
 
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("", emailHandler.List)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("", emailHandler.Create)
@@ -261,6 +263,16 @@ func NewServer(
 		api.GET("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.GetCampaign)
 		api.PUT("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.UpdateCampaign)
 		api.DELETE("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.DeleteCampaign)
+	}
+
+	// Page routes (context-resolved)
+	pageHandler := handler.NewPageHandler(pageRepo)
+	{
+		api.GET("/context/pages", middleware.AuthMiddleware(authService), pageHandler.List)
+		api.GET("/context/pages/:id", middleware.AuthMiddleware(authService), pageHandler.Get)
+		api.POST("/context/pages", middleware.AuthMiddleware(authService), pageHandler.Create)
+		api.PUT("/context/pages/:id", middleware.AuthMiddleware(authService), pageHandler.Update)
+		api.DELETE("/context/pages/:id", middleware.AuthMiddleware(authService), pageHandler.Delete)
 	}
 
 	// Tracking dashboard routes (context-resolved)

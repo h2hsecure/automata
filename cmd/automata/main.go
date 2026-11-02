@@ -28,13 +28,14 @@ import (
 	mailsmtp "github.com/h2hsecure/automata/internal/infrastructure/email/smtp"
 	form_repo "github.com/h2hsecure/automata/internal/infrastructure/form/repo"
 	geo_infra "github.com/h2hsecure/automata/internal/infrastructure/geo"
+	page_repo "github.com/h2hsecure/automata/internal/infrastructure/page/repo"
 	"github.com/h2hsecure/automata/internal/infrastructure/queue"
 	settings_repo "github.com/h2hsecure/automata/internal/infrastructure/settings/repo"
 	staticfile_repo "github.com/h2hsecure/automata/internal/infrastructure/staticfile/repo"
 	"github.com/h2hsecure/automata/internal/infrastructure/storage"
 	tracking_repo "github.com/h2hsecure/automata/internal/infrastructure/tracking/repo"
-	webhook_repo "github.com/h2hsecure/automata/internal/infrastructure/webhook/repo"
 	webhook_svc "github.com/h2hsecure/automata/internal/infrastructure/webhook"
+	webhook_repo "github.com/h2hsecure/automata/internal/infrastructure/webhook/repo"
 	emailusecase "github.com/h2hsecure/automata/internal/usecase/email"
 	"github.com/rs/zerolog/log"
 )
@@ -81,6 +82,10 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to run banner migrations")
 	}
 
+	if err := page_repo.RunMigrations(pool); err != nil {
+		log.Fatal().Err(err).Msg("failed to run page migrations")
+	}
+
 	if err := email_repo.RunMigrations(pool); err != nil {
 		log.Fatal().Err(err).Msg("failed to run email migrations")
 	}
@@ -116,6 +121,7 @@ func main() {
 	apiKeyRepo := auth_repo.NewApiKeyPostgresRepo(pool)
 	formRepo := form_repo.New(pool)
 	bannerRepo := banner_repo.New(pool)
+	pageRepo := page_repo.New(pool)
 	trackingRepo := tracking_repo.New(pool)
 	contactRepo := contact_repo.New(pool)
 	geoLookup := geo_infra.New()
@@ -218,6 +224,7 @@ func main() {
 	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, geoLookup, contactRepo)
 	tracking.RegisterUploadRoutes(trackingEngine, tracking.NewUploadHandler(fileStore, formRepo))
 	tracking.RegisterStaticRoutes(trackingEngine, tracking.NewStaticHandler(staticFileRepo, fileStore))
+	tracking.RegisterPageRoutes(trackingEngine, tracking.NewPageServeHandler(pageRepo))
 
 	trackingPort := config.Get("server.tracking_port")
 	if trackingPort == "" {
