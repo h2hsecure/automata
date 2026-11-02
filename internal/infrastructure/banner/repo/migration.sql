@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS banner_banners (
     is_active     BOOLEAN DEFAULT TRUE,
     ab_test       BOOLEAN DEFAULT FALSE,
     ab_variants   JSONB DEFAULT '[]',
+    position      VARCHAR(16) DEFAULT '',
+    buttons       JSONB DEFAULT '[]',
     impressions   BIGINT DEFAULT 0,
     clicks        BIGINT DEFAULT 0,
     created_at    TIMESTAMPTZ DEFAULT NOW(),
@@ -67,6 +69,12 @@ CREATE TABLE IF NOT EXISTS banner_clicks (
     visitor_id    VARCHAR(128),
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Position and buttons (configurable banner system). ADD COLUMN IF NOT
+-- EXISTS keeps this idempotent and backfills '' / '[]' for legacy rows, so
+-- old banners keep rendering through the legacy placement path.
+ALTER TABLE banner_banners ADD COLUMN IF NOT EXISTS position VARCHAR(16) DEFAULT '';
+ALTER TABLE banner_banners ADD COLUMN IF NOT EXISTS buttons JSONB DEFAULT '[]';
 
 CREATE INDEX IF NOT EXISTS idx_banners_context_active ON banner_banners(context_id, is_active, priority DESC);
 CREATE INDEX IF NOT EXISTS idx_banners_campaign ON banner_banners(context_id, campaign_id);

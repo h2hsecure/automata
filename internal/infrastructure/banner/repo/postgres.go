@@ -146,13 +146,17 @@ func (r *bannerRepo) CreateBanner(b *banner.Banner) error {
 	if err != nil {
 		return fmt.Errorf("marshal banner ab_variants: %w", err)
 	}
+	buttonsJSON, err := json.Marshal(b.Buttons)
+	if err != nil {
+		return fmt.Errorf("marshal banner buttons: %w", err)
+	}
 	query := `
-		INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, impressions, clicks, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 0, 0, NOW(), NOW())
+		INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, position, buttons, impressions, clicks, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 0, 0, NOW(), NOW())
 	`
 	_, err = r.pool.Exec(ctx, query, b.ID, b.ContextID, b.Name, b.Type, b.Content, b.LinkURL,
 		b.ImageURL, b.AltText, b.CampaignID, placementsJSON, b.Priority, b.StartDate, b.EndDate,
-		b.IsActive, b.ABTest, abVariantsJSON)
+		b.IsActive, b.ABTest, abVariantsJSON, b.Position, buttonsJSON)
 	if err != nil {
 		return fmt.Errorf("create banner: %w", err)
 	}
@@ -162,17 +166,18 @@ func (r *bannerRepo) CreateBanner(b *banner.Banner) error {
 func (r *bannerRepo) GetBanner(id string) (*banner.Banner, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, impressions, clicks, created_at, updated_at
+		SELECT id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, position, buttons, impressions, clicks, created_at, updated_at
 		FROM banner_banners WHERE id = $1
 	`
 	b := &banner.Banner{}
-	var placementsJSON, abVariantsJSON []byte
+	var placementsJSON, abVariantsJSON, buttonsJSON []byte
 	var imageURL, altText, campaignID *string
 	var startDate, endDate *time.Time
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&b.ID, &b.ContextID, &b.Name, &b.Type, &b.Content, &b.LinkURL, &imageURL, &altText,
 		&campaignID, &placementsJSON, &b.Priority, &startDate, &endDate, &b.IsActive,
-		&b.ABTest, &abVariantsJSON, &b.Impressions, &b.Clicks, &b.CreatedAt, &b.UpdatedAt,
+		&b.ABTest, &abVariantsJSON, &b.Position, &buttonsJSON, &b.Impressions, &b.Clicks,
+		&b.CreatedAt, &b.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -191,6 +196,14 @@ func (r *bannerRepo) GetBanner(id string) (*banner.Banner, error) {
 	if err := json.Unmarshal(abVariantsJSON, &b.ABVariants); err != nil {
 		return nil, fmt.Errorf("unmarshal banner ab_variants: %w", err)
 	}
+	if len(buttonsJSON) == 0 {
+		b.Buttons = []banner.Button{}
+	} else if err := json.Unmarshal(buttonsJSON, &b.Buttons); err != nil {
+		return nil, fmt.Errorf("unmarshal banner buttons: %w", err)
+	}
+	if b.Buttons == nil {
+		b.Buttons = []banner.Button{}
+	}
 	return b, nil
 }
 
@@ -198,7 +211,7 @@ func (r *bannerRepo) ListBanners(contextID string, opts banner.ListOptions) ([]*
 	ctx := context.Background()
 	countQuery := `SELECT COUNT(*) FROM banner_banners WHERE context_id = $1`
 	query := `
-		SELECT id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, impressions, clicks, created_at, updated_at
+		SELECT id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, position, buttons, impressions, clicks, created_at, updated_at
 		FROM banner_banners WHERE context_id = $1
 	`
 	args := []interface{}{contextID}
@@ -244,13 +257,14 @@ func (r *bannerRepo) ListBanners(contextID string, opts banner.ListOptions) ([]*
 	var banners []*banner.Banner
 	for rows.Next() {
 		b := &banner.Banner{}
-		var placementsJSON, abVariantsJSON []byte
+		var placementsJSON, abVariantsJSON, buttonsJSON []byte
 		var imageURL, altText, campaignID *string
 		var startDate, endDate *time.Time
 		err := rows.Scan(
 			&b.ID, &b.ContextID, &b.Name, &b.Type, &b.Content, &b.LinkURL, &imageURL, &altText,
 			&campaignID, &placementsJSON, &b.Priority, &startDate, &endDate, &b.IsActive,
-			&b.ABTest, &abVariantsJSON, &b.Impressions, &b.Clicks, &b.CreatedAt, &b.UpdatedAt,
+			&b.ABTest, &abVariantsJSON, &b.Position, &buttonsJSON, &b.Impressions, &b.Clicks,
+			&b.CreatedAt, &b.UpdatedAt,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan banner: %w", err)
@@ -266,6 +280,14 @@ func (r *bannerRepo) ListBanners(contextID string, opts banner.ListOptions) ([]*
 		if err := json.Unmarshal(abVariantsJSON, &b.ABVariants); err != nil {
 			return nil, 0, fmt.Errorf("unmarshal banner ab_variants: %w", err)
 		}
+		if len(buttonsJSON) > 0 {
+			if err := json.Unmarshal(buttonsJSON, &b.Buttons); err != nil {
+				return nil, 0, fmt.Errorf("unmarshal banner buttons: %w", err)
+			}
+		}
+		if b.Buttons == nil {
+			b.Buttons = []banner.Button{}
+		}
 		banners = append(banners, b)
 	}
 	return banners, total, nil
@@ -274,7 +296,7 @@ func (r *bannerRepo) ListBanners(contextID string, opts banner.ListOptions) ([]*
 func (r *bannerRepo) ListActiveBannersForPlacement(contextID, placementID string, date time.Time) ([]*banner.Banner, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, impressions, clicks, created_at, updated_at
+		SELECT id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, position, buttons, impressions, clicks, created_at, updated_at
 		FROM banner_banners
 		WHERE context_id = $1 AND is_active = true
 		  AND ($2 IS NULL OR start_date <= $2) AND ($2 IS NULL OR end_date >= $2)
@@ -289,13 +311,14 @@ func (r *bannerRepo) ListActiveBannersForPlacement(contextID, placementID string
 	var banners []*banner.Banner
 	for rows.Next() {
 		b := &banner.Banner{}
-		var placementsJSON, abVariantsJSON []byte
+		var placementsJSON, abVariantsJSON, buttonsJSON []byte
 		var imageURL, altText, campaignID *string
 		var startDate, endDate *time.Time
 		err := rows.Scan(
 			&b.ID, &b.ContextID, &b.Name, &b.Type, &b.Content, &b.LinkURL, &imageURL, &altText,
 			&campaignID, &placementsJSON, &b.Priority, &startDate, &endDate, &b.IsActive,
-			&b.ABTest, &abVariantsJSON, &b.Impressions, &b.Clicks, &b.CreatedAt, &b.UpdatedAt,
+			&b.ABTest, &abVariantsJSON, &b.Position, &buttonsJSON, &b.Impressions, &b.Clicks,
+			&b.CreatedAt, &b.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan banner: %w", err)
@@ -310,6 +333,14 @@ func (r *bannerRepo) ListActiveBannersForPlacement(contextID, placementID string
 		}
 		if err := json.Unmarshal(abVariantsJSON, &b.ABVariants); err != nil {
 			return nil, fmt.Errorf("unmarshal banner ab_variants: %w", err)
+		}
+		if len(buttonsJSON) > 0 {
+			if err := json.Unmarshal(buttonsJSON, &b.Buttons); err != nil {
+				return nil, fmt.Errorf("unmarshal banner buttons: %w", err)
+			}
+		}
+		if b.Buttons == nil {
+			b.Buttons = []banner.Button{}
 		}
 		banners = append(banners, b)
 	}
@@ -326,16 +357,21 @@ func (r *bannerRepo) UpdateBanner(b *banner.Banner) error {
 	if err != nil {
 		return fmt.Errorf("marshal banner ab_variants: %w", err)
 	}
+	buttonsJSON, err := json.Marshal(b.Buttons)
+	if err != nil {
+		return fmt.Errorf("marshal banner buttons: %w", err)
+	}
 	query := `
 		UPDATE banner_banners
 		SET name = $1, type = $2, content = $3, link_url = $4, image_url = $5, alt_text = $6,
 		    campaign_id = $7, placements = $8, priority = $9, start_date = $10, end_date = $11,
-		    is_active = $12, ab_test = $13, ab_variants = $14, updated_at = NOW()
-		WHERE id = $15
+		    is_active = $12, ab_test = $13, ab_variants = $14, position = $15, buttons = $16,
+		    updated_at = NOW()
+		WHERE id = $17
 	`
 	_, err = r.pool.Exec(ctx, query, b.Name, b.Type, b.Content, b.LinkURL, b.ImageURL, b.AltText,
 		b.CampaignID, placementsJSON, b.Priority, b.StartDate, b.EndDate, b.IsActive, b.ABTest,
-		abVariantsJSON, b.ID)
+		abVariantsJSON, b.Position, buttonsJSON, b.ID)
 	if err != nil {
 		return fmt.Errorf("update banner: %w", err)
 	}
