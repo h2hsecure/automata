@@ -24,6 +24,8 @@ import type {
   Activity,
   StaticFile,
   Submission,
+  Page,
+  PageInput,
 } from '@/types/api'
 
 const client: AxiosInstance = axios.create({
@@ -512,6 +514,31 @@ export async function uploadStaticFile(file: File, name: string): Promise<Static
 
 export async function deleteStaticFile(name: string): Promise<void> {
   await client.delete(`/context/static-files/${encodeURIComponent(name)}`)
+}
+
+// Page endpoints (context-resolved)
+export async function listPages(): Promise<Page[]> {
+  const { data } = await client.get('/context/pages')
+  return data.pages ?? []
+}
+
+export async function getPage(id: string): Promise<Page> {
+  const { data } = await client.get(`/context/pages/${id}`)
+  return data
+}
+
+export async function createPage(data: PageInput): Promise<Page> {
+  const response = await client.post('/context/pages', data)
+  return response.data
+}
+
+export async function updatePage(id: string, data: PageInput): Promise<Page> {
+  const response = await client.put(`/context/pages/${id}`, data)
+  return response.data
+}
+
+export async function deletePage(id: string): Promise<void> {
+  await client.delete(`/context/pages/${id}`)
 }
 
 export default client

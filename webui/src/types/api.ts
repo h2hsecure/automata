@@ -319,3 +319,24 @@ export interface StaticFile {
   Size: number;
   CreatedAt: string;
 }
+
+// NOTE: the backend Page domain struct has no json tags, so list/get
+// responses use Go's PascalCase field names. Request payloads use the
+// snake_case tags on the handler input struct.
+export interface Page {
+  ID: string;
+  ContextID: string;
+  Slug: string;
+  Title: string;
+  Content: string;
+  IsActive: boolean;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
+export interface PageInput {
+  slug: string;
+  title: string;
+  content?: string;
+  is_active?: boolean;
+}
