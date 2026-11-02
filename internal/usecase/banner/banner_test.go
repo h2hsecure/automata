@@ -59,6 +59,15 @@ func (f *fakeRepo) RecordImpression(string, string) error {
 	return nil
 }
 func (f *fakeRepo) RecordClick(string, string) error { return nil }
+func (f *fakeRepo) RecordDecision(*bdomain.Decision) error {
+	return nil
+}
+func (f *fakeRepo) ListDecisions(string, int, int) ([]*bdomain.Decision, int64, error) {
+	return nil, 0, nil
+}
+func (f *fakeRepo) DecisionCounts(string) (map[string]int64, error) {
+	return nil, nil
+}
 
 func (f *fakeRepo) CreateCampaign(*bdomain.Campaign) error { return nil }
 func (f *fakeRepo) GetCampaign(string) (*bdomain.Campaign, error) {

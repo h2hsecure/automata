@@ -23,6 +23,11 @@ type Repository interface {
 	RecordImpression(bannerID, visitorID string) error
 	RecordClick(bannerID, visitorID string) error
 
+	// Decision operations
+	RecordDecision(d *Decision) error
+	ListDecisions(bannerID string, offset, limit int) ([]*Decision, int64, error)
+	DecisionCounts(bannerID string) (map[string]int64, error)
+
 	// Campaign operations
 	CreateCampaign(c *Campaign) error
 	GetCampaign(id string) (*Campaign, error)
