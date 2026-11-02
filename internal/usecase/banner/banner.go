@@ -173,7 +173,7 @@ func (u *BannerUsecase) ListBanners(contextID string, opts bdomain.ListOptions) 
 // CreatePlacement creates a new placement.
 func (u *BannerUsecase) CreatePlacement(contextID string, req *bdomain.CreatePlacementRequest) (*bdomain.Placement, error) {
 	p := &bdomain.Placement{
-		ContextID:    contextID,
+		ContextID:   contextID,
 		Name:        req.Name,
 		Location:    req.Location,
 		CSSSelector: req.CSSSelector,
@@ -265,15 +265,15 @@ func (u *BannerUsecase) ListPlacements(contextID string, isActive bool) ([]*bdom
 func (u *BannerUsecase) CreateCampaign(contextID string, req *bdomain.CreateCampaignRequest) (*bdomain.Campaign, error) {
 	c := &bdomain.Campaign{
 		ContextID:    contextID,
-		Name:        req.Name,
-		Description: req.Description,
-		StartDate:   req.StartDate,
-		EndDate:     req.EndDate,
-		TargetURL:   req.TargetURL,
+		Name:         req.Name,
+		Description:  req.Description,
+		StartDate:    req.StartDate,
+		EndDate:      req.EndDate,
+		TargetURL:    req.TargetURL,
 		TrackingCode: req.TrackingCode,
-		IsActive:    true,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		IsActive:     true,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	if err := u.repo.CreateCampaign(c); err != nil {
