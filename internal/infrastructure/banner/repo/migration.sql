@@ -70,6 +70,17 @@ CREATE TABLE IF NOT EXISTS banner_clicks (
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS banner_decisions (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    context_id     UUID NOT NULL,
+    banner_id     UUID NOT NULL REFERENCES banner_banners(id) ON DELETE CASCADE,
+    visitor_id    VARCHAR(128),
+    action        VARCHAR(128),
+    ip_hash       VARCHAR(64),
+    user_agent    VARCHAR(512),
+    created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Position and buttons (configurable banner system). ADD COLUMN IF NOT
 -- EXISTS keeps this idempotent and backfills '' / '[]' for legacy rows, so
 -- old banners keep rendering through the legacy placement path.
@@ -81,3 +92,4 @@ CREATE INDEX IF NOT EXISTS idx_banners_campaign ON banner_banners(context_id, ca
 CREATE INDEX IF NOT EXISTS idx_banners_dates ON banner_banners(context_id, start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_impressions_banner ON banner_impressions(banner_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_clicks_banner ON banner_clicks(banner_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_decisions_banner ON banner_decisions(banner_id, created_at);

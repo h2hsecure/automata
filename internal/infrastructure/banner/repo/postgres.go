@@ -3,9 +3,9 @@ package repo
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"fmt"
-	_ "embed"
 	"time"
 
 	"github.com/google/uuid"
@@ -414,6 +414,84 @@ func (r *bannerRepo) RecordClick(bannerID, visitorID string) error {
 		return fmt.Errorf("record click: %w", err)
 	}
 	return nil
+}
+
+// --- Decision operations ---
+
+func (r *bannerRepo) RecordDecision(d *banner.Decision) error {
+	ctx := context.Background()
+	if d.ID == "" {
+		d.ID = uuid.New().String()
+	}
+	query := `
+		INSERT INTO banner_decisions (id, context_id, banner_id, visitor_id, action, ip_hash, user_agent, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+	`
+	_, err := r.pool.Exec(ctx, query, d.ID, d.ContextID, d.BannerID, d.VisitorID, d.Action, d.IPHash, d.UserAgent)
+	if err != nil {
+		return fmt.Errorf("record decision: %w", err)
+	}
+	return nil
+}
+
+func (r *bannerRepo) ListDecisions(bannerID string, offset, limit int) ([]*banner.Decision, int64, error) {
+	ctx := context.Background()
+	if limit <= 0 || limit > 1000 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	countQuery := `SELECT COUNT(*) FROM banner_decisions WHERE banner_id = $1`
+	var total int64
+	if err := r.pool.QueryRow(ctx, countQuery, bannerID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count decisions: %w", err)
+	}
+
+	query := `
+		SELECT id, context_id, banner_id, visitor_id, action, ip_hash, user_agent, created_at
+		FROM banner_decisions
+		WHERE banner_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+	rows, err := r.pool.Query(ctx, query, bannerID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list decisions: %w", err)
+	}
+	defer rows.Close()
+
+	var decisions []*banner.Decision
+	for rows.Next() {
+		d := &banner.Decision{}
+		if err := rows.Scan(&d.ID, &d.ContextID, &d.BannerID, &d.VisitorID, &d.Action, &d.IPHash, &d.UserAgent, &d.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan decision: %w", err)
+		}
+		decisions = append(decisions, d)
+	}
+	return decisions, total, nil
+}
+
+func (r *bannerRepo) DecisionCounts(bannerID string) (map[string]int64, error) {
+	ctx := context.Background()
+	query := `SELECT action, COUNT(*) FROM banner_decisions WHERE banner_id = $1 GROUP BY action`
+	rows, err := r.pool.Query(ctx, query, bannerID)
+	if err != nil {
+		return nil, fmt.Errorf("decision counts: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var action string
+		var count int64
+		if err := rows.Scan(&action, &count); err != nil {
+			return nil, fmt.Errorf("scan decision count: %w", err)
+		}
+		counts[action] = count
+	}
+	return counts, nil
 }
 
 // --- Campaign operations ---
