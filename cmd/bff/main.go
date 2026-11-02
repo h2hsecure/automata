@@ -133,8 +133,12 @@ func main() {
 		}
 	})
 
-	// Health check
+	// Health check (HEAD registered explicitly: gin >= 1.12 no longer
+	// auto-maps HEAD to GET)
 	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+	r.HEAD("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 

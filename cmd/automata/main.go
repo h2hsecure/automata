@@ -171,8 +171,12 @@ func main() {
 	// Admin server (port 8080)
 	adminEngine := gin.Default()
 
-	// Health check at root level (before SPA fallback)
+	// Health check at root level (before SPA fallback; HEAD registered
+	// explicitly: gin >= 1.12 no longer auto-maps HEAD to GET)
 	adminEngine.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+	adminEngine.HEAD("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 

@@ -52,7 +52,12 @@ func NewServer(
 
 	api := parent.Group(prefix)
 
+	// HEAD is registered explicitly: gin >= 1.12 no longer auto-maps HEAD
+	// to GET, so a GET-only route 404s health checks that use HEAD.
 	api.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+	api.HEAD("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 

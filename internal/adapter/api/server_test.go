@@ -54,3 +54,18 @@ var _ = Describe("NewServer contact import/export/tag routes", func() {
 		Expect(routeExists(engine, "DELETE", "/api/context/contacts/tags/:id")).To(BeTrue())
 	})
 })
+
+// gin >= 1.12 no longer auto-maps HEAD to GET, so the public health endpoint
+// is registered for both methods (same fix as the tracking server, b2746ec).
+var _ = Describe("NewServer health route", func() {
+	var engine *gin.Engine
+
+	BeforeEach(func() {
+		engine = newTestServer()
+	})
+
+	It("registers /api/health for GET and HEAD", func() {
+		Expect(routeExists(engine, "GET", "/api/health")).To(BeTrue())
+		Expect(routeExists(engine, "HEAD", "/api/health")).To(BeTrue())
+	})
+})

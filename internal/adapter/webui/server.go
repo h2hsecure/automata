@@ -12,7 +12,11 @@ import (
 func RegisterRoutes(engine *gin.Engine) {
 	_ = infraauth.GetCookieSecret() // ensures secrets are initialized
 
+	// HEAD registered explicitly: gin >= 1.12 no longer auto-maps HEAD to GET
 	engine.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+	engine.HEAD("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
