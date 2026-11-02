@@ -7,10 +7,10 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:2317fb6` |
-| Chart | `2026.10.28-2317fb6` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:b2746ec` |
+| Chart | `2026.11.01-b2746ec` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-The release is CI-verified. New in this release: the forms submissions page — the submissions modal in the forms list is replaced by a dedicated page at `forms/:id/submissions` (same one-column-per-field layout, attached files stay downloadable, pagination preserved); each submission can now be deleted from that page via a new context-scoped `DELETE /context/forms/:id/submissions/:sid` endpoint (204 on success, 404 when the submission is missing or belongs to another context, 401 without a context), and form creation now seeds a default `company` field that maps to the contact's Company. Also in this release the repo moved to `github.com/h2hsecure/automata`: the Go module path and all CI/helm references changed, so the image and chart now live under `ghcr.io/h2hsecure/...` (pull with a token that has access to the new account's packages, or make the packages public). The previous release (`cfc5fcf`) introduced the dashboard redesign —
+The release is CI-verified. New in this release: the tracking server now accepts `HEAD` on all public GET routes — gin v1.12.0 no longer auto-maps HEAD to GET, so `HEAD /api/health` and `HEAD /snippet/:id.js` returned 404 while `GET` returned 200; `HEAD /api/health` answering 200 (section 4) is the deploy canary for this fix. The previous release (`2317fb6`) introduced the forms submissions page — the submissions modal in the forms list is replaced by a dedicated page at `forms/:id/submissions` (same one-column-per-field layout, attached files stay downloadable, pagination preserved); each submission can now be deleted from that page via a new context-scoped `DELETE /context/forms/:id/submissions/:sid` endpoint (204 on success, 404 when the submission is missing or belongs to another context, 401 without a context), and form creation now seeds a default `company` field that maps to the contact's Company. Also in this release the repo moved to `github.com/h2hsecure/automata`: the Go module path and all CI/helm references changed, so the image and chart now live under `ghcr.io/h2hsecure/...` (pull with a token that has access to the new account's packages, or make the packages public). The previous release (`cfc5fcf`) introduced the dashboard redesign —
 an SVG world map of contact locations (last 90 days) with choropleth shading
 and per-country count badges, a reworked Top Pages chart (horizontal bars with
 rank, truncated URL, and count), the empty Events tab removed, and the Forms
@@ -87,6 +87,12 @@ kubectl -n automata create secret docker-registry ghcr-registry \
 ingress:
   hostname: m.h2hsecure.com
   gatewayClass: traefik        # kubectl get gatewayclass (default in chart)
+  # REQUIRED on this cluster: Traefik's entrypoints were moved off 80/443
+  # during the edge-nginx migration (websites' Gateways run on 8000/8443).
+  # Without these, the Gateway listeners are rejected (PortUnavailable) and
+  # every HTTPRoute is NotAllowedByListeners.
+  httpPort: 8000
+  httpsPort: 8443
   tls:
     - hosts: [m.h2hsecure.com]
       secretName: automata-tls   # existing Certificate/secret in the automata ns
@@ -110,7 +116,7 @@ bound to the GatewayClass named in `ingress.gatewayClass` — a `Gateway`
 whose rules carry `ExtensionRef` filters (pointing at a Traefik `Middleware`)
 for the upload size limit — Gateway API has no standard body-limit filter.
 With `ingress.tls` set, HTTP for the host is 301-redirected to HTTPS via
-a redirect-only `HTTPRoute` on the port-80 listener.
+a redirect-only `HTTPRoute` on the `ingress.httpPort` listener.
 
 TLS: `ingress.tls` requires `certificate.enabled: true` + `clusterIssuer`
 (e.g. `letsencrypt-prod`) — cert-manager does not watch Gateway resources,
@@ -186,8 +192,8 @@ two releases do not fight over the CRDs.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.10.28-2317fb6 -n automata \
-  -f values.prod.yaml --set image.tag=2317fb6
+  --version 2026.11.01-b2746ec -n automata \
+  -f values.prod.yaml --set image.tag=b2746ec
 ```
 
 ## 4) Verify rollout

@@ -42,6 +42,12 @@ ingress:
   # Name of the GatewayClass the Gateway binds to
   # (`kubectl get gatewayclass`; Traefik's default is "traefik").
   gatewayClass: traefik
+  # Gateway listener ports. The production cluster's Traefik entrypoints were
+  # moved off 80/443 (edge nginx migration): HTTP on 8000, HTTPS on 8443 —
+  # set httpPort: 8000 / httpsPort: 8443 there. Defaults keep classic
+  # 80/443 for clusters where Traefik listens there.
+  httpPort: 80
+  httpsPort: 443
   # Optional annotations for the Gateway + HTTPRoutes.
   annotations: {}
   # Max request body size for file uploads, as an integer byte count,
