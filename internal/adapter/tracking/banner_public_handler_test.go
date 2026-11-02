@@ -304,3 +304,39 @@ func TestRegisterBannerPublicRoutes_RegistersRoutes(t *testing.T) {
 		t.Fatalf("expected 400 for decision, got %d", w.Code)
 	}
 }
+
+func TestBannerPublicHandler_ServeSnippet(t *testing.T) {
+	h := NewBannerPublicHandler(&fakeBannerRepoPublic{}, &fakePageRepoPublic{})
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	RegisterBannerPublicRoutes(r, h)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/banner/snippet/ctx-1.js", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "application/javascript; charset=utf-8" {
+		t.Errorf("expected application/javascript content type, got %q", ct)
+	}
+	if !strings.Contains(w.Body.String(), `/banner/config/ctx-1`) {
+		t.Errorf("snippet missing config URL for ctx-1")
+	}
+}
+
+func TestBannerPublicHandler_ServeSnippet_EmptyContext_400(t *testing.T) {
+	h := NewBannerPublicHandler(&fakeBannerRepoPublic{}, &fakePageRepoPublic{})
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/banner/snippet/.js", nil)
+	c.Params = gin.Params{{Key: "contextID", Value: ""}}
+
+	h.ServeSnippet(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	bdomain "github.com/h2hsecure/automata/internal/domain/banner"
 	pagedomain "github.com/h2hsecure/automata/internal/domain/page"
+	"github.com/h2hsecure/automata/pkg/snippet"
 )
 
 // BannerPublicHandler serves the public banner config and records visitor
@@ -31,6 +32,8 @@ func RegisterBannerPublicRoutes(r *gin.Engine, h *BannerPublicHandler) {
 	r.GET("/banner/config/:contextID", h.Config)
 	r.HEAD("/banner/config/:contextID", h.Config)
 	r.POST("/banner/decision/:contextID", h.Decision)
+	r.GET("/banner/snippet/:contextID.js", h.ServeSnippet)
+	r.HEAD("/banner/snippet/:contextID.js", h.ServeSnippet)
 }
 
 // Config responds with the active banners for a context, each with its
@@ -117,6 +120,32 @@ func (h *BannerPublicHandler) Decision(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// ServeSnippet responds with the self-contained banner snippet JavaScript
+// for a context, for embedding in customer sites as
+// <script src="https://tracking.../banner/snippet/<ctx>.js"></script>.
+// The :contextID.js route captures the whole segment, so the context ID is
+// sliced from the path (same pattern as snippet_handler.go).
+func (h *BannerPublicHandler) ServeSnippet(c *gin.Context) {
+	path := c.Request.URL.Path
+	const prefix = "/banner/snippet/"
+	if len(path) <= len(prefix)+3 || path[:len(prefix)] != prefix || !strings.HasSuffix(path, ".js") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path"})
+		return
+	}
+	contextID := path[len(prefix) : len(path)-3]
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context ID required"})
+		return
+	}
+
+	js, err := snippet.GenerateBannerConfigSnippet(contextID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.Data(http.StatusOK, "application/javascript; charset=utf-8", []byte(js))
 }
 
 // ipHash returns the hex-encoded SHA-256 of an IP address.
