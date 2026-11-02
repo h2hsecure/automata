@@ -40,8 +40,21 @@ type Banner struct {
 	ABVariants  []ABVariant
 	Impressions int64
 	Clicks      int64
+	Position    string   // "top" | "bottom" | "fullpage" ("" = legacy placement injection)
+	Buttons     []Button
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+// Button is a banner action button. Action is a free-form name ("accept",
+// "decline", ...); LinkURL is optional (page slug like "/cookie-policy" or
+// an absolute URL); Dismisses declares that clicking closes the banner.
+type Button struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Action    string `json:"action"`
+	LinkURL   string `json:"link_url"`
+	Dismisses bool   `json:"dismisses"`
 }
 
 type Placement struct {
@@ -138,6 +151,8 @@ type CreateBannerRequest struct {
 	EndDate    time.Time         `json:"end_date"`
 	ABTest     bool              `json:"ab_test"`
 	ABVariants []ABVariant       `json:"ab_variants"`
+	Position   string            `json:"position"`
+	Buttons    []Button          `json:"buttons"`
 }
 
 // UpdateBannerRequest is the request body for updating a banner.
@@ -156,6 +171,8 @@ type UpdateBannerRequest struct {
 	IsActive   *bool        `json:"is_active"`
 	ABTest     *bool        `json:"ab_test"`
 	ABVariants []ABVariant  `json:"ab_variants"`
+	Position   string       `json:"position"`
+	Buttons    []Button     `json:"buttons"`
 }
 
 // CreatePlacementRequest is the request body for creating a placement.

@@ -51,6 +51,14 @@ func (u *BannerUsecase) CreateBanner(contextID string, req *bdomain.CreateBanner
 		b.EndDate = &req.EndDate
 	}
 
+	b.Position = req.Position
+	if req.Buttons != nil {
+		b.Buttons = req.Buttons
+	}
+	if b.Buttons == nil {
+		b.Buttons = []bdomain.Button{}
+	}
+
 	if err := u.repo.CreateBanner(b); err != nil {
 		return nil, fmt.Errorf("create banner: %w", err)
 	}
@@ -81,6 +89,12 @@ func (u *BannerUsecase) UpdateBanner(contextID, bannerID string, req *bdomain.Up
 	}
 	if req.LinkURL != "" {
 		b.LinkURL = req.LinkURL
+	}
+	if req.Position != "" {
+		b.Position = req.Position
+	}
+	if req.Buttons != nil {
+		b.Buttons = req.Buttons
 	}
 	if req.ImageURL != "" {
 		b.ImageURL = &req.ImageURL
