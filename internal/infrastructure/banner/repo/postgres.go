@@ -299,7 +299,7 @@ func (r *bannerRepo) ListActiveBannersForPlacement(contextID, placementID string
 		SELECT id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, start_date, end_date, is_active, ab_test, ab_variants, position, buttons, impressions, clicks, created_at, updated_at
 		FROM banner_banners
 		WHERE context_id = $1 AND is_active = true
-		  AND ($2 IS NULL OR start_date <= $2) AND ($2 IS NULL OR end_date >= $2)
+		  AND (start_date IS NULL OR start_date <= $2) AND (end_date IS NULL OR end_date >= $2)
 		ORDER BY priority DESC
 	`
 	rows, err := r.pool.Query(ctx, query, contextID, date)
