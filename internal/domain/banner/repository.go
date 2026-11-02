@@ -20,8 +20,8 @@ type Repository interface {
 	DeleteBanner(id string) error
 
 	// Tracking operations
-	RecordImpression(bannerID, visitorID string) error
-	RecordClick(bannerID, visitorID string) error
+	RecordImpression(contextID, bannerID, visitorID string) error
+	RecordClick(contextID, bannerID, visitorID string) error
 
 	// Decision operations
 	RecordDecision(d *Decision) error

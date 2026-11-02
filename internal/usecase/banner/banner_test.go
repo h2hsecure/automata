@@ -55,10 +55,10 @@ func (f *fakeRepo) UpdateBanner(b *bdomain.Banner) error {
 }
 
 func (f *fakeRepo) DeleteBanner(string) error { return nil }
-func (f *fakeRepo) RecordImpression(string, string) error {
+func (f *fakeRepo) RecordImpression(string, string, string) error {
 	return nil
 }
-func (f *fakeRepo) RecordClick(string, string) error { return nil }
+func (f *fakeRepo) RecordClick(string, string, string) error { return nil }
 func (f *fakeRepo) RecordDecision(*bdomain.Decision) error {
 	return nil
 }

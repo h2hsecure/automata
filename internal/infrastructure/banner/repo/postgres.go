@@ -390,26 +390,26 @@ func (r *bannerRepo) DeleteBanner(id string) error {
 
 // --- Tracking operations ---
 
-func (r *bannerRepo) RecordImpression(bannerID, visitorID string) error {
+func (r *bannerRepo) RecordImpression(contextID, bannerID, visitorID string) error {
 	ctx := context.Background()
 	query := `
-		INSERT INTO banner_impressions (id, banner_id, visitor_id, created_at)
-		VALUES ($1, $2, $3, NOW())
+		INSERT INTO banner_impressions (id, banner_id, context_id, visitor_id, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
 	`
-	_, err := r.pool.Exec(ctx, query, uuid.New().String(), bannerID, visitorID)
+	_, err := r.pool.Exec(ctx, query, uuid.New().String(), bannerID, contextID, visitorID)
 	if err != nil {
 		return fmt.Errorf("record impression: %w", err)
 	}
 	return nil
 }
 
-func (r *bannerRepo) RecordClick(bannerID, visitorID string) error {
+func (r *bannerRepo) RecordClick(contextID, bannerID, visitorID string) error {
 	ctx := context.Background()
 	query := `
-		INSERT INTO banner_clicks (id, banner_id, visitor_id, created_at)
-		VALUES ($1, $2, $3, NOW())
+		INSERT INTO banner_clicks (id, banner_id, context_id, visitor_id, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
 	`
-	_, err := r.pool.Exec(ctx, query, uuid.New().String(), bannerID, visitorID)
+	_, err := r.pool.Exec(ctx, query, uuid.New().String(), bannerID, contextID, visitorID)
 	if err != nil {
 		return fmt.Errorf("record click: %w", err)
 	}

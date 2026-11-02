@@ -57,11 +57,11 @@ func (r *fakeBannerRepoPublic) ListActiveBannersForPlacement(contextID, _ string
 }
 func (r *fakeBannerRepoPublic) UpdateBanner(*bdomain.Banner) error { return nil }
 func (r *fakeBannerRepoPublic) DeleteBanner(string) error          { return nil }
-func (r *fakeBannerRepoPublic) RecordImpression(string, string) error {
+func (r *fakeBannerRepoPublic) RecordImpression(string, string, string) error {
 	r.impressions++
 	return nil
 }
-func (r *fakeBannerRepoPublic) RecordClick(string, string) error { return nil }
+func (r *fakeBannerRepoPublic) RecordClick(string, string, string) error { return nil }
 func (r *fakeBannerRepoPublic) RecordDecision(d *bdomain.Decision) error {
 	if d.ID == "" {
 		d.ID = "d1"

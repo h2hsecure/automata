@@ -86,12 +86,12 @@ func (h *ServingHandler) TrackBanner(c *gin.Context) {
 
 	switch btype {
 	case "impression":
-		if err := bannerUsecase.NewBannerUsecase(h.repo).RecordImpression(bannerID, visitorID); err != nil {
+		if err := bannerUsecase.NewBannerUsecase(h.repo).RecordImpression(contextID, bannerID, visitorID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 	case "click":
-		if err := bannerUsecase.NewBannerUsecase(h.repo).RecordClick(bannerID, visitorID); err != nil {
+		if err := bannerUsecase.NewBannerUsecase(h.repo).RecordClick(contextID, bannerID, visitorID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

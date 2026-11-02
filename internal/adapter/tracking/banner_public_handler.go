@@ -51,7 +51,7 @@ func (h *BannerPublicHandler) Config(c *gin.Context) {
 	out := make([]gin.H, 0, len(banners))
 	for _, b := range banners {
 		if visitorID != "" {
-			_ = h.bannerRepo.RecordImpression(b.ID, visitorID)
+			_ = h.bannerRepo.RecordImpression(contextID, b.ID, visitorID)
 		}
 		out = append(out, gin.H{
 			"id":       b.ID,

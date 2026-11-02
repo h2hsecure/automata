@@ -357,16 +357,16 @@ func (u *BannerUsecase) ListCampaigns(contextID string, isActive bool) ([]*bdoma
 }
 
 // RecordImpression records a banner impression.
-func (u *BannerUsecase) RecordImpression(bannerID, visitorID string) error {
-	if err := u.repo.RecordImpression(bannerID, visitorID); err != nil {
+func (u *BannerUsecase) RecordImpression(contextID, bannerID, visitorID string) error {
+	if err := u.repo.RecordImpression(contextID, bannerID, visitorID); err != nil {
 		return fmt.Errorf("record impression: %w", err)
 	}
 	return nil
 }
 
 // RecordClick records a banner click.
-func (u *BannerUsecase) RecordClick(bannerID, visitorID string) error {
-	if err := u.repo.RecordClick(bannerID, visitorID); err != nil {
+func (u *BannerUsecase) RecordClick(contextID, bannerID, visitorID string) error {
+	if err := u.repo.RecordClick(contextID, bannerID, visitorID); err != nil {
 		return fmt.Errorf("record click: %w", err)
 	}
 	return nil

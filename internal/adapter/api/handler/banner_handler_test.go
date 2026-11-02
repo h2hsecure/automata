@@ -43,10 +43,10 @@ func (r *fakeBannerRepoAPI) ListActiveBannersForPlacement(string, string, time.T
 }
 func (r *fakeBannerRepoAPI) UpdateBanner(*bdomain.Banner) error { return nil }
 func (r *fakeBannerRepoAPI) DeleteBanner(string) error          { return nil }
-func (r *fakeBannerRepoAPI) RecordImpression(string, string) error {
+func (r *fakeBannerRepoAPI) RecordImpression(string, string, string) error {
 	return nil
 }
-func (r *fakeBannerRepoAPI) RecordClick(string, string) error { return nil }
+func (r *fakeBannerRepoAPI) RecordClick(string, string, string) error { return nil }
 func (r *fakeBannerRepoAPI) RecordDecision(*bdomain.Decision) error {
 	return nil
 }
