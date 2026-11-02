@@ -36,7 +36,8 @@ bff:
 ingress:
   # Renders a Gateway + HTTPRoutes (gateway.networking.k8s.io/v1), bound to
   # the GatewayClass named in `gatewayClass` (the cluster runs Traefik).
-  # Routes /snippet, /track, /form, /static -> tracking :8081 and / -> BFF :8082.
+  # Routes /snippet, /track, /form/, /static/, /banner/, /page/ -> tracking
+# :8081 and / -> BFF :8082.
   enabled: true
   hostname: automata.home.arpa
   # Name of the GatewayClass the Gateway binds to
