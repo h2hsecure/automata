@@ -490,14 +490,11 @@ func (h *AuthHandler) RevokeAPIKey(c *gin.Context) {
 		contextID = contexts[0].ID
 	}
 
-	// Verify key belongs to this context
-	key, err := h.apiKeyRepo.GetByPrefix(keyID, contextID)
-	if err != nil {
+	// Resolve key by ID, scoped to this context (the webui passes the key ID
+	// returned by ListAPIKeys; plaintext-prefix lookup would never match a
+	// bcrypt hash).
+	if _, err := h.apiKeyRepo.GetByID(keyID, contextID); err != nil {
 		log.Error().Err(err).Str("key_id", keyID).Msg("api key not found")
-		c.JSON(http.StatusNotFound, gin.H{"error": "api key not found"})
-		return
-	}
-	if key.ID != keyID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "api key not found"})
 		return
 	}

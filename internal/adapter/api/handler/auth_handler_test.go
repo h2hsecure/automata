@@ -60,6 +60,8 @@ func (f *fakeAuthService) LogoutAllSessions(userID string) error { return nil }
 // fakeApiKeyRepo implements auth_repo.ApiKeyRepository for handler tests.
 type fakeApiKeyRepo struct {
 	createErr error
+	keys      map[string]*auth.APIKey
+	deleted   map[string]int
 }
 
 func (f *fakeApiKeyRepo) Create(key *auth.APIKey) error { return f.createErr }
@@ -67,11 +69,23 @@ func (f *fakeApiKeyRepo) ListByContext(contextID string) ([]*auth.APIKey, error)
 	return nil, nil
 }
 func (f *fakeApiKeyRepo) ListAll() ([]*auth.APIKey, error) { return nil, nil }
-func (f *fakeApiKeyRepo) Delete(id string) error           { return nil }
+func (f *fakeApiKeyRepo) Delete(id string) error {
+	if f.deleted == nil {
+		f.deleted = map[string]int{}
+	}
+	f.deleted[id]++
+	return nil
+}
 func (f *fakeApiKeyRepo) GetByHash(hash string) (*auth.APIKey, error) {
 	return nil, errors.New("not found")
 }
 func (f *fakeApiKeyRepo) GetByPrefix(prefix, contextID string) (*auth.APIKey, error) {
+	return nil, errors.New("not found")
+}
+func (f *fakeApiKeyRepo) GetByID(id, contextID string) (*auth.APIKey, error) {
+	if key, ok := f.keys[id]; ok && key.ContextID == contextID {
+		return key, nil
+	}
 	return nil, errors.New("not found")
 }
 
@@ -122,5 +136,77 @@ func TestCreateAPIKeyOtherRepoErrorReturns500(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d (body: %s)", w.Code, w.Body.String())
+	}
+}
+
+// newRevokeAPIKeyTestRouter emulates the auth middleware by pre-setting the
+// user_id / context_id gin context values, mirroring newCreateAPIKeyTestRouter.
+func newRevokeAPIKeyTestRouter(repo *fakeApiKeyRepo) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	h := NewAuthHandler(&fakeAuthService{}, nil, nil, repo, nil)
+	r := gin.New()
+	r.DELETE("/admin/api-keys/:id", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Set("context_id", "ctx-1")
+		h.RevokeAPIKey(c)
+	})
+	return r
+}
+
+// The webui passes the key ID (UUID) returned by ListAPIKeys, so revocation
+// must resolve the key by ID — not by plaintext prefix (a UUID is never a
+// prefix of the stored bcrypt hash).
+func TestRevokeAPIKeyExistingKeySucceeds(t *testing.T) {
+	keyID := "11111111-1111-1111-1111-111111111111"
+	repo := &fakeApiKeyRepo{
+		keys: map[string]*auth.APIKey{
+			keyID: {ID: keyID, ContextID: "ctx-1", Name: "Production API Key"},
+		},
+	}
+	r := newRevokeAPIKeyTestRouter(repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/admin/api-keys/"+keyID, nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if repo.deleted[keyID] != 1 {
+		t.Fatalf("expected Delete to be called once for %s, got %d", keyID, repo.deleted[keyID])
+	}
+}
+
+func TestRevokeAPIKeyUnknownKeyReturnsNotFound(t *testing.T) {
+	keyID := "22222222-2222-2222-2222-222222222222"
+	r := newRevokeAPIKeyTestRouter(&fakeApiKeyRepo{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/admin/api-keys/"+keyID, nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d (body: %s)", w.Code, w.Body.String())
+	}
+}
+
+func TestRevokeAPIKeyOtherContextReturnsNotFound(t *testing.T) {
+	keyID := "33333333-3333-3333-3333-333333333333"
+	repo := &fakeApiKeyRepo{
+		keys: map[string]*auth.APIKey{
+			keyID: {ID: keyID, ContextID: "other-ctx", Name: "Other Context Key"},
+		},
+	}
+	r := newRevokeAPIKeyTestRouter(repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/admin/api-keys/"+keyID, nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if repo.deleted[keyID] != 0 {
+		t.Fatalf("expected Delete not to be called for a foreign-context key, got %d", repo.deleted[keyID])
 	}
 }

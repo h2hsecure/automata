@@ -27,6 +27,7 @@ type ApiKeyRepository interface {
 	Delete(id string) error
 	GetByHash(hash string) (*auth.APIKey, error)
 	GetByPrefix(prefix string, contextID string) (*auth.APIKey, error)
+	GetByID(id string, contextID string) (*auth.APIKey, error)
 }
 
 func (r *apiKeyPostgresRepo) Create(key *auth.APIKey) error {
@@ -72,6 +73,25 @@ func (r *apiKeyPostgresRepo) GetByHash(hash string) (*auth.APIKey, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get api key by hash: %w", err)
+	}
+
+	return key, nil
+}
+
+func (r *apiKeyPostgresRepo) GetByID(id, contextID string) (*auth.APIKey, error) {
+	key := &auth.APIKey{}
+
+	query := `
+		SELECT id, context_id, user_id, key_hash, name, expires_at, created_at
+		FROM api_keys WHERE id = $1 AND context_id = $2
+	`
+
+	err := r.pool.QueryRow(context.Background(), query, id, contextID).Scan(
+		&key.ID, &key.ContextID, &key.UserID, &key.KeyHash,
+		&key.Name, &key.ExpiresAt, &key.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get api key by id: %w", err)
 	}
 
 	return key, nil

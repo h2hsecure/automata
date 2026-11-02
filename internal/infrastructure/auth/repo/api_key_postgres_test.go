@@ -164,6 +164,44 @@ var _ = Describe("Postgres API Key Repository", func() {
 			Expect(keyRepo.Create(second)).To(Succeed())
 		})
 	})
+
+	Describe("GetByID", func() {
+		It("returns the key when the context matches", func() {
+			key := &domainauth.APIKey{
+				ID:        uuid.New().String(),
+				ContextID: contextID,
+				UserID:    userID,
+				KeyHash:   "hash-1",
+				Name:      "Production API Key",
+			}
+			Expect(keyRepo.Create(key)).To(Succeed())
+
+			got, err := keyRepo.GetByID(key.ID, contextID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got.ID).To(Equal(key.ID))
+			Expect(got.ContextID).To(Equal(contextID))
+			Expect(got.Name).To(Equal("Production API Key"))
+		})
+
+		It("returns an error when the context does not match", func() {
+			key := &domainauth.APIKey{
+				ID:        uuid.New().String(),
+				ContextID: contextID,
+				UserID:    userID,
+				KeyHash:   "hash-1",
+				Name:      "Production API Key",
+			}
+			Expect(keyRepo.Create(key)).To(Succeed())
+
+			_, err := keyRepo.GetByID(key.ID, uuid.New().String())
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("returns an error for an unknown id", func() {
+			_, err := keyRepo.GetByID(uuid.New().String(), contextID)
+			Expect(err).To(HaveOccurred())
+		})
+	})
 })
 
 func TestApiKeyRepo(t *testing.T) {
