@@ -7,8 +7,8 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:836f557c` |
-| Chart | `2026.11.02-836f557c` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:e2e1d1ac` |
+| Chart | `2026.11.02-e2e1d1ac` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
 The release is CI-verified. New in this release: the generic configurable banner system and per-context legal pages. Banners gain a `position` (`top` / `bottom` / `fullpage` / empty for legacy) and a `buttons` array (`{id, label, action, link_url, dismisses}`); a `fullpage` banner whose decline button has `dismisses=false` blocks the page until a dismissing action is taken. Per-visitor decisions are recorded on `banner_decisions` (client IP stored only as a sha256 hash), and new public tracking endpoints are served by the tracking server: `GET /banner/config/:contextID` (JSON; inlines the page content of the first `/`-link button; records an impression when `?visitor_id=` is given), `POST /banner/decision/:contextID` (`text/plain` body `{"banner_id","action","visitor_id"}` → 204), and `GET/HEAD /banner/snippet/:contextID.js` (the new config-aware snippet — `pkg/snippet.GenerateBannerConfigSnippet`; the legacy `GET /snippet/:uuid.js` is unchanged). Legal content is a new per-context `Page` entity (`{id, context_id, slug, title, content, is_active}`) managed via `CRUD /api/context/pages` and served publicly as a minimal HTML doc at `GET /page/:contextID/:slug` (404 when missing or inactive). A cookie-consent banner is now just one config: a `fullpage` banner with accept (dismisses), decline (no dismiss), and a cookie-policy link button. The WebUI Banners view and Pages view expose the new fields and pages. **Companion website change:** the customer site's nginx must also proxy the new prefixes — merge `h2hsecure.github.io` branch `static-nginx` (tracking regex `^/(snippet|track|form|banner|page)`) into `main` so `www.h2hsecure.com/banner/*` and `/page/*` reach the tracking server; without it those 404 on the customer domain. Deploy canaries: `GET https://www.h2hsecure.com/banner/config/<contextID>` → 200 JSON, `GET https://www.h2hsecure.com/banner/snippet/<contextID>.js` → 200, `GET https://www.h2hsecure.com/page/<contextID>/cookie-policy` → 200 HTML (after a page exists), `POST https://www.h2hsecure.com/banner/decision/<contextID>` (`text/plain`) → 204. The previous release (`670e91e`): (1) the Gateway HTTPRoutes are scoped to their listeners via `parentRefs.sectionName` — the HTTP listener (port 8000) now serves exclusively the 301 redirect to HTTPS; previously both routes bound to every listener and, with no Gateway API route priority, Traefik's deterministic router tiebreak let the main route win on plain HTTP; (2) `HEAD` is accepted on the public `/health` routes of the api (`/api/health`), bff, admin, and standalone webui servers — gin v1.12 no longer auto-maps HEAD to GET (the tracking server got the same fix in `b2746ec`). Deploy canaries: `http://m.h2hsecure.com/` → 301 to HTTPS and `HEAD https://m.h2hsecure.com/api/health` → 200. The previous release (`1f3e2e0`) made the Gateway listener ports configurable (`ingress.httpPort`/`ingress.httpsPort`; REQUIRED `8000`/`8443` on the prod cluster — see section 2) and restored `m.h2hsecure.com` TLS + routing after the Traefik entrypoint remap. The release before that (`b2746ec`) added `HEAD` support to the tracking server's public GET routes. The previous release (`2317fb6`) introduced the forms submissions page — the submissions modal in the forms list is replaced by a dedicated page at `forms/:id/submissions` (same one-column-per-field layout, attached files stay downloadable, pagination preserved); each submission can now be deleted from that page via a new context-scoped `DELETE /context/forms/:id/submissions/:sid` endpoint (204 on success, 404 when the submission is missing or belongs to another context, 401 without a context), and form creation now seeds a default `company` field that maps to the contact's Company. Also in this release the repo moved to `github.com/h2hsecure/automata`: the Go module path and all CI/helm references changed, so the image and chart now live under `ghcr.io/h2hsecure/...` (pull with a token that has access to the new account's packages, or make the packages public). The previous release (`cfc5fcf`) introduced the dashboard redesign —
 an SVG world map of contact locations (last 90 days) with choropleth shading
@@ -192,8 +192,8 @@ two releases do not fight over the CRDs.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.02-836f557c -n automata \
-  -f values.prod.yaml --set image.tag=836f557c
+  --version 2026.11.02-e2e1d1ac -n automata \
+  -f values.prod.yaml --set image.tag=e2e1d1ac
 ```
 
 ## 4) Verify rollout
@@ -216,7 +216,24 @@ curl -sI -X HEAD https://<PROD-DOMAIN>/api/health   # expect 200 (gin 1.12: HEAD
 kubectl -n automata get certificate automata-tls
 ```
 
+New banner/page endpoints (tracking server, `m.h2hsecure.com`;
+`<CTX>` = `422adc7a-5b07-49a5-bd00-c6a44d61a172` for the h2hsecure site —
+replace with your context ID). These verify the ingress now forwards
+`/banner/` and `/page/` to tracking `:8081`:
+
+```bash
+curl -s https://m.h2hsecure.com/banner/config/<CTX>   # 200 JSON (banners: [] until one is created)
+curl -sI https://m.h2hsecure.com/banner/snippet/<CTX>.js   # 200, application/javascript
+curl -s -o /dev/null -w '%{http_code}\n' https://m.h2hsecure.com/page/<CTX>/cookie-policy   # 404 until the page exists, 200 after
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: text/plain' \
+  -d '{"banner_id":"x","action":"accept","visitor_id":"v1"}' \
+  https://m.h2hsecure.com/banner/decision/<CTX>   # 204
+```
+
+Customer-domain canaries (only after the website nginx change is merged,
+see the release notes above): same four URLs on `www.h2hsecure.com`.
+
 ## Notes
 
-- Future releases: bump both tags to the new 7-char SHA
+- Future releases: bump both tags to the new 8-char SHA
   (`make deploy-staging` pattern: `IMG=<sha> CHART=<YYYY.MM.DD>-<sha>`).
