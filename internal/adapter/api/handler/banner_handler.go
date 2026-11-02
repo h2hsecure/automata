@@ -141,6 +141,47 @@ func (h *BannerHandler) ListBanners(c *gin.Context) {
 	})
 }
 
+// ListDecisions handles GET /context/banners/:id/decisions —
+// per-visitor decision log + aggregate counts for a banner.
+func (h *BannerHandler) ListDecisions(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "context required"})
+		return
+	}
+
+	b, err := h.repo.GetBanner(c.Param("id"))
+	if err != nil || b == nil || b.ContextID != contextID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "banner not found"})
+		return
+	}
+
+	var offset, limit int
+	if o := c.Query("offset"); o != "" {
+		if p, err := strconv.Atoi(o); err == nil {
+			offset = p
+		}
+	}
+	if l := c.Query("limit"); l != "" {
+		if p, err := strconv.Atoi(l); err == nil {
+			limit = p
+		}
+	}
+
+	decisions, total, err := h.repo.ListDecisions(b.ID, offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	counts, _ := h.repo.DecisionCounts(b.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"decisions": decisions,
+		"counts":    counts,
+		"total":     total,
+	})
+}
+
 // PlacementHandler handles placement CRUD API endpoints.
 type PlacementHandler struct {
 	repo bdomain.Repository

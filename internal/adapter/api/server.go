@@ -253,6 +253,7 @@ func NewServer(
 		api.POST("/context/banners", middleware.AuthMiddleware(authService), bannerHandler.CreateBanner)
 		api.PUT("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.UpdateBanner)
 		api.DELETE("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.DeleteBanner)
+		api.GET("/context/banners/:id/decisions", middleware.AuthMiddleware(authService), bannerHandler.ListDecisions)
 		api.GET("/context/placements", middleware.AuthMiddleware(authService), placementHandler.ListPlacements)
 		api.POST("/context/placements", middleware.AuthMiddleware(authService), placementHandler.CreatePlacement)
 		api.GET("/context/placements/:id", middleware.AuthMiddleware(authService), placementHandler.GetPlacement)
