@@ -320,7 +320,7 @@ func TestPageHandler_ListDecisions(t *testing.T) {
 	var resp struct {
 		Decisions []*page.Decision `json:"decisions"`
 		Counts    map[string]int64 `json:"counts"`
-		Total     int64           `json:"total"`
+		Total     int64            `json:"total"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)

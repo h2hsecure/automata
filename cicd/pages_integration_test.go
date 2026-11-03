@@ -20,10 +20,10 @@ import (
 
 var _ = Describe("Pages end-to-end", func() {
 	var (
-		w        *httptest.ResponseRecorder
-		engine   *gin.Engine
-		pageRepo pagedomain.Repository
-		contextID string
+		w            *httptest.ResponseRecorder
+		engine       *gin.Engine
+		pageRepo     pagedomain.Repository
+		contextID    string
 		bannerPageID string
 	)
 
@@ -83,24 +83,24 @@ var _ = Describe("Pages end-to-end", func() {
 
 		var resp struct {
 			Pages []struct {
-				ID       string             `json:"id"`
-				Slug     string             `json:"slug"`
-				Position string             `json:"position"`
-				Content  string             `json:"content"`
+				ID       string              `json:"id"`
+				Slug     string              `json:"slug"`
+				Position string              `json:"position"`
+				Content  string              `json:"content"`
 				Buttons  []pagedomain.Button `json:"buttons"`
-				Page     *string            `json:"page"`
+				Page     *string             `json:"page"`
 			} `json:"pages"`
 		}
 		Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
 		Expect(resp.Pages).To(HaveLen(2))
 
 		var found *struct {
-			ID       string             `json:"id"`
-			Slug     string             `json:"slug"`
-			Position string             `json:"position"`
-			Content  string             `json:"content"`
+			ID       string              `json:"id"`
+			Slug     string              `json:"slug"`
+			Position string              `json:"position"`
+			Content  string              `json:"content"`
 			Buttons  []pagedomain.Button `json:"buttons"`
-			Page     *string            `json:"page"`
+			Page     *string             `json:"page"`
 		}
 		for i := range resp.Pages {
 			if resp.Pages[i].Slug == "cookie-banner" {
