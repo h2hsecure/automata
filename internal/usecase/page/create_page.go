@@ -13,6 +13,8 @@ type CreatePageInput struct {
 	Title    string
 	Content  string
 	IsActive *bool
+	Position page.Position
+	Buttons  []page.Button
 }
 
 // CreatePage validates and creates a page for the given context.
@@ -28,6 +30,8 @@ func CreatePage(repo page.Repository, contextID string, input CreatePageInput) (
 		Title:     input.Title,
 		Content:   input.Content,
 		IsActive:  true,
+		Position:  input.Position,
+		Buttons:   input.Buttons,
 	}
 	if input.IsActive != nil {
 		p.IsActive = *input.IsActive

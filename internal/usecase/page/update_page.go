@@ -27,6 +27,8 @@ func UpdatePage(repo page.Repository, contextID, id string, input CreatePageInpu
 	p.Slug = input.Slug
 	p.Title = input.Title
 	p.Content = input.Content
+	p.Position = input.Position
+	p.Buttons = input.Buttons
 	if input.IsActive != nil {
 		p.IsActive = *input.IsActive
 	}
