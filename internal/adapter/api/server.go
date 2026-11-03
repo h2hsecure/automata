@@ -244,29 +244,6 @@ func NewServer(
 		api.DELETE("/context/forms/:id/submissions/:sid", middleware.AuthMiddleware(authService), formHandler.DeleteSubmission)
 	}
 
-	// Banner routes (context-resolved)
-	bannerHandler := handler.NewBannerHandler(bannerRepo)
-	placementHandler := handler.NewPlacementHandler(bannerRepo)
-	campaignHandler := handler.NewCampaignHandler(bannerRepo)
-	{
-		api.GET("/context/banners", middleware.AuthMiddleware(authService), bannerHandler.ListBanners)
-		api.GET("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.GetBanner)
-		api.POST("/context/banners", middleware.AuthMiddleware(authService), bannerHandler.CreateBanner)
-		api.PUT("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.UpdateBanner)
-		api.DELETE("/context/banners/:id", middleware.AuthMiddleware(authService), bannerHandler.DeleteBanner)
-		api.GET("/context/banners/:id/decisions", middleware.AuthMiddleware(authService), bannerHandler.ListDecisions)
-		api.GET("/context/placements", middleware.AuthMiddleware(authService), placementHandler.ListPlacements)
-		api.POST("/context/placements", middleware.AuthMiddleware(authService), placementHandler.CreatePlacement)
-		api.GET("/context/placements/:id", middleware.AuthMiddleware(authService), placementHandler.GetPlacement)
-		api.PUT("/context/placements/:id", middleware.AuthMiddleware(authService), placementHandler.UpdatePlacement)
-		api.DELETE("/context/placements/:id", middleware.AuthMiddleware(authService), placementHandler.DeletePlacement)
-		api.GET("/context/campaigns", middleware.AuthMiddleware(authService), campaignHandler.ListCampaigns)
-		api.POST("/context/campaigns", middleware.AuthMiddleware(authService), campaignHandler.CreateCampaign)
-		api.GET("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.GetCampaign)
-		api.PUT("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.UpdateCampaign)
-		api.DELETE("/context/campaigns/:id", middleware.AuthMiddleware(authService), campaignHandler.DeleteCampaign)
-	}
-
 	// Page routes (context-resolved)
 	pageHandler := handler.NewPageHandler(pageRepo)
 	{
@@ -275,6 +252,7 @@ func NewServer(
 		api.POST("/context/pages", middleware.AuthMiddleware(authService), pageHandler.Create)
 		api.PUT("/context/pages/:id", middleware.AuthMiddleware(authService), pageHandler.Update)
 		api.DELETE("/context/pages/:id", middleware.AuthMiddleware(authService), pageHandler.Delete)
+		api.GET("/context/pages/:id/decisions", middleware.AuthMiddleware(authService), pageHandler.ListDecisions)
 	}
 
 	// Tracking dashboard routes (context-resolved)

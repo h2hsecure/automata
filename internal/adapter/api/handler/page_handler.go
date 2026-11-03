@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -20,10 +21,12 @@ func NewPageHandler(repo page.Repository) *PageHandler {
 }
 
 type pageInput struct {
-	Slug     string `json:"slug"`
-	Title    string `json:"title"`
-	Content  string `json:"content"`
-	IsActive *bool  `json:"is_active"`
+	Slug     string        `json:"slug"`
+	Title    string        `json:"title"`
+	Content  string        `json:"content"`
+	IsActive *bool         `json:"is_active"`
+	Position page.Position `json:"position"`
+	Buttons  []page.Button `json:"buttons"`
 }
 
 func (h *PageHandler) List(c *gin.Context) {
@@ -81,6 +84,8 @@ func (h *PageHandler) Create(c *gin.Context) {
 		Title:    input.Title,
 		Content:  input.Content,
 		IsActive: input.IsActive,
+		Position: input.Position,
+		Buttons:  input.Buttons,
 	})
 	if err != nil {
 		if isDuplicateError(err) {
@@ -114,6 +119,8 @@ func (h *PageHandler) Update(c *gin.Context) {
 		Title:    input.Title,
 		Content:  input.Content,
 		IsActive: input.IsActive,
+		Position: input.Position,
+		Buttons:  input.Buttons,
 	})
 	if err != nil {
 		if isDuplicateError(err) {
@@ -142,6 +149,47 @@ func (h *PageHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "page deleted"})
+}
+
+// ListDecisions handles GET /context/pages/:id/decisions — per-visitor
+// decision log + aggregate counts for a page.
+func (h *PageHandler) ListDecisions(c *gin.Context) {
+	contextID := c.GetString("context_id")
+	if contextID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "context not found"})
+		return
+	}
+
+	p, err := h.repo.GetByID(c.Param("id"))
+	if err != nil || p == nil || p.ContextID != contextID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+		return
+	}
+
+	var offset, limit int
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil {
+			offset = v
+		}
+	}
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil {
+			limit = v
+		}
+	}
+
+	decisions, total, err := h.repo.ListDecisions(p.ID, offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	counts, _ := h.repo.DecisionCounts(p.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"decisions": decisions,
+		"counts":    counts,
+		"total":     total,
+	})
 }
 
 // isDuplicateError reports whether err is a unique-constraint violation.

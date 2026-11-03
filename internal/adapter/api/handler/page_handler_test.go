@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 // fakePageRepo is an in-memory page.Repository for handler tests.
 type fakePageRepo struct {
 	pages     map[string]*page.Page
+	decisions []page.Decision
 	nextID    int
 	dupOnSlug string // if set, Create returns a duplicate error for this slug
 }
@@ -77,6 +79,58 @@ func (r *fakePageRepo) Delete(id string) error {
 	}
 	delete(r.pages, id)
 	return nil
+}
+
+func (r *fakePageRepo) ListActive(contextID string) ([]*page.Page, error) {
+	var out []*page.Page
+	for _, p := range r.pages {
+		if p.ContextID == contextID && p.IsActive {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakePageRepo) RecordImpression(contextID, pageID, visitorID string) error {
+	return nil
+}
+
+func (r *fakePageRepo) RecordDecision(d *page.Decision) error {
+	r.decisions = append(r.decisions, *d)
+	return nil
+}
+
+func (r *fakePageRepo) ListDecisions(pageID string, offset, limit int) ([]*page.Decision, int64, error) {
+	var out []*page.Decision
+	for i := range r.decisions {
+		if r.decisions[i].PageID == pageID {
+			out = append(out, &r.decisions[i])
+		}
+	}
+	total := int64(len(out))
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > len(out) {
+		offset = len(out)
+	}
+	end := len(out)
+	if limit > 0 {
+		if e := offset + limit; e < end {
+			end = e
+		}
+	}
+	return out[offset:end], total, nil
+}
+
+func (r *fakePageRepo) DecisionCounts(pageID string) (map[string]int64, error) {
+	counts := map[string]int64{}
+	for _, d := range r.decisions {
+		if d.PageID == pageID {
+			counts[d.Action]++
+		}
+	}
+	return counts, nil
 }
 
 func newPageTestContext(method, path, body string, params gin.Params, contextID string) (*gin.Context, *httptest.ResponseRecorder) {
@@ -220,6 +274,88 @@ func TestPageHandler_Update_ForeignContext_404(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 (foreign context maps to 400 via usecase), got %d", w.Code)
+	}
+}
+
+func TestPageHandler_Create_PositionAndButtons(t *testing.T) {
+	repo := newFakePageRepo()
+	h := NewPageHandler(repo)
+	body := `{"slug":"cookie-banner","title":"Cookie Banner","position":"bottom","buttons":[{"label":"Accept","href":"#","action":"dismiss_accept","variant":"primary"},{"label":"Decline","href":"/privacy","action":"dismiss_decline","variant":"secondary"}]}`
+	c, w := newPageTestContext("POST", "/context/pages", body, nil, "ctx-1")
+	h.Create(c)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var p *page.Page
+	for _, pg := range repo.pages {
+		p = pg
+	}
+	if p == nil {
+		t.Fatal("expected 1 page created")
+	}
+	if p.Position != "bottom" {
+		t.Fatalf("expected position bottom, got %q", p.Position)
+	}
+	if len(p.Buttons) != 2 || p.Buttons[0].Label != "Accept" || p.Buttons[1].Action != "dismiss_decline" {
+		t.Fatalf("unexpected buttons: %+v", p.Buttons)
+	}
+}
+
+func TestPageHandler_ListDecisions(t *testing.T) {
+	repo := newFakePageRepo()
+	repo.pages["page-1"] = &page.Page{ID: "page-1", ContextID: "ctx-1", Slug: "a", Title: "A", Position: "top"}
+	repo.decisions = []page.Decision{
+		{ID: "d1", ContextID: "ctx-1", PageID: "page-1", VisitorID: "v1", Action: "accept"},
+		{ID: "d2", ContextID: "ctx-1", PageID: "page-1", VisitorID: "v2", Action: "decline"},
+	}
+
+	h := NewPageHandler(repo)
+	c, w := newPageTestContext("GET", "/context/pages/page-1/decisions", "", gin.Params{{Key: "id", Value: "page-1"}}, "ctx-1")
+	h.ListDecisions(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Decisions []*page.Decision `json:"decisions"`
+		Counts    map[string]int64 `json:"counts"`
+		Total     int64           `json:"total"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Decisions) != 2 {
+		t.Fatalf("expected 2 decisions, got %d", len(resp.Decisions))
+	}
+	if resp.Total != 2 {
+		t.Fatalf("expected total 2, got %d", resp.Total)
+	}
+	if resp.Counts["accept"] != 1 || resp.Counts["decline"] != 1 {
+		t.Fatalf("unexpected counts: %v", resp.Counts)
+	}
+}
+
+func TestPageHandler_ListDecisions_Missing_404(t *testing.T) {
+	repo := newFakePageRepo()
+	h := NewPageHandler(repo)
+	c, w := newPageTestContext("GET", "/context/pages/nope/decisions", "", gin.Params{{Key: "id", Value: "nope"}}, "ctx-1")
+	h.ListDecisions(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestPageHandler_ListDecisions_ForeignContext_404(t *testing.T) {
+	repo := newFakePageRepo()
+	repo.pages["page-1"] = &page.Page{ID: "page-1", ContextID: "other-ctx", Slug: "a", Title: "A"}
+	h := NewPageHandler(repo)
+	c, w := newPageTestContext("GET", "/context/pages/page-1/decisions", "", gin.Params{{Key: "id", Value: "page-1"}}, "ctx-1")
+	h.ListDecisions(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for foreign context, got %d", w.Code)
 	}
 }
 
