@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Users,
   FileText,
-  Image,
   Menu,
   X,
   Zap,
@@ -35,7 +34,6 @@ const navItems: NavItem[] = [
   { name: 'Forms', path: '/forms', icon: FileText },
   { name: 'Static Files', path: '/static-files', icon: Paperclip },
   { name: 'Pages', path: '/pages', icon: Files },
-  { name: 'Banners', path: '/banners', icon: Image },
   { name: 'Email', path: '/email', icon: Mail, adminOnly: true },
 ]
 

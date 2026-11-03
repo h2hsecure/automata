@@ -112,85 +112,22 @@ export interface Submission {
   CreatedAt: string;
 }
 
-export interface BannerButton {
-  id?: string;
+export interface PageButton {
   label: string;
-  action: string;
-  link_url?: string;
-  dismisses: boolean;
+  action: string; // "link" | "dismiss_accept" | "dismiss_decline"
+  href?: string;
+  variant?: string; // "primary" | "secondary"
 }
 
-export interface BannerDecision {
+export interface PageDecision {
   ID: string;
   ContextID: string;
-  BannerID: string;
+  PageID: string;
   VisitorID: string;
   Action: string;
   IPHash: string;
   UserAgent: string;
   CreatedAt: string;
-}
-
-export interface Banner {
-  ID: string;
-  ContextID: string;
-  Name: string;
-  Type: string;
-  Content: string;
-  LinkURL: string;
-  ImageURL: string | null;
-  AltText: string | null;
-  CampaignID: string | null;
-  Placements: string[];
-  Priority: number;
-  StartDate: string | null;
-  EndDate: string | null;
-  IsActive: boolean;
-  ABTest: boolean;
-  ABVariants: unknown[];
-  Impressions: number;
-  Clicks: number;
-  Position: string;
-  Buttons: BannerButton[];
-  CreatedAt: string;
-  UpdatedAt: string;
-}
-
-export interface BannerInput {
-  name?: string;
-  type?: string;
-  content?: string;
-  link_url?: string;
-  image_url?: string;
-  alt_text?: string;
-  campaign_id?: string;
-  placements?: string[];
-  priority?: number;
-  start_date?: string;
-  end_date?: string;
-  is_active?: boolean;
-  ab_test?: boolean;
-  ab_variants?: unknown[];
-  position?: string;
-  buttons?: BannerButton[];
-}
-
-export interface Placement {
-  id: string;
-  name: string;
-  selector: string;
-  status: string;
-  created_at: string;
-}
-
-export interface Campaign {
-  id: string;
-  name: string;
-  description: string;
-  start_date: string;
-  end_date: string;
-  status: string;
-  created_at: string;
 }
 
 export interface ApiKey {
@@ -353,6 +290,8 @@ export interface Page {
   Title: string;
   Content: string;
   IsActive: boolean;
+  Position: string;
+  Buttons: PageButton[];
   CreatedAt: string;
   UpdatedAt: string;
 }
@@ -362,4 +301,6 @@ export interface PageInput {
   title: string;
   content?: string;
   is_active?: boolean;
+  position?: string;
+  buttons?: PageButton[];
 }

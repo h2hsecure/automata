@@ -44,8 +44,8 @@ interface ActivityMeta {
 const ACTIVITY_META: Record<string, ActivityMeta> = {
   form_submission: { label: 'Form submission', icon: FileText, classes: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
   page_visit: { label: 'Page visit', icon: Globe, classes: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' },
-  banner_click: { label: 'Banner click', icon: MousePointerClick, classes: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
-  banner_impression: { label: 'Banner impression', icon: Eye, classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
+  page_clicked: { label: 'Page click', icon: MousePointerClick, classes: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
+  page_shown: { label: 'Page shown', icon: Eye, classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
   contact_created: { label: 'Contact created', icon: UserPlus, classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
   contact_updated: { label: 'Contact updated', icon: UserCog, classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
   contact_merged: { label: 'Contact merged', icon: GitMerge, classes: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },

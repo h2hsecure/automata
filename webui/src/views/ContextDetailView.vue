@@ -5,14 +5,14 @@ import { ArrowLeft, Copy, Check, Globe } from 'lucide-vue-next'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import Badge from '@/components/Badge.vue'
-import { getContext, listForms, listBanners } from '@/api/client'
-import type { Context, Form, Banner } from '@/types/api'
+import { getContext, listForms, listPages } from '@/api/client'
+import type { Context, Form, Page } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 const context = ref<Context | null>(null)
 const forms = ref<Form[]>([])
-const banners = ref<Banner[]>([])
+const pages = ref<Page[]>([])
 const loading = ref(true)
 const error = ref('')
 const copied = ref(false)
@@ -28,12 +28,12 @@ async function load() {
   error.value = ''
   try {
     context.value = await getContext(contextId.value)
-    const [f, b] = await Promise.all([
+    const [f, p] = await Promise.all([
       listForms(contextId.value),
-      listBanners(contextId.value),
+      listPages(),
     ])
     forms.value = f
-    banners.value = b
+    pages.value = p
   } catch (e: any) {
     error.value = e.response?.data?.error || 'Failed to load website.'
   } finally {
@@ -144,23 +144,23 @@ onMounted(load)
         </div>
       </Card>
 
-      <!-- Banners -->
-      <Card title="Banners" description="Banners associated with this website">
+      <!-- Pages -->
+      <Card title="Pages" description="Pages associated with this website">
         <div class="mt-4 space-y-3">
-          <p v-if="banners.length === 0" class="py-4 text-center text-sm text-muted-foreground">
-            No banners yet.
+          <p v-if="pages.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+            No pages yet.
           </p>
           <div
-            v-for="banner in banners"
-            :key="banner.ID"
+            v-for="page in pages"
+            :key="page.ID"
             class="flex items-center justify-between rounded-md border px-3 py-2"
           >
             <div>
-              <p class="text-sm font-medium">{{ banner.Name }}</p>
-              <code class="text-xs text-muted-foreground">{{ banner.ID }}</code>
+              <p class="text-sm font-medium">{{ page.Title }}</p>
+              <code class="text-xs text-muted-foreground">{{ page.Slug }}</code>
             </div>
-            <Badge :variant="banner.IsActive ? 'success' : 'destructive'">
-              {{ banner.IsActive ? 'Active' : 'Inactive' }}
+            <Badge :variant="page.IsActive ? 'success' : 'destructive'">
+              {{ page.IsActive ? 'Active' : 'Inactive' }}
             </Badge>
           </div>
         </div>

@@ -21,7 +21,7 @@ import WorldMapChart from '@/components/WorldMapChart.vue'
 import {
   listContacts,
   listForms,
-  listBanners,
+  listPages,
   getDashboardStats,
   getEmailStats,
 } from '@/api/client'
@@ -38,7 +38,7 @@ const stats = ref({
   totalPageViews: 0,
   totalContacts: 0,
   totalForms: 0,
-  totalBanners: 0,
+  totalPages: 0,
 })
 
 // Email stats (queue status + reach) — cards hide if the call fails
@@ -88,8 +88,8 @@ async function loadOverview() {
     const forms = await listForms(authStore.currentContextId)
     stats.value.totalForms = forms.length
 
-    const banners = await listBanners(authStore.currentContextId)
-    stats.value.totalBanners = banners.length
+    const pages = await listPages()
+    stats.value.totalPages = pages.length
 
     // Non-blocking: hide email cards on failure
     getEmailStats()
@@ -238,23 +238,23 @@ watch(
           </router-link>
         </Card>
 
-        <!-- Banners -->
+        <!-- Pages -->
         <Card>
           <router-link
-            to="/banners"
+            to="/pages"
             class="group -mx-1 -my-1 block rounded-lg p-1 transition hover:bg-primary/5 hover:ring-1 hover:ring-primary/30"
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-sm font-medium text-muted-foreground">Banners</p>
-                <p class="text-2xl font-bold">{{ stats.totalBanners }}</p>
+                <p class="text-sm font-medium text-muted-foreground">Pages</p>
+                <p class="text-2xl font-bold">{{ stats.totalPages }}</p>
               </div>
               <div class="rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3">
                 <Image class="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
             <div class="mt-2 flex items-center justify-between text-sm text-muted-foreground">
-              Active banners
+              Published pages
               <ChevronRight
                 class="h-4 w-4 opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-100"
               />

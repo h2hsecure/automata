@@ -71,11 +71,6 @@ const routes: RouteRecordRaw[] = [
         redirect: '/settings?tab=api-keys',
       },
       {
-        path: 'banners',
-        name: 'Banners',
-        component: () => import('@/views/BannersView.vue'),
-      },
-      {
         path: 'contexts',
         redirect: '/settings?tab=websites',
       },

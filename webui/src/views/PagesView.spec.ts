@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createPage: vi.fn(async (d: any) => d),
   updatePage: vi.fn(async (_id: string, d: any) => d),
   deletePage: vi.fn(async () => {}),
+  listPageDecisions: vi.fn(async () => ({ decisions: [], counts: {}, total: 0 })),
 }))
 
 vi.mock('@/api/client', () => mocks)
@@ -48,11 +49,18 @@ async function fillModal(slug: string, title: string) {
   await flushPromises()
 }
 
+function positionSelect() {
+  return Array.from(document.body.querySelectorAll('select')).find(
+    (s) => Array.from(s.options).some((o) => o.value === 'full'),
+  )
+}
+
 afterEach(() => {
   wrapper?.unmount()
   document.body.innerHTML = ''
   vi.clearAllMocks()
   mocks.listPages.mockImplementation(async () => [])
+  mocks.listPageDecisions.mockImplementation(async () => ({ decisions: [], counts: {}, total: 0 }))
 })
 
 describe('PagesView', () => {
@@ -64,6 +72,8 @@ describe('PagesView', () => {
         Slug: 'cookie-policy',
         Title: 'Cookie Policy',
         Content: '<p>We use cookies.</p>',
+        Position: '',
+        Buttons: [],
         IsActive: true,
         CreatedAt: '2026-01-01T00:00:00Z',
         UpdatedAt: '2026-01-01T00:00:00Z',
@@ -75,10 +85,40 @@ describe('PagesView', () => {
     expect(wrapper.text()).toContain('/page/ctx-1/cookie-policy')
   })
 
-  it('creates a page and calls the API', async () => {
+  it('shows a position badge and buttons count for positioned pages', async () => {
+    mocks.listPages.mockImplementation(async () => [
+      {
+        ID: '1',
+        ContextID: 'ctx-1',
+        Slug: 'cookie-policy',
+        Title: 'Cookie Policy',
+        Content: '<p>We use cookies.</p>',
+        Position: 'left',
+        Buttons: [
+          { label: 'Accept', action: 'dismiss_accept', href: '', variant: 'primary' },
+          { label: 'Decline', action: 'dismiss_decline', href: '', variant: 'secondary' },
+        ],
+        IsActive: true,
+        CreatedAt: '2026-01-01T00:00:00Z',
+        UpdatedAt: '2026-01-01T00:00:00Z',
+      },
+    ])
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain('left')
+    expect(wrapper.text()).toContain('2 buttons')
+  })
+
+  it('creates a page sending position and buttons in the payload', async () => {
     await mountView()
     await openCreateModal()
     await fillModal('about', 'About Us')
+
+    // pick a position from the select
+    const select = positionSelect()
+    expect(select).toBeTruthy()
+    select!.value = 'bottom'
+    select!.dispatchEvent(new Event('change'))
+    await flushPromises()
 
     bodyButtons().find((b) => b.textContent?.trim() === 'Create')!.click()
     await flushPromises()
@@ -88,6 +128,60 @@ describe('PagesView', () => {
     expect(data.slug).toBe('about')
     expect(data.title).toBe('About Us')
     expect(data.is_active).toBe(true)
+    expect(data.position).toBe('bottom')
+    expect(data.buttons).toEqual([])
+  })
+
+  it('offers None/Top/Bottom/Left/Right/Full as position options', async () => {
+    await mountView()
+    await openCreateModal()
+    const select = positionSelect()
+    expect(select).toBeTruthy()
+    const values = Array.from(select!.options).map((o) => o.value)
+    expect(values).toEqual(['', 'top', 'bottom', 'left', 'right', 'full'])
+  })
+
+  it('opens the decisions panel, calls listPageDecisions and renders counts', async () => {
+    mocks.listPages.mockImplementation(async () => [
+      {
+        ID: '1',
+        ContextID: 'ctx-1',
+        Slug: 'cookie-policy',
+        Title: 'Cookie Policy',
+        Content: '',
+        Position: 'top',
+        Buttons: [],
+        IsActive: true,
+        CreatedAt: '2026-01-01T00:00:00Z',
+        UpdatedAt: '2026-01-01T00:00:00Z',
+      },
+    ])
+    mocks.listPageDecisions.mockImplementation(async () => ({
+      decisions: [
+        {
+          ID: 'd1',
+          ContextID: 'ctx-1',
+          PageID: '1',
+          VisitorID: 'v1',
+          Action: 'dismiss_accept',
+          IPHash: 'abc',
+          UserAgent: 'UA',
+          CreatedAt: '2026-01-02T00:00:00Z',
+        },
+      ],
+      counts: { dismiss_accept: 3 },
+      total: 3,
+    }))
+    await mountView()
+    const decisionsBtn = bodyButtons().find((b) => b.getAttribute('aria-label') === 'View decisions')
+    expect(decisionsBtn).toBeTruthy()
+    decisionsBtn!.click()
+    await flushPromises()
+
+    expect(mocks.listPageDecisions).toHaveBeenCalledWith('1')
+    // Modal teleports to document.body
+    expect(document.body.textContent).toContain('dismiss_accept: 3')
+    expect(document.body.textContent).toContain('v1')
   })
 
   it('shows an edit action for each page', async () => {
@@ -98,6 +192,8 @@ describe('PagesView', () => {
         Slug: 'cookie-policy',
         Title: 'Cookie Policy',
         Content: '',
+        Position: '',
+        Buttons: [],
         IsActive: true,
         CreatedAt: '2026-01-01T00:00:00Z',
         UpdatedAt: '2026-01-01T00:00:00Z',
@@ -116,6 +212,8 @@ describe('PagesView', () => {
         Slug: 'cookie-policy',
         Title: 'Cookie Policy',
         Content: '',
+        Position: '',
+        Buttons: [],
         IsActive: true,
         CreatedAt: '2026-01-01T00:00:00Z',
         UpdatedAt: '2026-01-01T00:00:00Z',

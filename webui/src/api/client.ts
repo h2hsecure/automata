@@ -4,9 +4,6 @@ import type {
   ContactInput,
   Form,
   FormInput,
-  Banner,
-  BannerInput,
-  BannerDecision,
   ApiKey,
   Context,
   ContextInput,
@@ -15,8 +12,6 @@ import type {
   TrackingEvent,
   Visitor,
   User,
-  Campaign,
-  Placement,
   ContextUser,
   EmailTemplate,
   EmailTemplateInput,
@@ -27,6 +22,7 @@ import type {
   Submission,
   Page,
   PageInput,
+  PageDecision,
 } from '@/types/api'
 
 const client: AxiosInstance = axios.create({
@@ -220,49 +216,6 @@ export async function downloadSubmissionFile(
 
 export async function submitForm(formId: string, data: Record<string, string>): Promise<{ id: string }> {
   return { id: '' }
-}
-
-// Banner endpoints
-export async function listBanners(contextId = ''): Promise<Banner[]> {
-  const params: Record<string, string> = {}
-  if (contextId) params.context_id = contextId
-  const response = await client.get('/context/banners', { params })
-  return response.data.banners ?? []
-}
-
-export async function createBanner(data: BannerInput): Promise<Banner> {
-  const response = await client.post('/context/banners', data)
-  return response.data
-}
-
-export async function updateBanner(id: string, data: BannerInput): Promise<Banner> {
-  const response = await client.put(`/context/banners/${id}`, data)
-  return response.data
-}
-
-export async function deleteBanner(id: string): Promise<void> {
-  await client.delete(`/context/banners/${id}`)
-}
-
-export async function listBannerDecisions(
-  bannerId: string,
-  offset = 0,
-  limit = 50,
-): Promise<{ decisions: BannerDecision[]; counts: Record<string, number>; total: number }> {
-  const response = await client.get(`/context/banners/${bannerId}/decisions`, {
-    params: { offset, limit },
-  })
-  return response.data
-}
-
-// Placement endpoints
-export async function listPlacements(contextId = ''): Promise<Placement[]> {
-  return [] // TODO: implement placements endpoint
-}
-
-// Campaign endpoints
-export async function listCampaigns(contextId = ''): Promise<Campaign[]> {
-  return [] // TODO: implement campaigns endpoint
 }
 
 // Tracking endpoints
@@ -551,6 +504,17 @@ export async function updatePage(id: string, data: PageInput): Promise<Page> {
 
 export async function deletePage(id: string): Promise<void> {
   await client.delete(`/context/pages/${id}`)
+}
+
+export async function listPageDecisions(
+  pageId: string,
+  offset = 0,
+  limit = 50,
+): Promise<{ decisions: PageDecision[]; counts: Record<string, number>; total: number }> {
+  const response = await client.get(`/context/pages/${pageId}/decisions`, {
+    params: { offset, limit },
+  })
+  return response.data
 }
 
 export default client

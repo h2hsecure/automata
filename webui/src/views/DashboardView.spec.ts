@@ -23,7 +23,10 @@ const mocks = vi.hoisted(() => ({
     limit: 100,
   })),
   listForms: vi.fn(async () => [{ ID: 'f1', Name: 'Form 1' }]),
-  listBanners: vi.fn(async () => [{ ID: 'b1', Name: 'Banner 1' }]),
+  listPages: vi.fn(async () => [
+    { ID: 'p1', Slug: 'cookie-policy', Title: 'Cookie Policy' },
+    { ID: 'p2', Slug: 'about', Title: 'About' },
+  ]),
   getEmailStats: vi.fn(async () => {
     throw new Error('email down')
   }),
@@ -104,14 +107,16 @@ describe('DashboardView', () => {
     expect(wrapper.text()).not.toContain('Events Log')
   })
 
-  it('links the forms card to /forms and the banners card to /banners', async () => {
+  it('links the forms card to /forms and the pages card to /pages', async () => {
     const wrapper = await mountView()
     const formsLink = wrapper.find('a[href="/forms"]')
     expect(formsLink.exists()).toBe(true)
     expect(formsLink.text()).toContain('Forms')
-    const bannersLink = wrapper.find('a[href="/banners"]')
-    expect(bannersLink.exists()).toBe(true)
-    expect(bannersLink.text()).toContain('Banners')
+    const pagesLink = wrapper.find('a[href="/pages"]')
+    expect(pagesLink.exists()).toBe(true)
+    expect(pagesLink.text()).toContain('Pages')
+    expect(pagesLink.text()).toContain('2')
+    expect(mocks.listPages).toHaveBeenCalled()
   })
 
   it('keeps the top pages list with counts', async () => {
