@@ -228,11 +228,13 @@ curl -s -o /dev/null -w '%{http_code}\n' https://m.h2hsecure.com/page/<CTX>/cook
 curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: text/plain' \
   -d '{"page_id":"<id>","decision":"accept","visitor_id":"v1"}' \
   https://m.h2hsecure.com/page/decision/<CTX>   # 204 (404 for an unknown page_id)
-curl -s -o /dev/null -w '%{http_code}\n' https://m.h2hsecure.com/banner/config/<CTX>   # 404 (retired)
+curl -s https://m.h2hsecure.com/banner/config/<CTX>   # retired: no banner JSON — the ingress no longer routes /banner/ to tracking, so the response is the WebUI index.html (200 SPA fallback). On the customer site it is a clean 404 (nginx regex).
 ```
 
 Customer-domain canaries (only after the website `static-nginx` merge,
-see the release notes above): the same five URLs on `www.h2hsecure.com`.
+see the release notes above): the same five URLs on `www.h2hsecure.com`
+(the retired `/banner/config` is a clean 404 there — nginx no longer
+proxies it).
 
 ## Notes
 
