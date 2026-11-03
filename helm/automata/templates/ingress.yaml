@@ -14,7 +14,7 @@
 # (default: traefik; `kubectl get gatewayclass`).
 #
 # Routing (unchanged from the old IngressRoute):
-#   /snippet, /track, /form/, /static/, /banner/, /page/ -> tracking :8081
+#   /snippet, /track, /form/, /static/, /page/ -> tracking :8081
 #   /                                   -> BFF service :8082
 #
 # Upload body limit: Gateway API has no standard body-limit filter type, so
@@ -67,9 +67,9 @@ spec:
       hostname: {{ .Values.ingress.hostname | quote }}
   {{- end }}
 ---
-# Trailing slashes on /form/, /static/, /banner/ and /page/ are intentional:
+# Trailing slashes on /form/, /static/ and /page/ are intentional:
 # the bare prefixes would also match the admin SPA routes /forms,
-# /static-files, /banners and /pages (and /forms/:id/submissions) and 404
+# /static-files and /pages (and /forms/:id/submissions) and 404
 # them. /snippet and /track have no colliding SPA routes, so they stay bare.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -96,7 +96,7 @@ spec:
       sectionName: http
       {{- end }}
   rules:
-    {{- range list "/snippet" "/track" "/form/" "/static/" "/banner/" "/page/" }}
+    {{- range list "/snippet" "/track" "/form/" "/static/" "/page/" }}
     - matches:
         - path:
             type: PathPrefix
