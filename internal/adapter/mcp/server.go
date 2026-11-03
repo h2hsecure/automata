@@ -10,6 +10,7 @@ import (
 	"github.com/h2hsecure/automata/internal/domain/auth"
 	"github.com/h2hsecure/automata/internal/domain/contact"
 	"github.com/h2hsecure/automata/internal/domain/form"
+	pagedomain "github.com/h2hsecure/automata/internal/domain/page"
 	"github.com/h2hsecure/automata/internal/domain/tracking"
 	"github.com/h2hsecure/automata/internal/infrastructure/webhook"
 	bannerusecase "github.com/h2hsecure/automata/internal/usecase/banner"
@@ -21,13 +22,14 @@ import (
 // Tools call these directly (no REST proxying) and are scoped to the
 // authenticated key's context.
 type Deps struct {
-	AuthService  auth.AuthService
-	ContactRepo  contact.Repository
-	FormRepo     form.Repository
+	AuthService   auth.AuthService
+	ContactRepo   contact.Repository
+	FormRepo      form.Repository
 	BannerUsecase *bannerusecase.BannerUsecase
-	TrackingRepo tracking.Repository
-	EmailUsecase *emailusecase.EmailUsecase
-	WebhookSvc   *webhook.Service
+	TrackingRepo  tracking.Repository
+	EmailUsecase  *emailusecase.EmailUsecase
+	WebhookSvc    *webhook.Service
+	PageRepo      pagedomain.Repository
 }
 
 type apiKeyCtxKey struct{}
@@ -101,6 +103,7 @@ func registerAllTools(s *mcp.Server, d Deps, contextID string) {
 	registerBannerTools(s, d, contextID)
 	registerPlacementTools(s, d, contextID)
 	registerCampaignTools(s, d, contextID)
+	registerPageTools(s, d, contextID)
 	registerTrackingTools(s, d, contextID)
 	registerEmailTools(s, d, contextID)
 	registerWebhookTools(s, d, contextID)

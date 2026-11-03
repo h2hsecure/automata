@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	bdomain "github.com/h2hsecure/automata/internal/domain/banner"
@@ -37,6 +38,14 @@ const (
 		"priority": {"type": "integer"}
 	}}`
 
+	schemaButton = `{"type": "object", "properties": {
+		"id": {"type": "string"},
+		"label": {"type": "string", "description": "button text shown to the visitor"},
+		"action": {"type": "string", "description": "free-form action name recorded on decision (e.g. accept, decline)"},
+		"link_url": {"type": "string", "description": "page slug (e.g. /cookie-policy) to navigate to, or an absolute URL"},
+		"dismisses": {"type": "boolean", "description": "whether clicking closes the banner"}
+	}}`
+
 	schemaBannerCreate = `{
 		"type": "object",
 		"properties": {
@@ -52,7 +61,9 @@ const (
 			"start_date": {"type": "string", "description": "RFC3339 timestamp"},
 			"end_date": {"type": "string", "description": "RFC3339 timestamp"},
 			"ab_test": {"type": "boolean"},
-			"ab_variants": {"type": "array", "items": ` + schemaABVariant + `}
+			"ab_variants": {"type": "array", "items": ` + schemaABVariant + `},
+			"position": {"type": "string", "description": "self-rendered position: top, bottom, or fullpage (omit for legacy placement injection)"},
+			"buttons": {"type": "array", "items": ` + schemaButton + `}
 		},
 		"required": ["name"]
 	}`
@@ -74,11 +85,17 @@ const (
 			"end_date": {"type": "string", "description": "RFC3339 timestamp"},
 			"is_active": {"type": "boolean"},
 			"ab_test": {"type": "boolean"},
-			"ab_variants": {"type": "array", "items": ` + schemaABVariant + `}
+			"ab_variants": {"type": "array", "items": ` + schemaABVariant + `},
+			"position": {"type": "string", "description": "self-rendered position: top, bottom, or fullpage (empty = no change)"},
+			"buttons": {"type": "array", "items": ` + schemaButton + `}
 		},
 		"required": ["banner_id"]
 	}`
 )
+
+// validPositions are the self-rendered banner positions accepted by the
+// tracking snippet; empty means legacy placement injection (not rendered).
+var validPositions = map[string]bool{"": true, "top": true, "bottom": true, "fullpage": true}
 
 func mapABVariants(in []abVariantIn) []bdomain.ABVariant {
 	out := make([]bdomain.ABVariant, 0, len(in))
@@ -140,6 +157,9 @@ func registerBannerTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Create a banner.",
 		InputSchema: json.RawMessage(schemaBannerCreate),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in bannersCreateIn) (*mcp.CallToolResult, any, error) {
+		if !validPositions[in.Position] {
+			return nil, nil, fmt.Errorf("invalid position %q (use top, bottom, fullpage, or omit)", in.Position)
+		}
 		b, err := d.BannerUsecase.CreateBanner(contextID, &bdomain.CreateBannerRequest{
 			Name:       in.Name,
 			Type:       bdomain.BannerType(in.Type),
@@ -154,6 +174,8 @@ func registerBannerTools(s *mcp.Server, d Deps, contextID string) {
 			EndDate:    in.EndDate,
 			ABTest:     in.ABTest,
 			ABVariants: mapABVariants(in.ABVariants),
+			Position:   in.Position,
+			Buttons:    mapButtons(in.Buttons),
 		})
 		if err != nil {
 			return nil, nil, err
@@ -166,6 +188,9 @@ func registerBannerTools(s *mcp.Server, d Deps, contextID string) {
 		Description: "Update a banner by ID; only provided fields change.",
 		InputSchema: json.RawMessage(schemaBannerUpdate),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in bannersUpdateIn) (*mcp.CallToolResult, any, error) {
+		if !validPositions[in.Position] {
+			return nil, nil, fmt.Errorf("invalid position %q (use top, bottom, fullpage, or empty)", in.Position)
+		}
 		b, err := d.BannerUsecase.UpdateBanner(contextID, in.BannerID, &bdomain.UpdateBannerRequest{
 			Name:       in.Name,
 			Type:       bdomain.BannerType(in.Type),
@@ -181,6 +206,8 @@ func registerBannerTools(s *mcp.Server, d Deps, contextID string) {
 			IsActive:   in.IsActive,
 			ABTest:     in.ABTest,
 			ABVariants: mapABVariants(in.ABVariants),
+			Position:   in.Position,
+			Buttons:    mapButtons(in.Buttons),
 		})
 		if err != nil {
 			return nil, nil, err
@@ -218,6 +245,28 @@ type bannerIDIn struct {
 	BannerID string `json:"banner_id"`
 }
 
+type buttonIn struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Action    string `json:"action"`
+	LinkURL   string `json:"link_url"`
+	Dismisses bool   `json:"dismisses"`
+}
+
+func mapButtons(in []buttonIn) []bdomain.Button {
+	out := make([]bdomain.Button, 0, len(in))
+	for _, b := range in {
+		out = append(out, bdomain.Button{
+			ID:        b.ID,
+			Label:     b.Label,
+			Action:    b.Action,
+			LinkURL:   b.LinkURL,
+			Dismisses: b.Dismisses,
+		})
+	}
+	return out
+}
+
 type abVariantIn struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -241,6 +290,8 @@ type bannersCreateIn struct {
 	EndDate    time.Time     `json:"end_date"`
 	ABTest     bool          `json:"ab_test"`
 	ABVariants []abVariantIn `json:"ab_variants"`
+	Position   string        `json:"position"`
+	Buttons    []buttonIn    `json:"buttons"`
 }
 
 type bannersUpdateIn struct {
@@ -259,6 +310,8 @@ type bannersUpdateIn struct {
 	IsActive   *bool         `json:"is_active"`
 	ABTest     *bool         `json:"ab_test"`
 	ABVariants []abVariantIn `json:"ab_variants"`
+	Position   string        `json:"position"`
+	Buttons    []buttonIn    `json:"buttons"`
 }
 
 type bannerDeletedOut struct {

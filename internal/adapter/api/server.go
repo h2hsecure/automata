@@ -200,6 +200,7 @@ func NewServer(
 		TrackingRepo:  trackingRepo,
 		EmailUsecase:  emailUsecase,
 		WebhookSvc:    webhookSvc,
+		PageRepo:      pageRepo,
 	}
 	api.POST("/mcp", gin.WrapH(mcpadapter.NewHandler(mcpDeps)))
 	api.GET("/mcp-skill.md", middleware.AuthMiddleware(authService), func(c *gin.Context) {

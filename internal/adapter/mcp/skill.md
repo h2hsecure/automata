@@ -42,9 +42,10 @@ Tool failures come back as MCP tool errors (`isError: true`) with the message in
 
 - `banners_list` — list banners. Args: `page`, `limit`, `is_active` (when `true`, only active banners).
 - `banners_get` — get a banner. Args: `banner_id`.
-- `banners_create` — create a banner. Args: `name` (required), `image_url`, `alt_text`, `link_url`, `is_active`.
+- `banners_create` — create a banner. Args: `name` (required), `type`, `content`, `image_url`, `alt_text`, `link_url`, `is_active`, `position` (`top`/`bottom`/`fullpage`; omit for legacy placement injection), `buttons` (array of `{id, label, action, link_url, dismisses}`).
 - `banners_update` — update a banner; provided fields only. Args: `banner_id` + banner fields.
 - `banners_delete` — delete a banner. Args: `banner_id`.
+- Banners with a `position` are self-rendered by the snippet at `/banner/snippet/<context>.js`; buttons with a `/`-prefixed `link_url` navigate to `/page/<context>/<slug>` and the linked page's content is inlined into the banner card.
 
 ## Placements
 
@@ -61,6 +62,14 @@ Tool failures come back as MCP tool errors (`isError: true`) with the message in
 - `campaigns_create` — create a campaign. Args: `name` (required), `placements` (placement IDs), `start_date`, `end_date`, `is_active`.
 - `campaigns_update` — update a campaign; provided fields only. Args: `campaign_id` + campaign fields.
 - `campaigns_delete` — delete a campaign. Args: `campaign_id`.
+
+## Pages
+
+- `pages_list` — list pages. Args: `page`, `limit`.
+- `pages_get` — get a page by `page_id` or `slug`.
+- `pages_create` — create a page served publicly at `/page/<context>/<slug>`. Args: `slug` (required), `title` (required), `content` (HTML), `is_active`.
+- `pages_update` — update a page (full replace). Args: `page_id`, `slug`, `title` (all required), `content`, `is_active`.
+- `pages_delete` — delete a page. Args: `page_id`.
 
 ## Tracking
 
