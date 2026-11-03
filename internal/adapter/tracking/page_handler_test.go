@@ -52,6 +52,30 @@ func (r *fakePageRepoForTrack) Update(p *page.Page) error { return nil }
 
 func (r *fakePageRepoForTrack) Delete(id string) error { return nil }
 
+func (r *fakePageRepoForTrack) ListActive(contextID string) ([]*page.Page, error) {
+	var out []*page.Page
+	for _, p := range r.pages {
+		if p.ContextID == contextID && p.IsActive {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakePageRepoForTrack) RecordImpression(contextID, pageID, visitorID string) error {
+	return nil
+}
+
+func (r *fakePageRepoForTrack) RecordDecision(*page.Decision) error { return nil }
+
+func (r *fakePageRepoForTrack) ListDecisions(pageID string, offset, limit int) ([]*page.Decision, int64, error) {
+	return nil, 0, nil
+}
+
+func (r *fakePageRepoForTrack) DecisionCounts(pageID string) (map[string]int64, error) {
+	return map[string]int64{}, nil
+}
+
 func TestPageServeHandler_ServesActivePage(t *testing.T) {
 	repo := &fakePageRepoForTrack{pages: []*page.Page{{
 		ID: "p1", ContextID: "ctx-1", Slug: "cookie-policy", Title: "Cookie Policy",

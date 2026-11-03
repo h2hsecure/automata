@@ -117,6 +117,28 @@ func (r *fakePageRepoPublic) List(contextID string) ([]*pagedomain.Page, error) 
 func (r *fakePageRepoPublic) Update(*pagedomain.Page) error { return nil }
 func (r *fakePageRepoPublic) Delete(string) error           { return nil }
 
+// Position/banner-merge methods (unused by banner tests; keep the fake
+// implementing pagedomain.Repository until this file is deleted in Task 7).
+func (r *fakePageRepoPublic) ListActive(contextID string) ([]*pagedomain.Page, error) {
+	var out []*pagedomain.Page
+	for _, p := range r.pages {
+		if p.ContextID == contextID && p.IsActive {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+func (r *fakePageRepoPublic) RecordImpression(contextID, pageID, visitorID string) error {
+	return nil
+}
+func (r *fakePageRepoPublic) RecordDecision(*pagedomain.Decision) error { return nil }
+func (r *fakePageRepoPublic) ListDecisions(pageID string, offset, limit int) ([]*pagedomain.Decision, int64, error) {
+	return nil, 0, nil
+}
+func (r *fakePageRepoPublic) DecisionCounts(pageID string) (map[string]int64, error) {
+	return map[string]int64{}, nil
+}
+
 // --- tests ---
 
 func TestBannerPublicHandler_Config_ReturnsBannersWithPage(t *testing.T) {
