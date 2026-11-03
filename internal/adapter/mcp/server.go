@@ -13,7 +13,6 @@ import (
 	pagedomain "github.com/h2hsecure/automata/internal/domain/page"
 	"github.com/h2hsecure/automata/internal/domain/tracking"
 	"github.com/h2hsecure/automata/internal/infrastructure/webhook"
-	bannerusecase "github.com/h2hsecure/automata/internal/usecase/banner"
 	emailusecase "github.com/h2hsecure/automata/internal/usecase/email"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -25,7 +24,6 @@ type Deps struct {
 	AuthService   auth.AuthService
 	ContactRepo   contact.Repository
 	FormRepo      form.Repository
-	BannerUsecase *bannerusecase.BannerUsecase
 	TrackingRepo  tracking.Repository
 	EmailUsecase  *emailusecase.EmailUsecase
 	WebhookSvc    *webhook.Service
@@ -100,9 +98,6 @@ func getOrCreateServer(deps Deps, contextID string) *mcp.Server {
 func registerAllTools(s *mcp.Server, d Deps, contextID string) {
 	registerContactTools(s, d, contextID)
 	registerFormTools(s, d, contextID)
-	registerBannerTools(s, d, contextID)
-	registerPlacementTools(s, d, contextID)
-	registerCampaignTools(s, d, contextID)
 	registerPageTools(s, d, contextID)
 	registerTrackingTools(s, d, contextID)
 	registerEmailTools(s, d, contextID)

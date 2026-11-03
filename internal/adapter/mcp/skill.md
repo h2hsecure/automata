@@ -1,6 +1,6 @@
 # Automata MCP
 
-MCP server for managing a single Automata tenant: contacts, forms, banners, placements, campaigns, tracking, email, and webhooks.
+MCP server for managing a single Automata tenant: contacts, forms, pages, tracking, email, and webhooks.
 
 ## Connecting
 
@@ -38,38 +38,15 @@ Tool failures come back as MCP tool errors (`isError: true`) with the message in
 - `form_submissions_list` — list submissions for a form. Args: `form_id` (the form ID), `page`, `limit`.
 - `form_submissions_get` — get one submission. Args: `submission_id`.
 
-## Banners
-
-- `banners_list` — list banners. Args: `page`, `limit`, `is_active` (when `true`, only active banners).
-- `banners_get` — get a banner. Args: `banner_id`.
-- `banners_create` — create a banner. Args: `name` (required), `type`, `content`, `image_url`, `alt_text`, `link_url`, `is_active`, `position` (`top`/`bottom`/`fullpage`; omit for legacy placement injection), `buttons` (array of `{id, label, action, link_url, dismisses}`).
-- `banners_update` — update a banner; provided fields only. Args: `banner_id` + banner fields.
-- `banners_delete` — delete a banner. Args: `banner_id`.
-- Banners with a `position` are self-rendered by the snippet at `/banner/snippet/<context>.js`; buttons with a `/`-prefixed `link_url` navigate to `/page/<context>/<slug>` and the linked page's content is inlined into the banner card.
-
-## Placements
-
-- `placements_list` — list placements. Args: `page`, `limit`.
-- `placements_get` — get a placement. Args: `placement_id`.
-- `placements_create` — create a placement. Args: `name` (required), `css_selector` (required), `max_banners`, `is_active`.
-- `placements_update` — update a placement; provided fields only. Args: `placement_id` + placement fields.
-- `placements_delete` — delete a placement. Args: `placement_id`.
-
-## Campaigns
-
-- `campaigns_list` — list campaigns. Args: `page`, `limit`, `is_active`.
-- `campaigns_get` — get a campaign. Args: `campaign_id`.
-- `campaigns_create` — create a campaign. Args: `name` (required), `placements` (placement IDs), `start_date`, `end_date`, `is_active`.
-- `campaigns_update` — update a campaign; provided fields only. Args: `campaign_id` + campaign fields.
-- `campaigns_delete` — delete a campaign. Args: `campaign_id`.
-
 ## Pages
 
 - `pages_list` — list pages. Args: `page`, `limit`.
 - `pages_get` — get a page by `page_id` or `slug`.
-- `pages_create` — create a page served publicly at `/page/<context>/<slug>`. Args: `slug` (required), `title` (required), `content` (HTML), `is_active`.
-- `pages_update` — update a page (full replace). Args: `page_id`, `slug`, `title` (all required), `content`, `is_active`.
+- `pages_create` — create a page served publicly at `/page/<context>/<slug>`. Args: `slug` (required), `title` (required), `content` (HTML), `is_active`, `position`, `buttons`.
+- `pages_update` — update a page (full replace). Args: `page_id`, `slug`, `title` (all required), `content`, `is_active`, `position`, `buttons`.
 - `pages_delete` — delete a page. Args: `page_id`.
+- A page with a `position` (`top`/`bottom`/`left`/`right`/`full`) is also rendered as a banner-style overlay by the snippet at `/page/snippet/<context>.js`. `left`/`right` are fixed edge strips, `full` is an opaque overlay.
+- `buttons` is an array of `{label, href, action, variant}`. `action` is `link` | `dismiss_accept` | `dismiss_decline`. A `/`-prefixed `href` is served from this Automata instance (the linked page's content is inlined into the card) and navigates to `/page/<context>/<slug>` on click.
 
 ## Tracking
 
@@ -96,7 +73,7 @@ Templates use Go `text/template` syntax with dot fields, e.g. `Hello {{ .name }}
 
 - `webhooks_list` — list webhook endpoints (secrets masked; `secret_set` shows presence).
 - `webhooks_get` — get an endpoint. Args: `webhook_id`.
-- `webhooks_create` — create an endpoint. Args: `name`, `url`, `events` (e.g. `form.submitted`), `secret` (8–256 chars), `active`.
+- `webhooks_create` — create an endpoint. Args: `name`, `url`, `events` (e.g. `form.submitted`, `page.shown`, `page.clicked`), `secret` (8–256 chars), `active`.
 - `webhooks_update` — update an endpoint; provided fields only. Args: `webhook_id` + endpoint fields.
 - `webhooks_delete` — delete an endpoint. Args: `webhook_id`.
 - `webhooks_test` — send a test delivery and return the delivery message. Args: `webhook_id`.

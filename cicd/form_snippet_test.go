@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/cicd/support"
 	bhandler "github.com/h2hsecure/automata/internal/adapter/api/handler"
-	brepo "github.com/h2hsecure/automata/internal/infrastructure/banner/repo"
 	formRepo "github.com/h2hsecure/automata/internal/infrastructure/form/repo"
 	ttracking "github.com/h2hsecure/automata/internal/adapter/tracking"
 	trepo "github.com/h2hsecure/automata/internal/infrastructure/tracking/repo"
@@ -25,12 +24,8 @@ var _ = Describe("HTTP Integration Tests - Public Form Endpoints", func() {
 	BeforeEach(func() {
 		gin.SetMode(gin.TestMode)
 		w = httptest.NewRecorder()
-		bannerRepo := brepo.New(pool)
 		engine = ttracking.NewServer(
 			bhandler.NewFormHandler(formRepo.New(pool)),
-			bhandler.NewBannerHandler(bannerRepo),
-			bhandler.NewPlacementHandler(bannerRepo),
-			bhandler.NewCampaignHandler(bannerRepo),
 			trepo.New(pool),
 			nil,
 		)

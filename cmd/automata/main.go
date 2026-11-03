@@ -16,7 +16,6 @@ import (
 	"github.com/h2hsecure/automata/internal/adapter/tracking"
 	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
 	auth_repo "github.com/h2hsecure/automata/internal/infrastructure/auth/repo"
-	banner_repo "github.com/h2hsecure/automata/internal/infrastructure/banner/repo"
 	"github.com/h2hsecure/automata/internal/infrastructure/bootstrap"
 	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	"github.com/h2hsecure/automata/internal/infrastructure/contact"
@@ -78,10 +77,6 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to run contact migrations")
 	}
 
-	if err := banner_repo.RunMigrations(pool); err != nil {
-		log.Fatal().Err(err).Msg("failed to run banner migrations")
-	}
-
 	if err := page_repo.RunMigrations(pool); err != nil {
 		log.Fatal().Err(err).Msg("failed to run page migrations")
 	}
@@ -120,7 +115,6 @@ func main() {
 	userRepo := context_repo.NewUserPostgresRepo(pool)
 	apiKeyRepo := auth_repo.NewApiKeyPostgresRepo(pool)
 	formRepo := form_repo.New(pool)
-	bannerRepo := banner_repo.New(pool)
 	pageRepo := page_repo.New(pool)
 	trackingRepo := tracking_repo.New(pool)
 	contactRepo := contact_repo.New(pool)
@@ -166,9 +160,6 @@ func main() {
 	// Create handlers for tracking server
 	formHandler := handler.NewFormHandlerWithEmailAndWebhooks(formRepo, contactRepo, trackingRepo, emailUsecase, webhookSvc).
 		WithFileResolver(uploadFileResolver{store: fileStore})
-	bannerHandler := handler.NewBannerHandler(bannerRepo)
-	placementHandler := handler.NewPlacementHandler(bannerRepo)
-	campaignHandler := handler.NewCampaignHandler(bannerRepo)
 
 	// Context for graceful shutdown and background workers
 	ctx, cancel := context.WithCancel(context.Background())
@@ -221,11 +212,11 @@ func main() {
 	}()
 
 	// Tracking server (port 8081)
-	trackingEngine := tracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, geoLookup, contactRepo)
+	trackingEngine := tracking.NewServer(formHandler, trackingRepo, geoLookup, contactRepo)
 	tracking.RegisterUploadRoutes(trackingEngine, tracking.NewUploadHandler(fileStore, formRepo))
 	tracking.RegisterStaticRoutes(trackingEngine, tracking.NewStaticHandler(staticFileRepo, fileStore))
 	tracking.RegisterPageRoutes(trackingEngine, tracking.NewPageServeHandler(pageRepo))
-	tracking.RegisterBannerPublicRoutes(trackingEngine, tracking.NewBannerPublicHandler(bannerRepo, pageRepo))
+	tracking.RegisterPagePublicRoutes(trackingEngine, tracking.NewPagePublicHandler(pageRepo))
 
 	trackingPort := config.Get("server.tracking_port")
 	if trackingPort == "" {

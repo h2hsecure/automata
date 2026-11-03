@@ -32,13 +32,26 @@ const (
 		"required": []
 	}`
 
+	schemaButton = `{
+		"type": "object",
+		"properties": {
+			"label": {"type": "string", "description": "button label"},
+			"href": {"type": "string", "description": "link target; if it starts with / it is served from this Automata instance (inline page) when the button is clicked"},
+			"action": {"type": "string", "description": "link | dismiss_accept | dismiss_decline"},
+			"variant": {"type": "string", "description": "visual style hint (e.g. primary, secondary)"}
+		},
+		"required": ["label", "action"]
+	}`
+
 	schemaPageCreate = `{
 		"type": "object",
 		"properties": {
 			"slug": {"type": "string", "description": "URL slug served at /page/<context>/<slug> (e.g. cookie-policy)"},
 			"title": {"type": "string", "description": "page title"},
 			"content": {"type": "string", "description": "HTML content"},
-			"is_active": {"type": "boolean", "description": "default true"}
+			"is_active": {"type": "boolean", "description": "default true"},
+			"position": {"type": "string", "description": "rendering position: top | bottom | left | right | full (empty = plain content page)"},
+			"buttons": {"type": "array", "description": "banner buttons rendered with the page", "items":` + schemaButton + `}
 		},
 		"required": ["slug", "title"]
 	}`
@@ -50,7 +63,9 @@ const (
 			"slug": {"type": "string"},
 			"title": {"type": "string"},
 			"content": {"type": "string"},
-			"is_active": {"type": "boolean"}
+			"is_active": {"type": "boolean"},
+			"position": {"type": "string", "description": "rendering position: top | bottom | left | right | full (empty = plain content page)"},
+			"buttons": {"type": "array", "description": "banner buttons rendered with the page", "items":` + schemaButton + `}
 		},
 		"required": ["page_id", "slug", "title"]
 	}`
@@ -76,18 +91,22 @@ type pageGetIn struct {
 }
 
 type pageCreateIn struct {
-	Slug     string `json:"slug"`
-	Title    string `json:"title"`
-	Content  string `json:"content"`
-	IsActive *bool  `json:"is_active"`
+	Slug     string              `json:"slug"`
+	Title    string              `json:"title"`
+	Content  string              `json:"content"`
+	IsActive *bool               `json:"is_active"`
+	Position pagedomain.Position `json:"position"`
+	Buttons  []pagedomain.Button `json:"buttons"`
 }
 
 type pageUpdateIn struct {
-	PageID   string `json:"page_id"`
-	Slug     string `json:"slug"`
-	Title    string `json:"title"`
-	Content  string `json:"content"`
-	IsActive *bool  `json:"is_active"`
+	PageID   string              `json:"page_id"`
+	Slug     string              `json:"slug"`
+	Title    string              `json:"title"`
+	Content  string              `json:"content"`
+	IsActive *bool               `json:"is_active"`
+	Position pagedomain.Position `json:"position"`
+	Buttons  []pagedomain.Button `json:"buttons"`
 }
 
 type pageIDIn struct {
@@ -167,6 +186,8 @@ func registerPageTools(s *mcp.Server, d Deps, contextID string) {
 			Title:    in.Title,
 			Content:  in.Content,
 			IsActive: in.IsActive,
+			Position: in.Position,
+			Buttons:  in.Buttons,
 		})
 		if err != nil {
 			return nil, nil, err
@@ -184,6 +205,8 @@ func registerPageTools(s *mcp.Server, d Deps, contextID string) {
 			Title:    in.Title,
 			Content:  in.Content,
 			IsActive: in.IsActive,
+			Position: in.Position,
+			Buttons:  in.Buttons,
 		})
 		if err != nil {
 			return nil, nil, err

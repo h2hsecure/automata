@@ -14,7 +14,7 @@ import (
 // geolocation). The optional contactRepo enables hidden visitor contacts and
 // page_visit activity logging; servers built without it (e.g. test harnesses)
 // skip them.
-func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHandler, placementHandler *handler.PlacementHandler, campaignHandler *handler.CampaignHandler, trackingRepo Repository, geoLookup geodomain.Lookup, contactRepo ...ContactRepository) *gin.Engine {
+func NewServer(formHandler *handler.FormHandler, trackingRepo Repository, geoLookup geodomain.Lookup, contactRepo ...ContactRepository) *gin.Engine {
 	r := gin.Default()
 
 	// Compress responses for clients that accept gzip (JSON, JS, HTML).
@@ -35,16 +35,6 @@ func NewServer(formHandler *handler.FormHandler, bannerHandler *handler.BannerHa
 	r.POST("/track/batch", trackHandler.TrackBatch)
 	r.GET("/snippet/:id.js", snippetHandler.ServeSnippet)
 	r.HEAD("/snippet/:id.js", snippetHandler.ServeSnippet)
-
-	// Banner endpoints
-	r.GET("/track/banner/list", ContextMiddleware(), bannerHandler.ListBanners)
-	r.HEAD("/track/banner/list", ContextMiddleware(), bannerHandler.ListBanners)
-	r.GET("/track/banner/:id", bannerHandler.GetBanner)
-	r.HEAD("/track/banner/:id", bannerHandler.GetBanner)
-	r.GET("/track/placement/:id", placementHandler.GetPlacement)
-	r.HEAD("/track/placement/:id", placementHandler.GetPlacement)
-	r.GET("/track/campaign/:id", campaignHandler.GetCampaign)
-	r.HEAD("/track/campaign/:id", campaignHandler.GetCampaign)
 
 	// Form endpoints (context via X-Context-ID header or context_id query)
 	formGroup := r.Group("/form")

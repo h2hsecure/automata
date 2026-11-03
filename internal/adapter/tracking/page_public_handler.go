@@ -1,6 +1,8 @@
 package tracking
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -9,6 +11,12 @@ import (
 	pagedomain "github.com/h2hsecure/automata/internal/domain/page"
 	"github.com/h2hsecure/automata/pkg/snippet"
 )
+
+// ipHash returns the hex-encoded SHA-256 of an IP address.
+func ipHash(ip string) string {
+	sum := sha256.Sum256([]byte(ip))
+	return hex.EncodeToString(sum[:])
+}
 
 // PagePublicHandler serves the public page config and records visitor
 // decisions for positioned pages. Trust model matches the existing

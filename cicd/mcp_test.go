@@ -236,12 +236,6 @@ var _ = Describe("MCP server (POST /api/mcp)", func() {
 			"contacts_delete", "contacts_merge", "contacts_activity",
 			"forms_list", "forms_get", "forms_create", "forms_update",
 			"forms_delete", "forms_submit", "form_submissions_list", "form_submissions_get",
-			"banners_list", "banners_get", "banners_create", "banners_update",
-			"banners_delete",
-			"placements_list", "placements_get", "placements_create", "placements_update",
-			"placements_delete",
-			"campaigns_list", "campaigns_get", "campaigns_create", "campaigns_update",
-			"campaigns_delete",
 			"pages_list", "pages_get", "pages_create", "pages_update",
 			"pages_delete",
 			"tracking_dashboard", "tracking_events", "tracking_visitors",
@@ -558,7 +552,7 @@ var _ = Describe("MCP forms tools", func() {
 	})
 })
 
-var _ = Describe("MCP banner/placement/campaign tools", func() {
+var _ = Describe("MCP pages tools", func() {
 	var (
 		engine    *gin.Engine
 		apiKey    string
@@ -573,66 +567,6 @@ var _ = Describe("MCP banner/placement/campaign tools", func() {
 		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
 		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
 		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
-	})
-
-	It("banners create/update/list/delete", func() {
-		// campaign first (banners can reference it)
-		w := mcpTool(engine, apiKey, 1, "campaigns_create", map[string]any{"name": "MCP Camp"})
-		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
-		var camp struct {
-			ID string `json:"ID"`
-		}
-		Expect(json.Unmarshal([]byte(mcpToolText(w)), &camp)).To(Succeed())
-		Expect(camp.ID).NotTo(BeEmpty())
-
-		w = mcpTool(engine, apiKey, 2, "campaigns_list", map[string]any{})
-		Expect(w.Code).To(Equal(http.StatusOK))
-		Expect(mcpToolText(w)).To(ContainSubstring("MCP Camp"))
-
-		w = mcpTool(engine, apiKey, 3, "banners_create", map[string]any{
-			"name":        "MCP Banner",
-			"type":        "sticky",
-			"campaign_id": camp.ID,
-			"position":    "bottom",
-			"buttons": []any{
-				map[string]any{"id": "b-accept", "label": "Accept", "action": "accept", "dismisses": true},
-				map[string]any{"id": "b-policy", "label": "More information", "action": "view_policy", "link_url": "/cookie-policy"},
-			},
-		})
-		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
-		banText := mcpToolText(w)
-		Expect(banText).To(ContainSubstring(`"Position":"bottom"`))
-		Expect(banText).To(ContainSubstring(`"label":"Accept"`))
-		var ban struct {
-			ID string `json:"ID"`
-		}
-		Expect(json.Unmarshal([]byte(banText), &ban)).To(Succeed())
-		Expect(ban.ID).NotTo(BeEmpty())
-
-		// invalid position is rejected with a tool error
-		w = mcpTool(engine, apiKey, 4, "banners_create", map[string]any{"name": "Bad Pos", "position": "left"})
-		isErr, txt := mcpToolResult(w)
-		Expect(isErr).To(BeTrue())
-		Expect(txt).To(ContainSubstring("invalid position"))
-
-		w = mcpTool(engine, apiKey, 5, "banners_list", map[string]any{"limit": 100})
-		Expect(w.Code).To(Equal(http.StatusOK))
-		text := mcpToolText(w)
-		Expect(text).To(ContainSubstring("MCP Banner"))
-		Expect(text).To(ContainSubstring(`"total":1`))
-
-		w = mcpTool(engine, apiKey, 6, "banners_update", map[string]any{"banner_id": ban.ID, "name": "Renamed Banner"})
-		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
-
-		w = mcpTool(engine, apiKey, 7, "banners_get", map[string]any{"banner_id": ban.ID})
-		Expect(w.Code).To(Equal(http.StatusOK))
-		Expect(mcpToolText(w)).To(ContainSubstring("Renamed Banner"))
-
-		w = mcpTool(engine, apiKey, 8, "banners_delete", map[string]any{"banner_id": ban.ID})
-		Expect(w.Code).To(Equal(http.StatusOK))
-
-		_, text = mcpToolResult(mcpTool(engine, apiKey, 9, "banners_get", map[string]any{"banner_id": ban.ID}))
-		Expect(text).NotTo(ContainSubstring(ban.ID))
 	})
 
 	It("pages create/get-by-slug/update/delete", func() {
@@ -670,52 +604,36 @@ var _ = Describe("MCP banner/placement/campaign tools", func() {
 		Expect(text).NotTo(ContainSubstring(pg.ID))
 	})
 
-	It("placements create/list/delete", func() {
-		w := mcpTool(engine, apiKey, 1, "placements_create", map[string]any{
-			"name":         "P1",
-			"css_selector": ".slot",
+	It("pages create with position and buttons (banner-style page)", func() {
+		w := mcpTool(engine, apiKey, 1, "pages_create", map[string]any{
+			"slug":     "cookie-banner",
+			"title":    "Cookie banner",
+			"content":  "<p>We use cookies to track visits.</p>",
+			"position": "bottom",
+			"buttons": []any{
+				map[string]any{"label": "Accept", "action": "dismiss_accept", "variant": "primary"},
+				map[string]any{"label": "More information", "action": "link", "href": "/cookie-policy"},
+			},
 		})
 		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
-		var pl struct {
+		created := mcpToolText(w)
+		Expect(created).To(ContainSubstring(`"Position":"bottom"`))
+		Expect(created).To(ContainSubstring(`"label":"Accept"`))
+		Expect(created).To(ContainSubstring(`"action":"dismiss_accept"`))
+		var ban struct {
 			ID string `json:"ID"`
 		}
-		Expect(json.Unmarshal([]byte(mcpToolText(w)), &pl)).To(Succeed())
-		Expect(pl.ID).NotTo(BeEmpty())
+		Expect(json.Unmarshal([]byte(created), &ban)).To(Succeed())
+		Expect(ban.ID).NotTo(BeEmpty())
 
-		w = mcpTool(engine, apiKey, 2, "placements_list", map[string]any{})
-		Expect(w.Code).To(Equal(http.StatusOK))
-		Expect(mcpToolText(w)).To(ContainSubstring("P1"))
-
-		w = mcpTool(engine, apiKey, 3, "placements_delete", map[string]any{"placement_id": pl.ID})
-		Expect(w.Code).To(Equal(http.StatusOK))
-
-		w = mcpTool(engine, apiKey, 4, "placements_list", map[string]any{})
-		Expect(mcpToolText(w)).NotTo(ContainSubstring("P1"))
-	})
-
-	It("campaigns get/update/delete", func() {
-		w := mcpTool(engine, apiKey, 1, "campaigns_create", map[string]any{"name": "MCP Camp2"})
+		w = mcpTool(engine, apiKey, 2, "pages_get", map[string]any{"slug": "cookie-banner"})
 		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
-		var camp struct {
-			ID string `json:"ID"`
-		}
-		Expect(json.Unmarshal([]byte(mcpToolText(w)), &camp)).To(Succeed())
+		got := mcpToolText(w)
+		Expect(got).To(ContainSubstring(`"Position":"bottom"`))
+		Expect(got).To(ContainSubstring(`/cookie-policy`))
 
-		w = mcpTool(engine, apiKey, 2, "campaigns_get", map[string]any{"campaign_id": camp.ID})
+		w = mcpTool(engine, apiKey, 3, "pages_delete", map[string]any{"page_id": ban.ID})
 		Expect(w.Code).To(Equal(http.StatusOK))
-		Expect(mcpToolText(w)).To(ContainSubstring("MCP Camp2"))
-
-		w = mcpTool(engine, apiKey, 3, "campaigns_update", map[string]any{"campaign_id": camp.ID, "name": "MCP Camp2 Renamed"})
-		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
-
-		w = mcpTool(engine, apiKey, 4, "campaigns_get", map[string]any{"campaign_id": camp.ID})
-		Expect(mcpToolText(w)).To(ContainSubstring("MCP Camp2 Renamed"))
-
-		w = mcpTool(engine, apiKey, 5, "campaigns_delete", map[string]any{"campaign_id": camp.ID})
-		Expect(w.Code).To(Equal(http.StatusOK))
-
-		_, text := mcpToolResult(mcpTool(engine, apiKey, 6, "campaigns_get", map[string]any{"campaign_id": camp.ID}))
-		Expect(text).NotTo(ContainSubstring(camp.ID))
 	})
 })
 
@@ -998,9 +916,7 @@ var _ = Describe("MCP cross-tenant scoping (ID-based tools)", func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM email_templates WHERE context_id = $1`, ctxB)
 		_, _ = pool.Exec(ctx, `DELETE FROM form_submissions WHERE context_id = $1`, ctxB)
 		_, _ = pool.Exec(ctx, `DELETE FROM forms WHERE context_id = $1`, ctxB)
-		_, _ = pool.Exec(ctx, `DELETE FROM banners WHERE context_id = $1`, ctxB)
-		_, _ = pool.Exec(ctx, `DELETE FROM placements WHERE context_id = $1`, ctxB)
-		_, _ = pool.Exec(ctx, `DELETE FROM campaigns WHERE context_id = $1`, ctxB)
+		_, _ = pool.Exec(ctx, `DELETE FROM pages WHERE context_id = $1`, ctxB)
 		_, _ = pool.Exec(ctx, "DELETE FROM api_keys")
 		_, _ = pool.Exec(ctx, `DELETE FROM contexts WHERE id = $1`, contextID)
 		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
@@ -1020,48 +936,29 @@ var _ = Describe("MCP cross-tenant scoping (ID-based tools)", func() {
 		return out.ID
 	}
 
-	It("banners_get/update/delete refuse a foreign banner", func() {
-		banID := createInB("banners_create", map[string]any{"name": "Foreign Banner", "type": "image"})
+	It("pages_get/update/delete refuse a foreign page", func() {
+		pgID := createInB("pages_create", map[string]any{"slug": "foreign-page", "title": "Foreign Page"})
 
-		w := mcpTool(engine, apiKey, 2, "banners_get", map[string]any{"banner_id": banID})
+		w := mcpTool(engine, apiKey, 2, "pages_get", map[string]any{"page_id": pgID})
 		isErr, _ := mcpToolResult(w)
 		Expect(isErr).To(BeTrue())
 
-		w = mcpTool(engine, apiKey, 3, "banners_update", map[string]any{"banner_id": banID, "name": "Hacked"})
+		w = mcpTool(engine, apiKey, 3, "pages_update", map[string]any{"page_id": pgID, "slug": "foreign-page", "title": "Hacked"})
 		isErr, _ = mcpToolResult(w)
 		Expect(isErr).To(BeTrue())
 
-		// Owner can still read the original name (update was refused).
-		w = mcpTool(engine, keyB, 4, "banners_get", map[string]any{"banner_id": banID})
-		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Banner"))
+		// Owner can still read the original title (update was refused).
+		w = mcpTool(engine, keyB, 4, "pages_get", map[string]any{"page_id": pgID})
+		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Page"))
 
-		w = mcpTool(engine, apiKey, 5, "banners_delete", map[string]any{"banner_id": banID})
+		w = mcpTool(engine, apiKey, 5, "pages_delete", map[string]any{"page_id": pgID})
 		isErr, _ = mcpToolResult(w)
 		Expect(isErr).To(BeTrue())
 
-		// Banner still exists for the owner.
-		w = mcpTool(engine, keyB, 6, "banners_get", map[string]any{"banner_id": banID})
+		// Page still exists for the owner.
+		w = mcpTool(engine, keyB, 6, "pages_get", map[string]any{"page_id": pgID})
 		Expect(w.Code).To(Equal(http.StatusOK))
-		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Banner"))
-	})
-
-	It("placements_get refuses a foreign placement", func() {
-		plID := createInB("placements_create", map[string]any{"name": "Foreign Placement", "css_selector": ".f-slot"})
-
-		w := mcpTool(engine, apiKey, 2, "placements_get", map[string]any{"placement_id": plID})
-		isErr, _ := mcpToolResult(w)
-		Expect(isErr).To(BeTrue())
-	})
-
-	It("campaigns_delete refuses a foreign campaign", func() {
-		campID := createInB("campaigns_create", map[string]any{"name": "Foreign Camp"})
-
-		w := mcpTool(engine, apiKey, 2, "campaigns_delete", map[string]any{"campaign_id": campID})
-		isErr, _ := mcpToolResult(w)
-		Expect(isErr).To(BeTrue())
-
-		w = mcpTool(engine, keyB, 3, "campaigns_get", map[string]any{"campaign_id": campID})
-		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Camp"))
+		Expect(mcpToolText(w)).To(ContainSubstring("Foreign Page"))
 	})
 
 	It("form_submissions_get/list refuse a foreign form's submissions", func() {
@@ -1172,7 +1069,7 @@ var _ = Describe("MCP tool catalog", func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE email LIKE 'swagger-admin-%@example.com'`)
 	})
 
-	It("exposes exactly the 52 catalog tools", func() {
+	It("exposes exactly the 42 catalog tools", func() {
 		w := mcpCall(engine, apiKey, 1, "tools/list", map[string]any{})
 		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
 		var resp struct {
@@ -1187,10 +1084,8 @@ var _ = Describe("MCP tool catalog", func() {
 		for _, t := range resp.Result.Tools {
 			names = append(names, t.Name)
 		}
-		Expect(names).To(HaveLen(57))
+		Expect(names).To(HaveLen(42))
 		for _, want := range []string{
-			"banners_create", "banners_delete", "banners_get", "banners_list", "banners_update",
-			"campaigns_create", "campaigns_delete", "campaigns_get", "campaigns_list", "campaigns_update",
 			"contacts_activity", "contacts_create", "contacts_delete", "contacts_get",
 			"contacts_import", "contacts_list", "contacts_merge", "contacts_update",
 			"contacts_export",
@@ -1200,7 +1095,6 @@ var _ = Describe("MCP tool catalog", func() {
 			"form_submissions_get", "form_submissions_list",
 			"forms_create", "forms_delete", "forms_get", "forms_list", "forms_submit", "forms_update",
 			"pages_create", "pages_delete", "pages_get", "pages_list", "pages_update",
-		"placements_create", "placements_delete", "placements_get", "placements_list", "placements_update",
 			"tracking_dashboard", "tracking_events", "tracking_track", "tracking_visitor_events",
 			"tracking_visitor_get", "tracking_visitors",
 			"webhooks_create", "webhooks_delete", "webhooks_get", "webhooks_list",

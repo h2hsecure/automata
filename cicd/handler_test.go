@@ -24,16 +24,9 @@ var _ = Describe("API Handler Integration Tests", func() {
 
 	AfterEach(func() {
 		// Clean up tables (in reverse dependency order)
-		_, err := pool.Exec(ctx, "DELETE FROM banner_clicks")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banner_impressions")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banner_banners")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM form_submissions")
+		_, err := pool.Exec(ctx, "DELETE FROM form_submissions")
 		Expect(err).NotTo(HaveOccurred())
 		_, err = pool.Exec(ctx, "DELETE FROM forms")
-		Expect(err).NotTo(HaveOccurred())
 		Expect(err).NotTo(HaveOccurred())
 		_, err = pool.Exec(ctx, "DELETE FROM contacts")
 		Expect(err).NotTo(HaveOccurred())
@@ -359,55 +352,6 @@ var _ = Describe("API Handler Integration Tests", func() {
 			// Verify event was recorded
 			var count int
 			err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM tracking_events").Scan(&count)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(count).To(Equal(1))
-		})
-	})
-
-	Describe("Banner API endpoints", func() {
-		It("should get active banners via GET /api/banners/:placement", func() {
-			contextID = support.NewTestContextID()
-			bannerData := support.NewTestBanner(contextID)
-
-			// Insert banner first
-			placements, _ := json.Marshal(bannerData["placements"])
-			abVariants, _ := json.Marshal(bannerData["ab_variants"])
-
-			_, err := pool.Exec(ctx, `
-				INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text,
-				                     campaign_id, placements, priority, start_date, end_date, is_active, 
-				                     ab_test, ab_variants, impressions, clicks, created_at, updated_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-			`,
-				bannerData["id"],
-				bannerData["context_id"],
-				bannerData["name"],
-				bannerData["type"],
-				bannerData["content"],
-				bannerData["link_url"],
-				bannerData["image_url"],
-				bannerData["alt_text"],
-				bannerData["campaign_id"],
-				placements,
-				bannerData["priority"],
-				bannerData["start_date"],
-				bannerData["end_date"],
-				bannerData["is_active"],
-				bannerData["ab_test"],
-				abVariants,
-				bannerData["impressions"],
-				bannerData["clicks"],
-				bannerData["created_at"],
-				bannerData["updated_at"],
-			)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify banner can be retrieved by placement
-			var count int
-			err = pool.QueryRow(ctx, `
-				SELECT COUNT(*) FROM banner_banners 
-				WHERE context_id = $1 AND placements @> '["header"]'::jsonb
-			`, contextID).Scan(&count)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(1))
 		})

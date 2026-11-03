@@ -9,8 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/cicd/support"
 	bhandler "github.com/h2hsecure/automata/internal/adapter/api/handler"
-	bdomain "github.com/h2hsecure/automata/internal/domain/banner"
-	brepo "github.com/h2hsecure/automata/internal/infrastructure/banner/repo"
 	formRepo "github.com/h2hsecure/automata/internal/infrastructure/form/repo"
 	ttracking "github.com/h2hsecure/automata/internal/adapter/tracking"
 	tdomain "github.com/h2hsecure/automata/internal/domain/tracking"
@@ -21,40 +19,22 @@ import (
 
 var _ = Describe("Tracking Server Integration Tests", func() {
 	var (
-		w                *httptest.ResponseRecorder
-		engine           *gin.Engine
-		trackingRepo     tdomain.Repository
-		bannerRepo       bdomain.Repository
-		formHandler      *bhandler.FormHandler
-		bannerHandler    *bhandler.BannerHandler
-		placementHandler *bhandler.PlacementHandler
-		campaignHandler  *bhandler.CampaignHandler
+		w            *httptest.ResponseRecorder
+		engine       *gin.Engine
+		trackingRepo tdomain.Repository
+		formHandler  *bhandler.FormHandler
 	)
 
 	BeforeEach(func() {
 		gin.SetMode(gin.TestMode)
 		w = httptest.NewRecorder()
 		trackingRepo = trepo.New(pool)
-		bannerRepo = brepo.New(pool)
 		formHandler = bhandler.NewFormHandler(formRepo.New(pool))
-		bannerHandler = bhandler.NewBannerHandler(bannerRepo)
-		placementHandler = bhandler.NewPlacementHandler(bannerRepo)
-		campaignHandler = bhandler.NewCampaignHandler(bannerRepo)
-		engine = ttracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, nil)
+		engine = ttracking.NewServer(formHandler, trackingRepo, nil)
 	})
 
 	AfterEach(func() {
-		_, err := pool.Exec(ctx, "DELETE FROM banner_clicks")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banner_impressions")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banner_banners")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banner_campaigns")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM banner_placements")
-		Expect(err).NotTo(HaveOccurred())
-		_, err = pool.Exec(ctx, "DELETE FROM tracking_events")
+		_, err := pool.Exec(ctx, "DELETE FROM tracking_events")
 		Expect(err).NotTo(HaveOccurred())
 		_, err = pool.Exec(ctx, "DELETE FROM tracking_visitors")
 		Expect(err).NotTo(HaveOccurred())
@@ -139,67 +119,6 @@ var _ = Describe("Tracking Server Integration Tests", func() {
 		})
 	})
 
-	Describe("GET /track/banner/list", func() {
-		It("should list banners for a context", func() {
-			tenantID := support.NewTestContextID()
-			placementID := support.NewTestUUID()
-			bannerID := support.NewTestUUID()
-
-			_, err := pool.Exec(ctx, `
-				INSERT INTO banner_placements (id, context_id, name, location, css_selector, max_banners, priority, is_active, created_at, updated_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-			`, placementID, tenantID, "Test Placement", "header", "#header", 1, 1, true)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = pool.Exec(ctx, `
-				INSERT INTO banner_banners (id, context_id, name, type, content, link_url, image_url, alt_text, campaign_id, placements, priority, is_active, created_at, updated_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
-			`, bannerID, tenantID, "Test Banner", "html", "<div>Test</div>", "https://example.com", "", "", nil, `["`+placementID+`"]`, 1, true)
-			Expect(err).NotTo(HaveOccurred())
-
-			req := httptest.NewRequest("GET", "/track/banner/list", nil)
-			req.Header.Set("X-Context-ID", tenantID)
-			engine.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusOK))
-		})
-	})
-
-	Describe("GET /track/placement/:id", func() {
-		It("should return a placement by ID", func() {
-			tenantID := support.NewTestContextID()
-			placementID := support.NewTestUUID()
-
-			_, err := pool.Exec(ctx, `
-				INSERT INTO banner_placements (id, context_id, name, location, css_selector, max_banners, priority, is_active, created_at, updated_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-			`, placementID, tenantID, "Test Placement", "header", "#header", 1, 1, true)
-			Expect(err).NotTo(HaveOccurred())
-
-			req := httptest.NewRequest("GET", "/track/placement/"+placementID, nil)
-			engine.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusOK))
-		})
-	})
-
-	Describe("GET /track/campaign/:id", func() {
-		It("should return a campaign by ID", func() {
-			tenantID := support.NewTestContextID()
-			campaignID := support.NewTestUUID()
-
-			_, err := pool.Exec(ctx, `
-				INSERT INTO banner_campaigns (id, context_id, name, description, start_date, end_date, is_active, target_url, tracking_code, created_at, updated_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-			`, campaignID, tenantID, "Test Campaign", "A test", "2026-01-01", "2026-12-31", true, "https://example.com", "test_code")
-			Expect(err).NotTo(HaveOccurred())
-
-			req := httptest.NewRequest("GET", "/track/campaign/"+campaignID, nil)
-			engine.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusOK))
-		})
-	})
 
 	Describe("GET /snippet/:id.js", func() {
 		It("should serve a snippet for any context ID", func() {

@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/h2hsecure/automata/cicd/support"
-	banner_repo "github.com/h2hsecure/automata/internal/infrastructure/banner/repo"
 	"github.com/h2hsecure/automata/internal/infrastructure/contact"
 	"github.com/h2hsecure/automata/internal/infrastructure/database"
 	email_repo "github.com/h2hsecure/automata/internal/infrastructure/email/repo"
 	form_repo "github.com/h2hsecure/automata/internal/infrastructure/form/repo"
+	page_repo "github.com/h2hsecure/automata/internal/infrastructure/page/repo"
 	settings_repo "github.com/h2hsecure/automata/internal/infrastructure/settings/repo"
 	tracking_repo "github.com/h2hsecure/automata/internal/infrastructure/tracking/repo"
 	webhook_repo "github.com/h2hsecure/automata/internal/infrastructure/webhook/repo"
@@ -36,8 +36,8 @@ func runProductionMigrations(pool *pgxpool.Pool) error {
 	if err := contact.RunMigrations(pool); err != nil {
 		return fmt.Errorf("contact: %w", err)
 	}
-	if err := banner_repo.RunMigrations(pool); err != nil {
-		return fmt.Errorf("banner: %w", err)
+	if err := page_repo.RunMigrations(pool); err != nil {
+		return fmt.Errorf("page: %w", err)
 	}
 	if err := email_repo.RunMigrations(pool); err != nil {
 		return fmt.Errorf("email: %w", err)

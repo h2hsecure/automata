@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/h2hsecure/automata/internal/infrastructure/auth"
-	banner_repo "github.com/h2hsecure/automata/internal/infrastructure/banner/repo"
+	page_repo "github.com/h2hsecure/automata/internal/infrastructure/page/repo"
 	"github.com/h2hsecure/automata/internal/infrastructure/bootstrap"
 	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	"github.com/h2hsecure/automata/internal/infrastructure/contact"
@@ -83,7 +83,7 @@ func main() {
 	// Run feature-specific migrations
 	contact.RunMigrations(dbPool)
 	form_repo.RunMigrations(dbPool)
-	banner_repo.RunMigrations(dbPool)
+	page_repo.RunMigrations(dbPool)
 	tracking_repo.RunMigrations(dbPool)
 	email_repo.RunMigrations(dbPool)
 	webhook_repo.RunMigrations(dbPool)

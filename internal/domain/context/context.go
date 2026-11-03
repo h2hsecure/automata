@@ -15,7 +15,7 @@ var (
 )
 
 // Context represents a website context in the platform.
-// Each context has its own contacts, forms, tracking data, banners, and configuration.
+// Each context has its own contacts, forms, tracking data, pages, and configuration.
 type Context struct {
 	ID        string
 	Slug      string

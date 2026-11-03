@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -38,11 +39,7 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 		_, _ = pool.Exec(ctx, "DELETE FROM contacts")
 		_, _ = pool.Exec(ctx, "DELETE FROM form_submissions")
 		_, _ = pool.Exec(ctx, "DELETE FROM forms")
-		_, _ = pool.Exec(ctx, "DELETE FROM banner_clicks")
-		_, _ = pool.Exec(ctx, "DELETE FROM banner_impressions")
-		_, _ = pool.Exec(ctx, "DELETE FROM banner_banners")
-		_, _ = pool.Exec(ctx, "DELETE FROM banner_campaigns")
-		_, _ = pool.Exec(ctx, "DELETE FROM banner_placements")
+		
 		_, _ = pool.Exec(ctx, "DELETE FROM tracking_events")
 		_, _ = pool.Exec(ctx, "DELETE FROM tracking_visitors")
 		_, _ = pool.Exec(ctx, "DELETE FROM tenants")
@@ -812,12 +809,11 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			Expect(js).To(ContainSubstring(apiHost))
 		})
 
-		It("should generate banner snippet", func() {
+		It("should generate page snippet", func() {
 			contextID := support.NewTestContextID()
-			js, err := snippet.GenerateBannerSnippet(contextID, nil)
+			js, err := snippet.GeneratePageConfigSnippet(contextID)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(ContainSubstring(contextID))
-			Expect(js).To(ContainSubstring("AutomataBanner"))
 		})
 
 		It("should generate minified snippet", func() {
@@ -922,14 +918,15 @@ var _ = Describe("Contact & Form Integration Tests", func() {
 			Expect(w.Body.String()).To(ContainSubstring(contextID))
 		})
 
-		It("should serve banner snippet at /banner/{context_id}", func() {
+		It("should serve page snippet at /page/snippet/{context_id}.js", func() {
 			contextID := support.NewTestContextID()
-			req := httptest.NewRequest(http.MethodGet, "/banner/"+contextID, nil)
+			req := httptest.NewRequest(http.MethodGet, "/page/snippet/"+contextID+".js", nil)
 			w := httptest.NewRecorder()
 			engine := gin.New()
-			engine.GET("/banner/:context_id", func(c *gin.Context) {
-				contextID := c.Param("context_id")
-				js, err := snippet.GenerateBannerSnippet(contextID, nil)
+			engine.GET("/page/snippet/:contextID.js", func(c *gin.Context) {
+				// Gin makes the param name "contextID.js", so parse the path.
+				path := c.Request.URL.Path
+				js, err := snippet.GeneratePageConfigSnippet(strings.TrimSuffix(strings.TrimPrefix(path, "/page/snippet/"), ".js"))
 				if err != nil {
 					c.String(500, "error")
 					return

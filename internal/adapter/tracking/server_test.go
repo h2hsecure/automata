@@ -11,7 +11,7 @@ import (
 // NewServer without handlers/repos: these tests only exercise route
 // registration (method handling), not handler behavior.
 func newTrackingServerForRouteTests() http.Handler {
-	return NewServer(nil, nil, nil, nil, nil, nil)
+	return NewServer(nil, nil, nil)
 }
 
 func TestSnippetRoute_GetServes200(t *testing.T) {

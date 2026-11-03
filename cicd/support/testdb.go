@@ -95,7 +95,6 @@ func (tdb *TestDB) RunMigrations(ctx context.Context) error {
 		"internal/infrastructure/database",
 		"internal/infrastructure/contact",
 		"internal/infrastructure/form/repo",
-		"internal/infrastructure/banner/repo",
 		"internal/infrastructure/page/repo",
 		"internal/infrastructure/tracking/repo",
 		"internal/infrastructure/queue",

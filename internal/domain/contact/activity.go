@@ -9,16 +9,16 @@ import (
 type ActivityType string
 
 const (
-	ActivityFormSubmission   ActivityType = "form_submission"
-	ActivityPageVisit        ActivityType = "page_visit"
-	ActivityBannerClick      ActivityType = "banner_click"
-	ActivityBannerImpression ActivityType = "banner_impression"
-	ActivityContactCreated   ActivityType = "contact_created"
-	ActivityContactUpdated   ActivityType = "contact_updated"
-	ActivityContactMerged    ActivityType = "contact_merged"
-	ActivityTagAdded         ActivityType = "tag_added"
-	ActivityTagRemoved       ActivityType = "tag_removed"
-	ActivityEmailSent        ActivityType = "email_sent"
+	ActivityFormSubmission ActivityType = "form_submission"
+	ActivityPageVisit      ActivityType = "page_visit"
+	ActivityPageClick      ActivityType = "page_clicked"
+	ActivityPageImpression ActivityType = "page_shown"
+	ActivityContactCreated ActivityType = "contact_created"
+	ActivityContactUpdated ActivityType = "contact_updated"
+	ActivityContactMerged  ActivityType = "contact_merged"
+	ActivityTagAdded       ActivityType = "tag_added"
+	ActivityTagRemoved     ActivityType = "tag_removed"
+	ActivityEmailSent      ActivityType = "email_sent"
 )
 
 // Activity represents a contact activity event.
@@ -61,16 +61,16 @@ func FormatActivityTitle(a Activity) string {
 			return fmt.Sprintf("Visited %s", url)
 		}
 		return "Page visit"
-	case ActivityBannerImpression:
-		if bn, ok := a.Data["banner_name"].(string); ok && bn != "" {
-			return fmt.Sprintf("Viewed banner '%s'", bn)
+	case ActivityPageImpression:
+		if pn, ok := a.Data["page_name"].(string); ok && pn != "" {
+			return fmt.Sprintf("Shown page '%s'", pn)
 		}
-		return "Banner impression"
-	case ActivityBannerClick:
-		if bn, ok := a.Data["banner_name"].(string); ok && bn != "" {
-			return fmt.Sprintf("Clicked banner '%s'", bn)
+		return "Page shown"
+	case ActivityPageClick:
+		if pn, ok := a.Data["page_name"].(string); ok && pn != "" {
+			return fmt.Sprintf("Clicked page '%s'", pn)
 		}
-		return "Banner click"
+		return "Page clicked"
 	case ActivityContactCreated:
 		return "Contact created"
 	case ActivityContactUpdated:
@@ -113,16 +113,16 @@ func FormatActivityDescription(a Activity) string {
 			return url
 		}
 		return "Page visit"
-	case ActivityBannerImpression:
-		if bn, ok := a.Data["banner_name"].(string); ok && bn != "" {
-			return bn
+	case ActivityPageImpression:
+		if pn, ok := a.Data["page_name"].(string); ok && pn != "" {
+			return pn
 		}
-		return "Banner view"
-	case ActivityBannerClick:
-		if bn, ok := a.Data["banner_name"].(string); ok && bn != "" {
-			return bn
+		return "Page view"
+	case ActivityPageClick:
+		if pn, ok := a.Data["page_name"].(string); ok && pn != "" {
+			return pn
 		}
-		return "Banner click"
+		return "Page click"
 	case ActivityContactCreated:
 		return "New contact"
 	case ActivityContactUpdated:

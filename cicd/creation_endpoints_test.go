@@ -86,7 +86,7 @@ var _ = Describe("Context-scoped creation endpoints (SPA default-context resolut
 		_, _ = pool.Exec(ctx, "DELETE FROM users")
 		_, _ = pool.Exec(ctx, "DELETE FROM contacts")
 		_, _ = pool.Exec(ctx, "DELETE FROM forms")
-		_, _ = pool.Exec(ctx, "DELETE FROM banners")
+		_, _ = pool.Exec(ctx, "DELETE FROM pages")
 	})
 
 	doRequest := func(method, path string, payload any) *httptest.ResponseRecorder {
@@ -157,25 +157,25 @@ var _ = Describe("Context-scoped creation endpoints (SPA default-context resolut
 		})
 	})
 
-	Describe("POST /api/context/banners without explicit context", func() {
-		It("creates the banner in the default context (SPA fallback)", func() {
-			w := doRequest("POST", "/api/context/banners", map[string]any{
-				"name":       "Cicd Creation Banner",
-				"type":       "html",
-				"content":    "<p>cicd banner</p>",
-				"placements": []string{"hero-top"},
+	Describe("POST /api/context/pages without explicit context", func() {
+		It("creates the page in the default context (SPA fallback)", func() {
+			w := doRequest("POST", "/api/context/pages", map[string]any{
+				"title":    "Cicd Creation Page",
+				"slug":     "cicd-creation-page",
+				"content":  "<p>cicd page</p>",
+				"position": "bottom",
 			})
 			Expect(w.Code).To(Equal(http.StatusCreated), "body: %s", w.Body.String())
 
 			var created map[string]any
 			Expect(json.Unmarshal(w.Body.Bytes(), &created)).To(Succeed())
 			Expect(created["ContextID"]).To(Equal(newCtxID))
-			Expect(created["Name"]).To(Equal("Cicd Creation Banner"))
+			Expect(created["Title"]).To(Equal("Cicd Creation Page"))
 		})
 	})
 
 	Describe("GET list endpoints without explicit context", func() {
-		It("lists contacts, forms, and banners via the default context", func() {
+		It("lists contacts, forms, and pages via the default context", func() {
 			// Seed one of each.
 			w := doRequest("POST", "/api/context/contacts", map[string]any{
 				"email":      "list-contact@example.com",
@@ -193,11 +193,11 @@ var _ = Describe("Context-scoped creation endpoints (SPA default-context resolut
 			})
 			Expect(w.Code).To(Equal(http.StatusCreated), "body: %s", w.Body.String())
 
-			w = doRequest("POST", "/api/context/banners", map[string]any{
-				"name":       "Cicd List Banner",
-				"type":       "html",
-				"content":    "<p>list banner</p>",
-				"placements": []string{"hero-top"},
+			w = doRequest("POST", "/api/context/pages", map[string]any{
+				"title":    "Cicd List Page",
+				"slug":     "cicd-list-page",
+				"content":  "<p>list page</p>",
+				"position": "top",
 			})
 			Expect(w.Code).To(Equal(http.StatusCreated), "body: %s", w.Body.String())
 
@@ -221,15 +221,15 @@ var _ = Describe("Context-scoped creation endpoints (SPA default-context resolut
 			Expect(formsResp.Forms).To(HaveLen(1))
 			Expect(formsResp.Forms[0]["Slug"]).To(Equal("cicd-list-form"))
 
-			// List banners.
-			w = doRequest("GET", "/api/context/banners", nil)
+			// List pages.
+			w = doRequest("GET", "/api/context/pages", nil)
 			Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
-			var bannersResp struct {
-				Banners []map[string]any `json:"banners"`
+			var pagesResp struct {
+				Pages []map[string]any `json:"pages"`
 			}
-			Expect(json.Unmarshal(w.Body.Bytes(), &bannersResp)).To(Succeed())
-			Expect(bannersResp.Banners).To(HaveLen(1))
-			Expect(bannersResp.Banners[0]["Name"]).To(Equal("Cicd List Banner"))
+			Expect(json.Unmarshal(w.Body.Bytes(), &pagesResp)).To(Succeed())
+			Expect(pagesResp.Pages).To(HaveLen(1))
+			Expect(pagesResp.Pages[0]["Title"]).To(Equal("Cicd List Page"))
 		})
 	})
 })

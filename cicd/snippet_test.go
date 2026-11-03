@@ -83,25 +83,13 @@ var _ = Describe("Snippet Generator Tests", func() {
 		})
 	})
 
-	Describe("Banner snippet generation", func() {
-		It("should generate banner snippet with context ID", func() {
+	Describe("Page snippet generation", func() {
+		It("should generate page config snippet with context ID", func() {
 			contextID := support.NewTestContextID()
 
-			js, err := snippet.GenerateBannerSnippet(contextID, nil)
+			js, err := snippet.GeneratePageConfigSnippet(contextID)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(js).To(ContainSubstring(contextID))
-			Expect(js).To(ContainSubstring("AutomataBanner"))
-		})
-
-		It("should generate banner snippet with custom server host", func() {
-			contextID := support.NewTestContextID()
-			options := map[string]interface{}{
-				"serverHost": "https://banners.example.com",
-			}
-
-			js, err := snippet.GenerateBannerSnippet(contextID, options)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(js).To(ContainSubstring("https://banners.example.com"))
 		})
 	})
 
@@ -126,8 +114,8 @@ var _ = Describe("Snippet Generator Tests", func() {
 			Expect(err.Error()).To(ContainSubstring("contextID required"))
 		})
 
-		It("should return error for empty context ID in banner snippet", func() {
-			_, err := snippet.GenerateBannerSnippet("", nil)
+		It("should return error for empty context ID in page snippet", func() {
+			_, err := snippet.GeneratePageConfigSnippet("")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("contextID required"))
 		})

@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/cicd/support"
 	bhandler "github.com/h2hsecure/automata/internal/adapter/api/handler"
-	brepo "github.com/h2hsecure/automata/internal/infrastructure/banner/repo"
 	crepo "github.com/h2hsecure/automata/internal/infrastructure/contact/repo"
 	geoInfra "github.com/h2hsecure/automata/internal/infrastructure/geo"
 	formRepo "github.com/h2hsecure/automata/internal/infrastructure/form/repo"
@@ -32,12 +31,8 @@ var _ = Describe("HTTP Integration Tests - Hidden Visitor Contacts", func() {
 		w = httptest.NewRecorder()
 
 		trackingRepo := trepo.New(pool)
-		bannerRepo := brepo.New(pool)
 		formHandler := bhandler.NewFormHandler(formRepo.New(pool))
-		bannerHandler := bhandler.NewBannerHandler(bannerRepo)
-		placementHandler := bhandler.NewPlacementHandler(bannerRepo)
-		campaignHandler := bhandler.NewCampaignHandler(bannerRepo)
-		trackEngine = ttracking.NewServer(formHandler, bannerHandler, placementHandler, campaignHandler, trackingRepo, geoInfra.New(), crepo.New(pool))
+		trackEngine = ttracking.NewServer(formHandler, trackingRepo, geoInfra.New(), crepo.New(pool))
 		contactEngine = setupContactEngine()
 
 		contextID = support.NewTestContextID()

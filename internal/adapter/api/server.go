@@ -15,7 +15,6 @@ import (
 	"github.com/h2hsecure/automata/internal/domain/context"
 	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
 	auth_repo "github.com/h2hsecure/automata/internal/infrastructure/auth/repo"
-	bannerRepo "github.com/h2hsecure/automata/internal/infrastructure/banner/repo"
 	config_repo "github.com/h2hsecure/automata/internal/infrastructure/config/repo"
 	crepo "github.com/h2hsecure/automata/internal/infrastructure/contact/repo"
 	email_repo "github.com/h2hsecure/automata/internal/infrastructure/email/repo"
@@ -28,7 +27,6 @@ import (
 	webhook_repo "github.com/h2hsecure/automata/internal/infrastructure/webhook/repo"
 	cookie "github.com/h2hsecure/automata/internal/infrastructure/webui/cookie"
 	emailusecase "github.com/h2hsecure/automata/internal/usecase/email"
-	bannerusecase "github.com/h2hsecure/automata/internal/usecase/banner"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -162,10 +160,9 @@ func NewServer(
 	emailUsecase := emailusecase.NewEmailUsecaseWithContact(emailRepo, emailQueue, contactRepo)
 	emailHandler := handler.NewEmailHandlerWithInbox(emailUsecase, email_repo.NewInboxRepo(pool))
 
-	// Form, tracking, and banner repos (shared by context routes and MCP).
+	// Form, tracking, and page repos (shared by context routes and MCP).
 	formRepo := formRepo.New(pool)
 	trackingRepo := trackingRepo.New(pool)
-	bannerRepo := bannerRepo.New(pool)
 	pageRepo := pageRepo.New(pool)
 
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("", emailHandler.List)
@@ -196,7 +193,6 @@ func NewServer(
 		AuthService:   authService,
 		ContactRepo:   contactRepo,
 		FormRepo:      formRepo,
-		BannerUsecase: bannerusecase.NewBannerUsecase(bannerRepo),
 		TrackingRepo:  trackingRepo,
 		EmailUsecase:  emailUsecase,
 		WebhookSvc:    webhookSvc,

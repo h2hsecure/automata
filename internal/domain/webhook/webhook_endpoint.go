@@ -66,8 +66,8 @@ var AllowedEvents = map[string]bool{
 	"contact.updated":    true,
 	"contact.deleted":    true,
 	"form.submitted":     true,
-	"banner.impressed":   true,
-	"banner.clicked":     true,
+	"page.shown":         true,
+	"page.clicked":       true,
 	"test.ping":          true,
 }
 
