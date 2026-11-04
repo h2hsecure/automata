@@ -59,10 +59,16 @@ const MAP_WINDOW_DAYS = 90
 const mapCountries = ref<CountryStat[]>([])
 const mapLoading = ref(true)
 
+// Generation counter so a late response from a previous load (e.g. after a
+// context switch) cannot overwrite data loaded for the current one.
+let overviewGen = 0
+
 async function loadOverview() {
+  const gen = ++overviewGen
   loading.value = true
   try {
     const dashboard = await getDashboardStats()
+    if (gen !== overviewGen) return
     stats.value.totalVisitors = dashboard.total_visitors
     stats.value.activeVisitors = dashboard.active_visitors
     stats.value.totalPageViews = dashboard.page_views
@@ -83,32 +89,40 @@ async function loadOverview() {
     }))
 
     const contacts = await listContacts(1, 1, '', authStore.currentContextId, false)
+    if (gen !== overviewGen) return
     stats.value.totalContacts = contacts.total || 0
 
     const forms = await listForms(authStore.currentContextId)
+    if (gen !== overviewGen) return
     stats.value.totalForms = forms.length
 
     const pages = await listPages()
+    if (gen !== overviewGen) return
     stats.value.totalPages = pages.length
 
     // Non-blocking: hide email cards on failure
     getEmailStats()
       .then((s) => {
+        if (gen !== overviewGen) return
         emailStats.value = s
         emailStatsLoaded.value = true
       })
       .catch(() => {
+        if (gen !== overviewGen) return
         emailStatsLoaded.value = false
       })
   } finally {
-    loading.value = false
+    if (gen === overviewGen) loading.value = false
   }
 }
 
 // Fetches all contacts updated in the last 90 days (paginated) and
 // aggregates them by country for the world map. Non-critical: an empty map
 // is fine if the call fails.
+let mapGen = 0
+
 async function loadMapData() {
+  const gen = ++mapGen
   mapLoading.value = true
   const since = new Date(Date.now() - MAP_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
   const pageSize = 100
@@ -118,6 +132,7 @@ async function loadMapData() {
   try {
     do {
       const res = await listContacts(page, pageSize, '', authStore.currentContextId, undefined, since)
+      if (gen !== mapGen) return
       collected.push(...res.data)
       total = res.total || 0
       page += 1
@@ -125,8 +140,9 @@ async function loadMapData() {
   } catch {
     return
   } finally {
-    mapLoading.value = false
+    if (gen === mapGen) mapLoading.value = false
   }
+  if (gen !== mapGen) return
   mapCountries.value = aggregateContacts(collected)
 }
 

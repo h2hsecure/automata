@@ -125,4 +125,42 @@ describe('DashboardView', () => {
     expect(wrapper.text()).toContain('/home')
     expect(wrapper.text()).toContain('30')
   })
+
+  it('a stale loadOverview response does not overwrite fresh state', async () => {
+    // The first (mount-time) loadOverview hangs on getDashboardStats...
+    let resolveStale!: (v: unknown) => void
+    mocks.getDashboardStats.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveStale = resolve })
+    )
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const auth = useAuthStore(pinia)
+    auth.currentContextId = 'ctx-1'
+    const wrapper = mount(DashboardView, {
+      attachTo: document.body,
+      global: {
+        plugins: [pinia],
+        stubs: {
+          'router-link': { props: ['to'], template: '<a :href="to"><slot /></a>' },
+        },
+      },
+    })
+    // ...a context switch starts a fresh loadOverview (resolves via the
+    // default mock)...
+    auth.currentContextId = 'ctx-2'
+    await flushPromises()
+    // ...and then the stale response arrives late with bogus data.
+    resolveStale({
+      total_visitors: 999,
+      active_visitors: 0,
+      page_views: 0,
+      top_pages: [],
+      device_breakdown: {},
+      top_referrers: [],
+    })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('999')
+    // fresh data (total_visitors: 10 from the default mock) is what renders
+    expect(wrapper.text()).toContain('10')
+  })
 })

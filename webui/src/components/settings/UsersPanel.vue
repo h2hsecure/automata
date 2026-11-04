@@ -34,6 +34,7 @@ const email = ref('')
 const password = ref('')
 const isAdmin = ref(false)
 const formError = ref('')
+const deleteError = ref('')
 
 const userColumns = [
   { key: 'email', label: 'Email' },
@@ -109,10 +110,11 @@ async function handleDelete(u: User) {
   })
   if (confirmed) {
     try {
+      deleteError.value = ''
       await deleteUser(u.id)
       await loadUsers()
-    } catch {
-      // handled
+    } catch (e: any) {
+      deleteError.value = e.response?.data?.error || 'Failed to delete user.'
     }
   }
 }
@@ -230,6 +232,7 @@ onMounted(() => {
     </div>
 
     <Card>
+      <p v-if="deleteError" class="mb-2 text-sm text-destructive">{{ deleteError }}</p>
       <DataTable
         :columns="userColumns"
         :data="users"

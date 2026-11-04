@@ -28,6 +28,7 @@ const contextSlug = ref('')
 const contextDomain = ref('')
 const contextActive = ref(true)
 const formError = ref('')
+const deleteError = ref('')
 const emailContext = ref<Context | null>(null)
 
 const columns = [
@@ -110,11 +111,12 @@ async function handleDelete(c: Context) {
   })
   if (confirmed) {
     try {
+      deleteError.value = ''
       await deleteContext(c.ID)
       await authStore.loadContexts()
       loadContexts()
-    } catch {
-      // handled
+    } catch (e: any) {
+      deleteError.value = e.response?.data?.error || 'Failed to delete website.'
     }
   }
 }
@@ -143,6 +145,7 @@ onMounted(loadContexts)
     </div>
 
     <Card>
+      <p v-if="deleteError" class="mb-2 text-sm text-destructive">{{ deleteError }}</p>
       <DataTable
         :columns="columns"
         :data="contexts"
