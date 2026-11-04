@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	webhookdomain "github.com/h2hsecure/automata/internal/domain/webhook"
 	"github.com/rs/zerolog/log"
 )
 
@@ -84,6 +85,13 @@ func (w *WebhookWorker) processBatch(ctx context.Context) error {
 }
 
 func (w *WebhookWorker) deliver(ctx context.Context, d *WebhookDelivery) error {
+	// Re-validate the delivery URL at dispatch time (defense in depth): rows
+	// enqueued before the SSRF allowlist was tightened must not be delivered.
+	if !webhookdomain.IsValidWebhookURL(d.URL) {
+		log.Error().Str("id", d.ID).Str("url", d.URL).Msg("webhook delivery URL failed SSRF revalidation; marking failed")
+		return w.queue.MarkFailed(d.ID, "url failed SSRF revalidation")
+	}
+
 	payloadBytes, err := json.Marshal(d.Payload)
 	if err != nil {
 		return fmt.Errorf("marshal payload: %w", err)

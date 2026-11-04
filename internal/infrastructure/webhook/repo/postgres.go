@@ -27,14 +27,24 @@ func (r *webhookRepo) Create(e *webhook.WebhookEndpoint) error {
 
 	eventsStr := webhook.FormatEvents(e.Events)
 	query := `
-		INSERT INTO webhook_endpoints (id, context_id, name, url, events, secret_hash, signing_secret, active, created_at, updated_at)
+		INSERT INTO webhook_endpoints (id, context_id, name, url, events, secret_hash, signing_secret_enc, active, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 	`
+
+	// The signing secret is encrypted at rest; plaintext never touches the DB.
+	var encSecret interface{}
+	if e.SigningSecret != nil && *e.SigningSecret != "" {
+		enc, err := encryptSecret(*e.SigningSecret)
+		if err != nil {
+			return fmt.Errorf("encrypt signing secret: %w", err)
+		}
+		encSecret = enc
+	}
 
 	id := uuid.New().String()
 	_, err := r.pool.Exec(ctx, query,
 		id, e.ContextID, e.Name, e.URL, eventsStr,
-		e.SecretHash, e.SigningSecret, e.Active,
+		e.SecretHash, encSecret, e.Active,
 	)
 	if err != nil {
 		return fmt.Errorf("create webhook endpoint: %w", err)
@@ -48,7 +58,7 @@ func (r *webhookRepo) Create(e *webhook.WebhookEndpoint) error {
 func (r *webhookRepo) GetByID(id string) (*webhook.WebhookEndpoint, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, name, url, events, secret_hash, signing_secret, active, created_at, updated_at
+		SELECT id, context_id, name, url, events, secret_hash, signing_secret_enc, active, created_at, updated_at
 		FROM webhook_endpoints
 		WHERE id = $1
 	`
@@ -67,15 +77,34 @@ func (r *webhookRepo) GetByID(id string) (*webhook.WebhookEndpoint, error) {
 		return nil, fmt.Errorf("get webhook endpoint: %w", err)
 	}
 
+	if err := decryptSigningSecret(e); err != nil {
+		return nil, fmt.Errorf("decrypt webhook endpoint secret: %w", err)
+	}
+
 	e.Events = webhook.ParseEvents(eventsStr)
 	return e, nil
+}
+
+// decryptSigningSecret replaces the encrypted-at-rest signing secret with the
+// plaintext value (in memory only, at delivery time). A NULL/empty stored
+// value leaves SigningSecret as nil.
+func decryptSigningSecret(e *webhook.WebhookEndpoint) error {
+	if e.SigningSecret == nil || *e.SigningSecret == "" {
+		return nil
+	}
+	plain, err := decryptSecret(*e.SigningSecret)
+	if err != nil {
+		return err
+	}
+	e.SigningSecret = &plain
+	return nil
 }
 
 // ListByContext retrieves all webhook endpoints for a context, ordered by name.
 func (r *webhookRepo) ListByContext(contextID string) ([]*webhook.WebhookEndpoint, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, name, url, events, secret_hash, signing_secret, active, created_at, updated_at
+		SELECT id, context_id, name, url, events, secret_hash, signing_secret_enc, active, created_at, updated_at
 		FROM webhook_endpoints
 		WHERE context_id = $1
 		ORDER BY name ASC
@@ -98,6 +127,10 @@ func (r *webhookRepo) ListByContext(contextID string) ([]*webhook.WebhookEndpoin
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan webhook endpoint: %w", err)
+		}
+
+		if err := decryptSigningSecret(e); err != nil {
+			return nil, fmt.Errorf("decrypt webhook endpoint secret: %w", err)
 		}
 
 		e.Events = webhook.ParseEvents(eventsStr)
@@ -139,9 +172,13 @@ func (r *webhookRepo) Update(e *webhook.WebhookEndpoint) error {
 		args = append(args, *e.SecretHash)
 		argIndex++
 	}
-	if e.SigningSecret != nil {
-		setClauses = append(setClauses, fmt.Sprintf("signing_secret = $%d", argIndex))
-		args = append(args, *e.SigningSecret)
+	if e.SigningSecret != nil && *e.SigningSecret != "" {
+		enc, err := encryptSecret(*e.SigningSecret)
+		if err != nil {
+			return fmt.Errorf("encrypt signing secret: %w", err)
+		}
+		setClauses = append(setClauses, fmt.Sprintf("signing_secret_enc = $%d", argIndex))
+		args = append(args, enc)
 		argIndex++
 	}
 
@@ -185,7 +222,7 @@ func (r *webhookRepo) Delete(id string) error {
 func (r *webhookRepo) ListActiveByContextAndEvent(contextID, event string) ([]*webhook.WebhookEndpoint, error) {
 	ctx := context.Background()
 	query := `
-		SELECT id, context_id, name, url, events, secret_hash, signing_secret, active, created_at, updated_at
+		SELECT id, context_id, name, url, events, secret_hash, signing_secret_enc, active, created_at, updated_at
 		FROM webhook_endpoints
 		WHERE context_id = $1 AND active = true
 		ORDER BY created_at ASC
@@ -208,6 +245,10 @@ func (r *webhookRepo) ListActiveByContextAndEvent(contextID, event string) ([]*w
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan webhook endpoint: %w", err)
+		}
+
+		if err := decryptSigningSecret(e); err != nil {
+			return nil, fmt.Errorf("decrypt webhook endpoint secret: %w", err)
 		}
 
 		e.Events = webhook.ParseEvents(eventsStr)

@@ -71,12 +71,22 @@ var AllowedEvents = map[string]bool{
 	"test.ping":          true,
 }
 
-// urlPattern validates webhook URLs (HTTPS or localhost/127.0.0.1).
-var urlPattern = regexp.MustCompile(`^https://|^http://(localhost|127\.0\.0\.1)`)
+// WebhookURLPattern validates webhook URLs: https to any host, or plain
+// http to loopback only (local dev webhooks). The pattern is anchored on the
+// host boundary (a path separator or end of string must follow the host), so
+// prefix tricks like http://localhost.evil.com cannot match.
+var WebhookURLPattern = regexp.MustCompile(`^(https://|http://(localhost|127\.0\.0\.1)(:\d+)?(/|$))`)
+
+// IsValidWebhookURL reports whether the URL passes the SSRF allowlist.
+// Used at create/update time and re-checked at dispatch time (defense in
+// depth for rows created before the allowlist tightened).
+func IsValidWebhookURL(url string) bool {
+	return WebhookURLPattern.MatchString(url)
+}
 
 // ValidateCreate validates a CreateWebhookInput.
 func (input CreateWebhookInput) ValidateCreate() error {
-	if !urlPattern.MatchString(input.URL) {
+	if !IsValidWebhookURL(input.URL) {
 		return fmt.Errorf("url must use https:// or http://localhost / http://127.0.0.1")
 	}
 	for _, event := range input.Events {
@@ -94,7 +104,7 @@ func (input CreateWebhookInput) ValidateCreate() error {
 
 // ValidateUpdate validates an UpdateWebhookInput (all fields optional).
 func (input UpdateWebhookInput) ValidateUpdate() error {
-	if input.URL != "" && !urlPattern.MatchString(input.URL) {
+	if input.URL != "" && !IsValidWebhookURL(input.URL) {
 		return fmt.Errorf("url must use https:// or http://localhost / http://127.0.0.1")
 	}
 	for _, event := range input.Events {

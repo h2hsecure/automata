@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 
@@ -9,11 +10,12 @@ import (
 )
 
 // Secrets holds the application's cryptographic secrets, loaded and validated
-// at startup. All callers should access secrets through GetJWTSecret() and
-// GetCookieSecret() rather than reading config directly.
+// at startup. All callers should access secrets through GetJWTSecret(),
+// GetCookieSecret(), and GetSecretKey() rather than reading config directly.
 type Secrets struct {
 	jwtSecret    string
 	cookieSecret string
+	secretKey    [32]byte
 }
 
 var globalSecrets *Secrets
@@ -49,6 +51,7 @@ func Init() {
 	globalSecrets = &Secrets{
 		jwtSecret:    jwtSecret,
 		cookieSecret: cookieSecret,
+		secretKey:    sha256.Sum256([]byte(cookieSecret)),
 	}
 
 	log.Info().Msg("Secret keys loaded successfully")
@@ -70,12 +73,24 @@ func GetCookieSecret() string {
 	return globalSecrets.cookieSecret
 }
 
+// GetSecretKey returns a stable 32-byte AES-GCM key derived from the cookie
+// secret. It is derived from the same material the cookie manager uses, so
+// deployments that already set auth.cookie_secret need no new configuration.
+// Must be called after Init().
+func GetSecretKey() [32]byte {
+	if globalSecrets == nil {
+		panic("secrets: GetSecretKey() called before Init()")
+	}
+	return globalSecrets.secretKey
+}
+
 // InitForTesting initializes secrets with known test values.
 // This is for testing purposes only.
 func InitForTesting(jwtSecret, cookieSecret string) {
 	globalSecrets = &Secrets{
 		jwtSecret:    jwtSecret,
 		cookieSecret: cookieSecret,
+		secretKey:    sha256.Sum256([]byte(cookieSecret)),
 	}
 }
 
