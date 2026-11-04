@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,16 @@ import (
 	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
 	"github.com/h2hsecure/automata/internal/infrastructure/config"
 )
+
+// trackLimiter is the shared per-IP rate limiter for all public tracking
+// endpoints on one engine (in-process, per-pod — spec 4.2, §9).
+var trackLimiter = middleware.NewLimiter()
+
+// publicRateLimit builds the shared per-IP rate-limit middleware for public
+// tracking endpoints (rate_tracking_per_min, 300/min default).
+func publicRateLimit() gin.HandlerFunc {
+	return middleware.RateLimit(trackLimiter, config.GetInt("rate_tracking_per_min", 300), time.Minute, middleware.IPKeyFn)
+}
 
 // NewServer creates a new tracking server with public-facing endpoints.
 // The geoLookup resolves visitor locations offline (nil disables
@@ -34,10 +45,10 @@ func NewServer(formHandler *handler.FormHandler, trackingRepo Repository, geoLoo
 	// Public GET routes are also registered for HEAD (curl -I, health checks,
 	// proxies): gin >= 1.12 no longer auto-maps HEAD to GET, so a GET-only
 	// route 404s HEAD requests.
-	// Tracking endpoints
-	r.POST("/track", trackHandler.Track)
-	r.POST("/track/:cid", trackHandler.TrackScoped)
-	r.POST("/track/batch", trackHandler.TrackBatch)
+	// Tracking endpoints (public, per-IP rate limited: rate_tracking_per_min)
+	r.POST("/track", publicRateLimit(), trackHandler.Track)
+	r.POST("/track/:cid", publicRateLimit(), trackHandler.TrackScoped)
+	r.POST("/track/batch", publicRateLimit(), trackHandler.TrackBatch)
 	r.GET("/snippet/:id.js", snippetHandler.ServeSnippet)
 	r.HEAD("/snippet/:id.js", snippetHandler.ServeSnippet)
 

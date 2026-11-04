@@ -204,7 +204,7 @@ var _ = Describe("Postgres API Key Repository", func() {
 	})
 })
 
-func TestApiKeyRepo(t *testing.T) {
+func TestRepo(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "API Key Repository Suite")
+	RunSpecs(t, "Auth Repo Suite")
 }

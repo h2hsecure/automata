@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
@@ -79,9 +80,14 @@ func NewServer(
 
 	cookieMgr := cookie.New(infraauth.GetCookieSecret())
 	authHandler := handler.NewAuthHandler(authService, userRepo, contextRepo, apiKeyRepo, cookieMgr)
-	api.POST("/auth/login", authHandler.Login)
+
+	// Rate-limit login/refresh: 10/min per IP+email (rate_login_per_min).
+	// In-process token bucket — per-pod (spec 4.2, documented limitation §9).
+	loginLimiter := middleware.NewLimiter()
+	loginRateLimit := middleware.RateLimit(loginLimiter, config.GetInt("rate_login_per_min", 10), time.Minute, middleware.LoginKeyFn)
+	api.POST("/auth/login", loginRateLimit, authHandler.Login)
 	api.POST("/auth/logout", authHandler.Logout)
-	api.POST("/auth/refresh", authHandler.HandleRefresh)
+	api.POST("/auth/refresh", loginRateLimit, authHandler.HandleRefresh)
 
 	api.GET("/auth/me", middleware.AuthMiddleware(authService), authHandler.GetMe)
 	api.PUT("/auth/profile", middleware.AuthMiddleware(authService), authHandler.UpdateProfile)

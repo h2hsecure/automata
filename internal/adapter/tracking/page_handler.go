@@ -21,8 +21,9 @@ func NewPageServeHandler(repo pagedomain.Repository) *PageServeHandler {
 
 // RegisterPageRoutes registers the public page endpoint on the tracking engine.
 func RegisterPageRoutes(r *gin.Engine, h *PageServeHandler) {
-	r.GET("/page/:contextID/:slug", h.Serve)
-	r.HEAD("/page/:contextID/:slug", h.Serve)
+	rl := publicRateLimit()
+	r.GET("/page/:contextID/:slug", rl, h.Serve)
+	r.HEAD("/page/:contextID/:slug", rl, h.Serve)
 }
 
 // Serve renders the page content inside a minimal HTML document.

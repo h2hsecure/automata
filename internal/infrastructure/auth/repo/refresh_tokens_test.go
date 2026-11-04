@@ -2,7 +2,6 @@ package repo_test
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	"github.com/google/uuid"
@@ -155,7 +154,6 @@ var _ = Describe("Postgres Refresh Token Store", func() {
 	})
 })
 
-func TestRefreshTokenStore(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Refresh Token Store Suite")
-}
+// Note: this file has no Test* bootstrap — its specs run under the single
+// package Ginkgo suite bootstrapped in api_key_postgres_test.go (TestRepo).
+// Ginkgo does not support two RunSpecs in one test binary.

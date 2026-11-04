@@ -32,11 +32,12 @@ func NewPagePublicHandler(repo pagedomain.Repository) *PagePublicHandler {
 
 // RegisterPagePublicRoutes registers the public page endpoints.
 func RegisterPagePublicRoutes(r *gin.Engine, h *PagePublicHandler) {
-	r.GET("/page/config/:contextID", h.Config)
-	r.HEAD("/page/config/:contextID", h.Config)
-	r.POST("/page/decision/:contextID", h.Decision)
-	r.GET("/page/snippet/:contextID.js", h.ServeSnippet)
-	r.HEAD("/page/snippet/:contextID.js", h.ServeSnippet)
+	rl := publicRateLimit()
+	r.GET("/page/config/:contextID", rl, h.Config)
+	r.HEAD("/page/config/:contextID", rl, h.Config)
+	r.POST("/page/decision/:contextID", rl, h.Decision)
+	r.GET("/page/snippet/:contextID.js", rl, h.ServeSnippet)
+	r.HEAD("/page/snippet/:contextID.js", rl, h.ServeSnippet)
 }
 
 // Config responds with the active pages for a context, each with its
