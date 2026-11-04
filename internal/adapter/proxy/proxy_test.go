@@ -60,26 +60,39 @@ var _ = Describe("Proxy Adapter", func() {
 		})
 	})
 
+	const testUUID = "550e8400-e29b-41d4-a716-446655440000"
+
 	Describe("Snippet route", func() {
-		It("returns JavaScript for a context ID", func() {
-			req := httptest.NewRequest("GET", "/snippet/abc123.js", nil)
+		It("returns JavaScript for a UUID context ID", func() {
+			req := httptest.NewRequest("GET", "/snippet/"+testUUID+".js", nil)
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(w.Header().Get("Content-Type")).To(ContainSubstring("application/javascript"))
-			Expect(w.Body.String()).To(ContainSubstring("abc123"))
+			Expect(w.Body.String()).To(ContainSubstring(testUUID))
 		})
 
 		It("strips .js extension from context ID in snippet", func() {
-			req := httptest.NewRequest("GET", "/snippet/context-123.js", nil)
+			req := httptest.NewRequest("GET", "/snippet/"+testUUID+".js", nil)
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(w.Body.String()).To(ContainSubstring("context-123"))
+			Expect(w.Body.String()).To(ContainSubstring(testUUID))
 			// Should not contain .js in the tracking ID
-			Expect(w.Body.String()).NotTo(ContainSubstring("'context-123.js'"))
+			Expect(w.Body.String()).NotTo(ContainSubstring("'" + testUUID + ".js'"))
+		})
+
+		// Regression (M4): a non-UUID path segment must be rejected and must
+		// never be echoed into the generated JavaScript.
+		It("rejects a non-UUID path with 404 and does not echo the input", func() {
+			req := httptest.NewRequest("GET", "/snippet/%3Cscript%3Ealert(1)%3C%2Fscript%3E", nil)
+			w := httptest.NewRecorder()
+			engine.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+			Expect(w.Body.String()).NotTo(ContainSubstring("script"))
 		})
 	})
 
@@ -131,6 +144,9 @@ func (m *mockContextRepo) Delete(id string) error {
 }
 
 func (m *mockContextRepo) GetByUserEmail(email string) ([]*context.Context, error) {
+	return nil, nil
+}
+func (m *mockContextRepo) GetDefaultContext() (*context.Context, error) {
 	return nil, nil
 }
 
