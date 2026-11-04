@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/h2hsecure/automata/internal/infrastructure/auth"
@@ -138,9 +142,24 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	// Start server
-	log.Info().Str("port", port).Msg("starting BFF server")
-	if err := r.Run(":" + port); err != nil {
-		log.Fatal().Err(err).Msg("server failed")
+	// Start server with graceful shutdown on SIGINT/SIGTERM
+	srv := &http.Server{Addr: ":" + port, Handler: r}
+	go func() {
+		log.Info().Str("port", port).Msg("starting BFF server")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("server failed")
+		}
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	log.Info().Msg("shutting down...")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("graceful shutdown failed")
 	}
+	log.Info().Msg("all servers stopped")
 }

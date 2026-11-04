@@ -22,12 +22,6 @@ func NewAuthHandler(cookieMgr *webui_cookie.Manager) *AuthHandler {
 
 // HandleLogout clears the session cookie.
 func (h *AuthHandler) HandleLogout(c *gin.Context) {
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     webui_cookie.CookieName,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,
-	})
+	http.SetCookie(c.Writer, webui_cookie.ClearSessionCookie(secureCookies()))
 	c.Redirect(http.StatusFound, "/")
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"time"
 )
 
@@ -119,6 +120,34 @@ const CookieName = "automata_session"
 
 // CookieMaxAge is the cookie expiration in seconds (24 hours).
 const CookieMaxAge = 86400
+
+// SessionCookie builds the session cookie with the standard flags
+// (HttpOnly, SameSite=Lax, Secure unless the caller opts out for local
+// HTTP development).
+func SessionCookie(value string, secure bool) *http.Cookie {
+	return &http.Cookie{
+		Name:     CookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   CookieMaxAge,
+		Secure:   secure,
+	}
+}
+
+// ClearSessionCookie returns a cookie that expires the session.
+func ClearSessionCookie(secure bool) *http.Cookie {
+	return &http.Cookie{
+		Name:     CookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+		Secure:   secure,
+	}
+}
 
 // RefreshCookieName is the name used for the refresh token cookie.
 const RefreshCookieName = "automata_refresh"

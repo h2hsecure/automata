@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/url"
@@ -41,6 +43,14 @@ func NewAuthHandler(authService auth.AuthService, userRepo context.UserRepositor
 	return &AuthHandler{authService: authService, userRepo: userRepo, contextRepo: contextRepo, apiKeyRepo: apiKeyRepo, cookieMgr: cookieMgr}
 }
 
+// shortHash returns the first 12 hex chars of sha256(s). It lets operators
+// correlate log entries for the same account without the raw value (an
+// email address) appearing in logs.
+func shortHash(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])[:12]
+}
+
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -48,11 +58,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	log.Info().Str("email", req.Email).Msg("login attempt")
+	log.Info().Str("email", shortHash(req.Email)).Msg("login attempt")
 
 	token, userID, contextInfos, err := h.authService.Login(req.Email, req.Password)
 	if err != nil {
-		log.Error().Err(err).Str("email", req.Email).Msg("auth service login failed")
+		log.Error().Err(err).Str("email", shortHash(req.Email)).Msg("auth service login failed")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}

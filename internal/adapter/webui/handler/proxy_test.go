@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	webui_cookie "github.com/h2hsecure/automata/internal/infrastructure/webui/cookie"
 )
 
@@ -230,4 +231,61 @@ func TestProxy_LoginFailurePassesThrough(t *testing.T) {
 	if w.Body.String() != `{"error":"invalid credentials"}` {
 		t.Errorf("body must pass through untouched, got %s", w.Body.String())
 	}
+}
+
+// TestProxy_CookieHasSecureFlag: the session cookie must be flagged Secure
+// (and HttpOnly + SameSite=Lax) by default, and the logout cookie must be
+// too. The `insecure_cookie=true` escape hatch (local HTTP dev) omits
+// Secure from both.
+func TestProxy_CookieHasSecureFlag(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"token":"jwt-token-1","refresh_token":"refresh-1","user_id":"u1","email":"a@b.c"}`))
+	})
+	ph, mgr := newTestProxy(t, mux)
+	engine := gin.New()
+	engine.POST("/logout", NewAuthHandler(mgr).HandleLogout)
+	engine.NoRoute(ph.HandleProxy)
+
+	check := func(t *testing.T, wantSecure bool) {
+		t.Helper()
+		w := doRequest(t, engine, http.MethodPost, "/api/auth/login", "", "")
+		if w.Code != http.StatusOK {
+			t.Fatalf("login: expected 200, got %d", w.Code)
+		}
+		sc := w.Header().Get("Set-Cookie")
+		if !strings.Contains(sc, "automata_session=") {
+			t.Fatalf("expected Set-Cookie automata_session, got %q", sc)
+		}
+		if !strings.Contains(sc, "HttpOnly") || !strings.Contains(sc, "SameSite=Lax") {
+			t.Errorf("login cookie must be HttpOnly + SameSite=Lax, got %q", sc)
+		}
+		if strings.Contains(sc, "Secure") != wantSecure {
+			t.Errorf("login cookie Secure flag = %v, want %v (got %q)", !wantSecure, wantSecure, sc)
+		}
+
+		w = doRequest(t, engine, http.MethodPost, "/logout", "", "")
+		if w.Code != http.StatusFound {
+			t.Fatalf("logout: expected 302, got %d", w.Code)
+		}
+		sc = w.Header().Get("Set-Cookie")
+		if !strings.Contains(sc, "automata_session=") {
+			t.Fatalf("logout: expected Set-Cookie automata_session, got %q", sc)
+		}
+		if !strings.Contains(sc, "HttpOnly") || !strings.Contains(sc, "SameSite=Lax") {
+			t.Errorf("logout cookie must be HttpOnly + SameSite=Lax, got %q", sc)
+		}
+		if strings.Contains(sc, "Secure") != wantSecure {
+			t.Errorf("logout cookie Secure flag = %v, want %v (got %q)", !wantSecure, wantSecure, sc)
+		}
+	}
+
+	// Default: Secure on both cookies.
+	check(t, true)
+
+	// Escape hatch: local HTTP dev omits Secure.
+	config.Set("insecure_cookie", "true")
+	defer config.Set("insecure_cookie", "")
+	check(t, false)
 }

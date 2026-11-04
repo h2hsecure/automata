@@ -14,6 +14,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// secureCookies reports whether the session cookie should carry the Secure
+// flag. It is true by default; the `insecure_cookie=true` config value is an
+// escape hatch for local HTTP development (browsers reject Secure cookies
+// over plain HTTP).
+func secureCookies() bool {
+	return config.Get("insecure_cookie") != "true"
+}
+
 // ProxyHandler forwards /api/* requests to the internal API backend.
 // It acts as the JWT custodian for the Web UI: the browser only ever sees
 // an encrypted session cookie, and the API JWT lives server-side inside
@@ -144,10 +152,7 @@ func (h *ProxyHandler) proxyAuth(c *gin.Context, session *webui_cookie.SessionDa
 				}
 
 				if encrypted, err := h.cookieManager.Encrypt(next); err == nil {
-					c.Header("Set-Cookie",
-						webui_cookie.CookieName+"="+encrypted+
-							"; Path=/; Max-Age="+strconv.Itoa(webui_cookie.CookieMaxAge)+
-							"; HttpOnly; Secure; SameSite=Lax")
+					http.SetCookie(c.Writer, webui_cookie.SessionCookie(encrypted, secureCookies()))
 				} else {
 					log.Error().Err(err).Msg("failed to encrypt session cookie")
 				}

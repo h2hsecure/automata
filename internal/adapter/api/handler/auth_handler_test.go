@@ -2,17 +2,24 @@ package handler
 
 import (
 	"bytes"
-	"encoding/json"
 	stdcontext "context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/domain/auth"
 	"github.com/h2hsecure/automata/internal/domain/context"
+	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
+	webui_cookie "github.com/h2hsecure/automata/internal/infrastructure/webui/cookie"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // fakeAuthService implements auth.AuthService for handler tests.
@@ -388,5 +395,44 @@ func TestListAPIKeysFallsBackToFirstContextWithoutHeader(t *testing.T) {
 	}
 	if repo.listedContext != "ctx-oldest" {
 		t.Fatalf("expected ListByContext to fall back to ctx-oldest, got %q", repo.listedContext)
+	}
+}
+
+// TestLoginLog_DoesNotContainEmail: login logging must not emit the raw
+// email address (PII); it logs a 12-hex-char sha256 prefix instead, which
+// still lets operators correlate repeated attempts for the same account.
+func TestLoginLog_DoesNotContainEmail(t *testing.T) {
+	infraauth.InitForTesting("test-secret-key-for-jwt-signing-32bytes", "test-cookie-secret-32bytes-xxxx!")
+
+	var buf bytes.Buffer
+	prevLogger := log.Logger
+	log.Logger = zerolog.New(&buf)
+	defer func() { log.Logger = prevLogger }()
+
+	cookieMgr := webui_cookie.New("test-cookie-secret-32bytes-xxxx!")
+	h := NewAuthHandler(&fakeAuthService{}, nil, nil, nil, cookieMgr)
+	r := gin.New()
+	r.POST("/auth/login", h.Login)
+
+	email := "sensitive-person@example.com"
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/auth/login",
+		bytes.NewBufferString(`{"email":"`+email+`","password":"hunter2"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	logged := buf.String()
+	if strings.Contains(logged, email) {
+		t.Fatalf("login log must not contain the raw email, got: %s", logged)
+	}
+
+	sum := sha256.Sum256([]byte(email))
+	want := hex.EncodeToString(sum[:])[:12]
+	if !strings.Contains(logged, want) {
+		t.Errorf("expected log to contain email hash %q, got: %s", want, logged)
 	}
 }
