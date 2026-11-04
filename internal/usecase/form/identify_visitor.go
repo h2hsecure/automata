@@ -7,7 +7,25 @@ import (
 	ct "github.com/h2hsecure/automata/internal/domain/contact"
 	tracking "github.com/h2hsecure/automata/internal/domain/tracking"
 	contact "github.com/h2hsecure/automata/internal/usecase/contact"
+	"github.com/jackc/pgx/v5"
 )
+
+// txProvider is an optional narrow interface implemented by concrete
+// repositories that wrap a pool (contact and tracking both do). It lets
+// IdentifyVisitor run multi-repository steps atomically when the repos
+// support it.
+type txProvider interface {
+	WithTx(ctx context.Context, fn func(tx pgx.Tx) error) error
+}
+
+type contactMergeTxRepo interface {
+	txProvider
+	MergeTx(tx pgx.Tx, keepID, mergeIntoID string) error
+}
+
+type trackingReassignTxRepo interface {
+	ReassignVisitorContactIDTx(tx pgx.Tx, contextID, oldContactID, newContactID string) error
+}
 
 // IdentifyVisitor creates a contact from form data (email dedupe built in)
 // and links it to the tracking visitor. It only identifies when an email
@@ -43,6 +61,26 @@ func IdentifyVisitor(contactRepo contact.Repository, trackingRepo tracking.Repos
 		if existing != nil && existing.ID != hidden.ID {
 			// Keep the real contact (its email stays); the hidden contact is
 			// deleted by the merge, its page_visit activities move with it.
+			//
+			// When both repos expose a tx seam (the concrete PostgreSQL
+			// repos do), run merge + reassign in one transaction so a
+			// failure mid-merge cannot leave the contact merged while the
+			// visitor link still points at the deleted contact.
+			if m, ok := contactRepo.(contactMergeTxRepo); ok {
+				if r, ok := trackingRepo.(trackingReassignTxRepo); ok {
+					ctx := context.Background()
+					if err := m.WithTx(ctx, func(tx pgx.Tx) error {
+						if err := m.MergeTx(tx, existing.ID, hidden.ID); err != nil {
+							return err
+						}
+						return r.ReassignVisitorContactIDTx(tx, contextID, hidden.ID, existing.ID)
+					}); err != nil {
+						return nil, err
+					}
+					return existing, nil
+				}
+			}
+
 			if err := contactRepo.Merge(existing.ID, hidden.ID); err != nil {
 				return nil, err
 			}

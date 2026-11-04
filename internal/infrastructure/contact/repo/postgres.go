@@ -13,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	ct "github.com/h2hsecure/automata/internal/domain/contact"
 	uc "github.com/h2hsecure/automata/internal/usecase/contact"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -481,6 +483,29 @@ func (r *repo) FindBySourceID(contextID, source, sourceID string) (*ct.Contact, 
 
 // Merge merges the contact identified by mergeIntoID into the contact identified by keepID.
 // It merges custom_fields (JSONB), tags, reassigns activities, and deletes the merged ct.
+// txExecer is the slice of pgx.Tx / *pgx.Conn used by transactional
+// helpers so they can run inside a caller-provided transaction.
+type txExecer interface {
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	QueryRow(ctx context.Context, sql string, arguments ...interface{}) pgx.Row
+}
+
+// WithTx runs fn inside a single transaction started on the pool,
+// committing on success and rolling back on error. It lets usecases that
+// span this repository and sibling repositories (same database) compose
+// atomic multi-step operations.
+func (r *repo) WithTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (r *repo) Merge(keepID, mergeIntoID string) error {
 	ctx := context.Background()
 
@@ -490,9 +515,23 @@ func (r *repo) Merge(keepID, mergeIntoID string) error {
 	}
 	defer tx.Rollback(ctx)
 
+	if err := mergeContacts(ctx, tx, keepID, mergeIntoID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// MergeTx runs the contact merge on a caller-provided transaction so it can
+// be composed atomically with operations on other repositories (e.g. the
+// tracking visitor reassign in IdentifyVisitor).
+func (r *repo) MergeTx(tx pgx.Tx, keepID, mergeIntoID string) error {
+	return mergeContacts(context.Background(), tx, keepID, mergeIntoID)
+}
+
+func mergeContacts(ctx context.Context, tx txExecer, keepID, mergeIntoID string) error {
 	// 1. Merge custom_fields (JSONB merge)
 	var keepFields, mergeFields []byte
-	err = tx.QueryRow(ctx, "SELECT custom_fields FROM contacts WHERE id = $1", keepID).Scan(&keepFields)
+	err := tx.QueryRow(ctx, "SELECT custom_fields FROM contacts WHERE id = $1", keepID).Scan(&keepFields)
 	if err != nil {
 		return fmt.Errorf("get keep contact fields: %w", err)
 	}
@@ -538,7 +577,7 @@ func (r *repo) Merge(keepID, mergeIntoID string) error {
 		return fmt.Errorf("delete merged contact: %w", err)
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 // GetActivity retrieves activities for a contact, ordered by created_at DESC.

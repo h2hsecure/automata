@@ -11,6 +11,7 @@ import (
 	"github.com/h2hsecure/automata/internal/domain/tracking"
 	"github.com/h2hsecure/automata/internal/infrastructure/database"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -494,11 +495,42 @@ func (r *repo) SetVisitorContactID(ctx context.Context, contextID, visitorID, co
 	return nil
 }
 
+// WithTx runs fn inside a single transaction started on the pool,
+// committing on success and rolling back on error. It lets usecases that
+// span this repository and sibling repositories (same database) compose
+// atomic multi-step operations.
+func (r *repo) WithTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 // ReassignVisitorContactID unconditionally repoints every visitor linked to
 // oldContactID to newContactID. Used when a hidden visitor contact is merged
 // into an existing contact. 0 affected rows is not an error.
 func (r *repo) ReassignVisitorContactID(contextID, oldContactID, newContactID string) error {
-	_, err := r.pool.Exec(context.Background(),
+	return reassignVisitorContactID(r.pool, context.Background(), contextID, oldContactID, newContactID)
+}
+
+// ReassignVisitorContactIDTx runs the visitor reassign on a caller-provided
+// transaction so it can be composed atomically with the contact merge in
+// IdentifyVisitor.
+func (r *repo) ReassignVisitorContactIDTx(tx pgx.Tx, contextID, oldContactID, newContactID string) error {
+	return reassignVisitorContactID(tx, context.Background(), contextID, oldContactID, newContactID)
+}
+
+type execer interface {
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+}
+
+func reassignVisitorContactID(e execer, ctx context.Context, contextID, oldContactID, newContactID string) error {
+	_, err := e.Exec(ctx,
 		`UPDATE tracking_visitors SET contact_id = $3
 		 WHERE context_id = $1 AND contact_id = $2`,
 		contextID, oldContactID, newContactID)
