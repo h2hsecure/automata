@@ -20,8 +20,9 @@ type InboxMessage struct {
 type InboxRepository interface {
 	// List returns messages newest-first, capped at limit.
 	List(contextID string, limit int) ([]*InboxMessage, error)
-	// MarkRead flags a message as read; returns sql.ErrNoRows when not found.
-	MarkRead(id string) error
+	// MarkRead flags a message as read; returns sql.ErrNoRows when not found
+	// in the given context (cross-context calls are a no-op).
+	MarkRead(id, contextID string) error
 	// Upsert inserts a message, deduping on (context_id, uid).
 	Upsert(m *InboxMessage) error
 	// MaxUID returns the highest stored UID for the context, 0 when empty.

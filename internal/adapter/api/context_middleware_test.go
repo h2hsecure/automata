@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -95,10 +94,8 @@ func (m *mockContextRepo) GetDefaultContext() (*context.Context, error) {
 
 var _ context.Repository = (*mockContextRepo)(nil)
 
-func TestContextMiddleware(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Context Middleware Suite")
-}
+// No RunSpecs here: the package's specs are executed by TestServerRoutes
+// in server_test.go (two RunSpecs in one package panic).
 
 // requestWithHost creates an HTTP request and sets the Host header.
 func requestWithHost(method, path, host string) *http.Request {
@@ -264,7 +261,9 @@ var _ = Describe("ContextResolver middleware", func() {
 			w, _ := runWithCapture(mw, emptyRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("context not found"))
+			// The fallback abort uses "no context available" (a distinct
+			// message from the explicit-context "context not found").
+			Expect(string(body)).To(ContainSubstring("no context available"))
 		})
 	})
 

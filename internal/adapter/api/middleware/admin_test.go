@@ -14,7 +14,8 @@ import (
 
 // stubUserRepo implements context.UserRepository with a single user.
 type stubUserRepo struct {
-	user *context.User
+	user        *context.User
+	memberships map[string]string // userID -> contextID
 }
 
 func (s *stubUserRepo) Create(u *context.User) error { return nil }
@@ -46,6 +47,9 @@ func (s *stubUserRepo) GetPasswordChangedAt(userID string) (time.Time, error) {
 }
 func (s *stubUserRepo) UpdatePasswordChangedAt(userID string) error { return nil }
 func (s *stubUserRepo) GetByUserIDContext(ctx stdcontext.Context, userID, contextID string) (*context.UserContext, error) {
+	if s.memberships[userID] == contextID {
+		return &context.UserContext{UserID: userID, ContextID: contextID, Role: "owner"}, nil
+	}
 	return nil, errors.New("not found")
 }
 func (s *stubUserRepo) ListByUser(userID string) ([]context.UserContext, error) {

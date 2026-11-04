@@ -345,7 +345,8 @@ func (h *EmailHandler) MarkInboxRead(c *gin.Context) {
 		return
 	}
 
-	if err := h.inboxRepo.MarkRead(mid); err != nil {
+	// Context-scoped: the route's :id is the context the message must belong to.
+	if err := h.inboxRepo.MarkRead(mid, c.Param("id")); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
 			return

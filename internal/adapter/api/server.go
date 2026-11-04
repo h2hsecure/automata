@@ -107,7 +107,7 @@ func NewServer(
 			usersRoutes.DELETE("/:id", userHandler.Delete)
 		}
 
-		contextUserRoutes := admin.Group("/contexts/:id/users")
+		contextUserRoutes := admin.Group("/contexts/:id/users").Use(middleware.RequireContextAccess(userRepo, "id"))
 		{
 			contextUserRoutes.GET("", contextUserHandler.List)
 			contextUserRoutes.POST("", contextUserHandler.Create)
@@ -119,10 +119,10 @@ func NewServer(
 		// Config routes
 		configRepo := config_repo.NewConfigRepo(pool)
 		configHandler := handler.NewConfigHandler(configRepo)
-		admin.GET("/configs/:contextId", configHandler.GetConfig)
-		admin.PUT("/configs/:contextId/cors", configHandler.UpdateCORS)
-		admin.PUT("/configs/:contextId/domain", configHandler.UpdateDomain)
-		admin.PUT("/configs/:contextId/display", configHandler.UpdateDisplay)
+		admin.GET("/configs/:contextId", middleware.RequireContextAccess(userRepo, "contextId"), configHandler.GetConfig)
+		admin.PUT("/configs/:contextId/cors", middleware.RequireContextAccess(userRepo, "contextId"), configHandler.UpdateCORS)
+		admin.PUT("/configs/:contextId/domain", middleware.RequireContextAccess(userRepo, "contextId"), configHandler.UpdateDomain)
+		admin.PUT("/configs/:contextId/display", middleware.RequireContextAccess(userRepo, "contextId"), configHandler.UpdateDisplay)
 
 		// Global settings routes
 		settingsRepo := settingsrepo.New(pool)
@@ -134,16 +134,16 @@ func NewServer(
 		// Per-context settings routes
 		contextSettingsRepo := settingsrepo.NewContext(pool)
 		contextSettingsHandler := handler.NewContextSettingsHandler(contextSettingsRepo)
-		admin.GET("/contexts/:id/settings", contextSettingsHandler.List)
-		admin.PUT("/contexts/:id/settings", contextSettingsHandler.Upsert)
-		admin.DELETE("/contexts/:id/settings/:key", contextSettingsHandler.Delete)
+		admin.GET("/contexts/:id/settings", middleware.RequireContextAccess(userRepo, "id"), contextSettingsHandler.List)
+		admin.PUT("/contexts/:id/settings", middleware.RequireContextAccess(userRepo, "id"), contextSettingsHandler.Upsert)
+		admin.DELETE("/contexts/:id/settings/:key", middleware.RequireContextAccess(userRepo, "id"), contextSettingsHandler.Delete)
 
 		// Per-context email queue routes
 		emailQueueHandler := handler.NewEmailQueueHandler(queue.NewEmailQueue(pool))
-		admin.GET("/contexts/:id/email-queue", emailQueueHandler.List)
-		admin.POST("/contexts/:id/email-queue/:jobId/retry", emailQueueHandler.Retry)
-		admin.DELETE("/contexts/:id/email-queue/:jobId", emailQueueHandler.Cancel)
-		admin.POST("/contexts/:id/email-queue/test", emailQueueHandler.TestSend)
+		admin.GET("/contexts/:id/email-queue", middleware.RequireContextAccess(userRepo, "id"), emailQueueHandler.List)
+		admin.POST("/contexts/:id/email-queue/:jobId/retry", middleware.RequireContextAccess(userRepo, "id"), emailQueueHandler.Retry)
+		admin.DELETE("/contexts/:id/email-queue/:jobId", middleware.RequireContextAccess(userRepo, "id"), emailQueueHandler.Cancel)
+		admin.POST("/contexts/:id/email-queue/test", middleware.RequireContextAccess(userRepo, "id"), emailQueueHandler.TestSend)
 
 		// Tracking visitor routes
 		trackingRepo := trackingRepo.New(pool)
@@ -171,9 +171,9 @@ func NewServer(
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).PUT("/:id", emailHandler.Update)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).DELETE("/:id", emailHandler.Delete)
 	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).POST("/:id/test", emailHandler.TestSend)
-	admin.POST("/contexts/:id/email-templates/:tid/send", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), emailHandler.SendToContact)
-	admin.GET("/contexts/:id/inbox", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), emailHandler.ListInbox)
-	admin.POST("/contexts/:id/inbox/:mid/read", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), emailHandler.MarkInboxRead)
+	admin.POST("/contexts/:id/email-templates/:tid/send", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), middleware.RequireContextAccess(userRepo, "id"), emailHandler.SendToContact)
+	admin.GET("/contexts/:id/inbox", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), middleware.RequireContextAccess(userRepo, "id"), emailHandler.ListInbox)
+	admin.POST("/contexts/:id/inbox/:mid/read", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), middleware.RequireContextAccess(userRepo, "id"), emailHandler.MarkInboxRead)
 
 	// Tracking visitor admin routes (already above)
 
@@ -203,8 +203,10 @@ func NewServer(
 		c.Data(http.StatusOK, "text/markdown", []byte(mcpadapter.SkillMD))
 	})
 
-	// Context-resolved routes (forms, snippets, static assets)
-	api.Use(ContextResolver(contextRepo))
+	// Context-resolved routes (forms, snippets, static assets).
+	// RequireContextMembership runs after ContextResolver: it rejects requests
+	// whose resolved context the user is not a member of (tenant isolation).
+	api.Use(ContextResolver(contextRepo), middleware.RequireContextMembership(userRepo))
 	contextEmailGroup := api.Group("/context/:slug/email")
 	{
 		contextEmailGroup.POST("/send", emailHandler.Send)
@@ -262,8 +264,10 @@ func NewServer(
 
 	// API keys list/revoke (admin routes)
 	{
-		api.GET("/admin/api-keys", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), authHandler.ListAPIKeys)
-		api.DELETE("/admin/api-keys/:id", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), authHandler.RevokeAPIKey)
+		// No "id" param here: on /admin/api-keys/:id the :id is the API-key
+		// id, not a context id — only the X-Context-ID header is validated.
+		api.GET("/admin/api-keys", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), middleware.RequireContextAccess(userRepo), authHandler.ListAPIKeys)
+		api.DELETE("/admin/api-keys/:id", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), middleware.RequireContextAccess(userRepo), authHandler.RevokeAPIKey)
 	}
 
 	proxy.NewProxy(contextRepo, api)

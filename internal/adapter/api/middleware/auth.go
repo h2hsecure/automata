@@ -76,6 +76,10 @@ func AuthMiddleware(authService auth.AuthService) gin.HandlerFunc {
 		if err == nil {
 			c.Set("user_id", apiKey.UserID)
 			c.Set("context_id", apiKey.ContextID)
+			// API keys are pre-scoped to their own context; downstream
+			// membership checks must not re-validate (their user may have no
+			// membership rows, and the key's context is authoritative).
+			c.Set("auth_via_api_key", true)
 			c.Next()
 			return
 		}

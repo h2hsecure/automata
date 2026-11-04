@@ -51,10 +51,11 @@ func (r *inboxRepo) List(contextID string, limit int) ([]*email.InboxMessage, er
 	return msgs, nil
 }
 
-// MarkRead flags a message as read. Returns sql.ErrNoRows when no message is updated.
-func (r *inboxRepo) MarkRead(id string) error {
+// MarkRead flags a message as read, scoped to its context. Returns
+// sql.ErrNoRows when no message is updated (including cross-context calls).
+func (r *inboxRepo) MarkRead(id, contextID string) error {
 	res, err := r.pool.Exec(context.Background(),
-		`UPDATE email_inbox SET is_read = true WHERE id = $1`, id)
+		`UPDATE email_inbox SET is_read = true WHERE id = $1 AND context_id = $2`, id, contextID)
 	if err != nil {
 		return fmt.Errorf("mark inbox read: %w", err)
 	}
