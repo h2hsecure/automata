@@ -11,8 +11,8 @@ import (
 
 // ssrfFakeQueue implements WebhookQueue, recording MarkFailed calls.
 type ssrfFakeQueue struct {
-	failed   map[string]string
-	nextID   int
+	failed map[string]string
+	nextID int
 }
 
 func (q *ssrfFakeQueue) Enqueue(ctx context.Context, url string, payload map[string]interface{}, contextID, formID string) (string, error) {
@@ -20,7 +20,13 @@ func (q *ssrfFakeQueue) Enqueue(ctx context.Context, url string, payload map[str
 	return "id", nil
 }
 func (q *ssrfFakeQueue) GetPending(limit int) ([]*WebhookDelivery, error) { return nil, nil }
-func (q *ssrfFakeQueue) MarkSuccess(id string) error                    { return nil }
+func (q *ssrfFakeQueue) Claim(ctx context.Context, limit int) ([]*WebhookDelivery, error) {
+	return nil, nil
+}
+func (q *ssrfFakeQueue) ResetStaleProcessing(ctx context.Context, olderThan time.Time) (int64, error) {
+	return 0, nil
+}
+func (q *ssrfFakeQueue) MarkSuccess(id string) error { return nil }
 func (q *ssrfFakeQueue) MarkFailed(id string, err string) error {
 	q.failed[id] = err
 	return nil

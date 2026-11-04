@@ -20,10 +20,10 @@ type WebhookHTTPClient interface {
 
 // WebhookWorker is a background worker that processes webhook deliveries.
 type WebhookWorker struct {
-	queue    WebhookQueue
-	client   WebhookHTTPClient
+	queue        WebhookQueue
+	client       WebhookHTTPClient
 	pollInterval time.Duration
-	batchSize  int
+	batchSize    int
 }
 
 // NewWebhookWorkerWithInterval creates a worker with a custom poll interval.
@@ -66,9 +66,15 @@ func (w *WebhookWorker) Start(ctx context.Context) {
 }
 
 func (w *WebhookWorker) processBatch(ctx context.Context) error {
-	deliveries, err := w.queue.GetPending(w.batchSize)
+	// Reap deliveries stuck in 'processing' (e.g. by a worker that crashed
+	// mid-delivery) so they become claimable again.
+	if _, err := w.queue.ResetStaleProcessing(ctx, time.Now().Add(-5*time.Minute)); err != nil {
+		return fmt.Errorf("reap stale webhook deliveries: %w", err)
+	}
+
+	deliveries, err := w.queue.Claim(ctx, w.batchSize)
 	if err != nil {
-		return fmt.Errorf("get pending webhooks: %w", err)
+		return fmt.Errorf("claim webhooks: %w", err)
 	}
 
 	if len(deliveries) == 0 {

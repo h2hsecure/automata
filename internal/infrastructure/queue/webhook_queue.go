@@ -14,7 +14,7 @@ import (
 // WebhookDelivery represents a pending or completed webhook delivery.
 type WebhookDelivery struct {
 	ID         string
-	ContextID   string
+	ContextID  string
 	FormID     string
 	URL        string
 	Payload    map[string]interface{}
@@ -31,6 +31,8 @@ type WebhookDelivery struct {
 type WebhookQueue interface {
 	Enqueue(ctx context.Context, url string, payload map[string]interface{}, contextID, formID string) (string, error)
 	GetPending(limit int) ([]*WebhookDelivery, error)
+	Claim(ctx context.Context, limit int) ([]*WebhookDelivery, error)
+	ResetStaleProcessing(ctx context.Context, olderThan time.Time) (int64, error)
 	MarkSuccess(id string) error
 	MarkFailed(id string, err string) error
 	UpdateNextRetry(id string, nextRetry time.Time) error
@@ -116,6 +118,73 @@ func (q *webhookQueue) GetPending(limit int) ([]*WebhookDelivery, error) {
 	}
 
 	return deliveries, nil
+}
+
+// Claim atomically takes ownership of up to limit claimable deliveries: the
+// picked rows are locked and flipped to 'processing' in a single statement,
+// so two racing workers cannot claim the same row.
+func (q *webhookQueue) Claim(ctx context.Context, limit int) ([]*WebhookDelivery, error) {
+	query := `
+		WITH picked AS (
+			SELECT id FROM webhook_deliveries
+			WHERE status IN ('pending', 'retrying') AND next_retry <= NOW()
+			ORDER BY created_at
+			LIMIT $1
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE webhook_deliveries d
+		SET status = 'processing', updated_at = NOW()
+		FROM picked p WHERE d.id = p.id
+		RETURNING d.id, d.context_id, COALESCE(d.form_id::text, ''), d.url, d.payload,
+			d.status, d.attempts, d.max_retries, d.next_retry, d.error_msg,
+			d.created_at, d.updated_at
+	`
+
+	rows, err := q.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("claim webhooks: %w", err)
+	}
+	defer rows.Close()
+
+	var deliveries []*WebhookDelivery
+	for rows.Next() {
+		var d WebhookDelivery
+		var payloadBytes []byte
+
+		if err := rows.Scan(
+			&d.ID, &d.ContextID, &d.FormID, &d.URL,
+			&payloadBytes, &d.Status, &d.Attempts, &d.MaxRetries,
+			&d.NextRetry, &d.ErrorMsg, &d.CreatedAt, &d.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan claimed webhook: %w", err)
+		}
+		if err := json.Unmarshal(payloadBytes, &d.Payload); err != nil {
+			return nil, fmt.Errorf("unmarshal claimed webhook payload: %w", err)
+		}
+		deliveries = append(deliveries, &d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate claimed webhooks: %w", err)
+	}
+	return deliveries, nil
+}
+
+// ResetStaleProcessing returns deliveries stuck in 'processing' (e.g. by a
+// worker that crashed mid-delivery) to 'retrying' so they become claimable
+// again. It returns the number of rows reset.
+func (q *webhookQueue) ResetStaleProcessing(ctx context.Context, olderThan time.Time) (int64, error) {
+	tag, err := q.pool.Exec(ctx, `
+		UPDATE webhook_deliveries
+		SET status = 'retrying', updated_at = NOW()
+		WHERE status = 'processing' AND updated_at < $1
+	`, olderThan)
+	if err != nil {
+		return 0, fmt.Errorf("reset stale webhook deliveries: %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		log.Warn().Int64("reset", tag.RowsAffected()).Msg("reset stale webhook deliveries")
+	}
+	return tag.RowsAffected(), nil
 }
 
 // MarkSuccess marks a webhook delivery as successfully delivered.

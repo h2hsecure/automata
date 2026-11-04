@@ -43,6 +43,12 @@ func (q *fakeQueue) Enqueue(job *queue.EmailJob) error {
 	return nil
 }
 func (q *fakeQueue) StartWorker(ctx context.Context, m queue.Mailer) {}
+func (q *fakeQueue) Claim(ctx context.Context, limit int) ([]*queue.EmailJob, error) {
+	return nil, nil
+}
+func (q *fakeQueue) ResetStaleProcessing(ctx context.Context, olderThan time.Time) (int64, error) {
+	return 0, nil
+}
 func (q *fakeQueue) ListPending(c string, limit int) ([]*queue.EmailJob, error)          { return nil, nil }
 func (q *fakeQueue) ListHistory(c, s string, limit int) ([]*queue.EmailHistory, error)   { return nil, nil }
 func (q *fakeQueue) Retry(c, jobID string) error                                          { return nil }

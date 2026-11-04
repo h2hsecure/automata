@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS email_jobs (
 
 CREATE INDEX IF NOT EXISTS idx_email_jobs_status ON email_jobs(next_retry);
 
+-- Task 14 (security fixes): atomic claims need an explicit state and a
+-- timestamp to reap jobs stuck in 'processing' after a worker crash.
+ALTER TABLE email_jobs ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE email_jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 CREATE TABLE IF NOT EXISTS email_history (
     id            UUID PRIMARY KEY,
     context_id    UUID NOT NULL,

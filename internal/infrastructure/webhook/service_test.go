@@ -61,6 +61,14 @@ func (f *fakeQueue) Enqueue(_ context.Context, url string, payload map[string]in
 
 func (f *fakeQueue) GetPending(limit int) ([]*queue.WebhookDelivery, error) { return nil, nil }
 
+func (f *fakeQueue) Claim(ctx context.Context, limit int) ([]*queue.WebhookDelivery, error) {
+	return nil, nil
+}
+
+func (f *fakeQueue) ResetStaleProcessing(ctx context.Context, olderThan time.Time) (int64, error) {
+	return 0, nil
+}
+
 func (f *fakeQueue) MarkSuccess(id string) error { return nil }
 
 func (f *fakeQueue) MarkFailed(id string, err string) error { return nil }

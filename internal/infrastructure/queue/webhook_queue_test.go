@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -89,6 +90,126 @@ func TestWebhookQueue_EnqueueWithoutFormID(t *testing.T) {
 	}
 	if d.Payload["test"] != true {
 		t.Errorf("Payload = %v", d.Payload)
+	}
+}
+
+// TestWebhookQueue_ClaimConcurrentSingleWinner proves the claim is atomic:
+// two workers racing for one pending row must yield exactly one winner.
+func TestWebhookQueue_ClaimConcurrentSingleWinner(t *testing.T) {
+	pool, cleanup := startTestPostgres(t)
+	defer cleanup()
+
+	q := queue.NewWebhookQueue(pool)
+	ctx := context.Background()
+
+	if _, err := q.Enqueue(ctx, "https://example.com/hook", map[string]interface{}{"a": 1}, uuid.New().String(), ""); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	results := make(chan []string, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			deliveries, err := q.Claim(ctx, 10)
+			if err != nil {
+				t.Errorf("Claim: %v", err)
+				return
+			}
+			ids := make([]string, len(deliveries))
+			for i, d := range deliveries {
+				ids[i] = d.ID
+			}
+			results <- ids
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	total := 0
+	for ids := range results {
+		total += len(ids)
+	}
+	if total != 1 {
+		t.Fatalf("concurrent claims returned %d deliveries, want exactly 1", total)
+	}
+}
+
+func TestWebhookQueue_ClaimMarksProcessingAndSecondClaimEmpty(t *testing.T) {
+	pool, cleanup := startTestPostgres(t)
+	defer cleanup()
+
+	q := queue.NewWebhookQueue(pool)
+	ctx := context.Background()
+
+	id, err := q.Enqueue(ctx, "https://example.com/hook", map[string]interface{}{"a": 1}, uuid.New().String(), "")
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	deliveries, err := q.Claim(ctx, 10)
+	if err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+	if len(deliveries) != 1 || deliveries[0].ID != id {
+		t.Fatalf("claimed = %d deliveries, want 1 for %s", len(deliveries), id)
+	}
+	if deliveries[0].Status != "processing" {
+		t.Errorf("claimed status = %q, want processing", deliveries[0].Status)
+	}
+
+	second, err := q.Claim(ctx, 10)
+	if err != nil {
+		t.Fatalf("second Claim: %v", err)
+	}
+	if len(second) != 0 {
+		t.Fatalf("second claim = %d deliveries, want 0 (row is processing)", len(second))
+	}
+}
+
+func TestWebhookQueue_ResetStaleProcessing(t *testing.T) {
+	pool, cleanup := startTestPostgres(t)
+	defer cleanup()
+
+	q := queue.NewWebhookQueue(pool)
+	ctx := context.Background()
+
+	id, err := q.Enqueue(ctx, "https://example.com/hook", map[string]interface{}{"a": 1}, uuid.New().String(), "")
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	// Simulate a crashed worker: row stuck in processing with an old stamp.
+	if _, err := pool.Exec(ctx, `
+		UPDATE webhook_deliveries
+		SET status = 'processing', updated_at = NOW() - interval '10 minutes'
+		WHERE id = $1
+	`, id); err != nil {
+		t.Fatalf("force stale processing: %v", err)
+	}
+
+	// Fresh processing rows must not be reset.
+	if _, err := q.Enqueue(ctx, "https://example.com/hook2", map[string]interface{}{}, uuid.New().String(), ""); err != nil {
+		t.Fatalf("Enqueue 2: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE webhook_deliveries SET status = 'processing' WHERE url = 'https://example.com/hook2'`); err != nil {
+		t.Fatalf("force fresh processing: %v", err)
+	}
+
+	reset, err := q.ResetStaleProcessing(ctx, time.Now().Add(-5*time.Minute))
+	if err != nil {
+		t.Fatalf("ResetStaleProcessing: %v", err)
+	}
+	if reset != 1 {
+		t.Fatalf("reset = %d, want 1 (only the stale row)", reset)
+	}
+
+	var status string
+	if err := pool.QueryRow(ctx, `SELECT status FROM webhook_deliveries WHERE id = $1`, id).Scan(&status); err != nil {
+		t.Fatalf("scan status: %v", err)
+	}
+	if status != "retrying" {
+		t.Errorf("stale row status = %q, want retrying", status)
 	}
 }
 

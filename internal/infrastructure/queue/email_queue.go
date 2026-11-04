@@ -56,6 +56,8 @@ type EmailHistory struct {
 type Queue interface {
 	Enqueue(job *EmailJob) error
 	StartWorker(ctx context.Context, mailer Mailer)
+	Claim(ctx context.Context, limit int) ([]*EmailJob, error)
+	ResetStaleProcessing(ctx context.Context, olderThan time.Time) (int64, error)
 	ListPending(contextID string, limit int) ([]*EmailJob, error)
 	ListHistory(contextID string, status string, limit int) ([]*EmailHistory, error)
 	Retry(contextID, jobID string) error
@@ -107,6 +109,86 @@ func (q *emailQueue) Enqueue(job *EmailJob) error {
 
 	log.Info().Str("id", job.ID).Strs("to", job.To).Msg("email job enqueued")
 	return nil
+}
+
+// Claim atomically takes ownership of up to limit claimable jobs: rows are
+// locked and flipped to 'processing' in a single statement, so two racing
+// workers cannot claim the same job. The per-context starvation guard
+// (at most 3 jobs per context per batch) is preserved.
+func (q *emailQueue) Claim(ctx context.Context, limit int) ([]*EmailJob, error) {
+	query := `
+		WITH candidates AS (
+			SELECT id
+			FROM (
+				SELECT id, created_at, ROW_NUMBER() OVER (PARTITION BY context_id ORDER BY created_at) AS rn
+				FROM email_jobs
+				WHERE status = 'pending' AND next_retry <= NOW() AND attempts < max_retries
+			) t
+			WHERE rn <= 3
+			ORDER BY created_at
+			LIMIT $1
+		),
+		picked AS (
+			SELECT e.id
+			FROM email_jobs e
+			JOIN candidates c ON c.id = e.id
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE email_jobs e
+		SET status = 'processing', updated_at = NOW()
+		FROM picked p WHERE e.id = p.id
+		RETURNING e.id, e.context_id, e.to_addresses, e.subject, e.body, e.html_body,
+			e.attempts, e.max_retries, e.next_retry, e.created_at
+	`
+
+	rows, err := q.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("claim email jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*EmailJob
+	for rows.Next() {
+		job := &EmailJob{}
+		var toAddresses pgtype.Array[string]
+		var htmlBody pgtype.Text
+		var nextRetry pgtype.Timestamptz
+		if err := rows.Scan(&job.ID, &job.ContextID, &toAddresses, &job.Subject, &job.Body, &htmlBody, &job.Attempts, &job.MaxRetries, &nextRetry, &job.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan claimed job: %w", err)
+		}
+		if toAddresses.Valid {
+			job.To = toAddresses.Elements
+		} else {
+			job.To = []string{}
+		}
+		job.HTMLBody = htmlBody.String
+		if nextRetry.Valid {
+			job.NextRetry = nextRetry.Time
+		}
+		jobs = append(jobs, job)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate claimed jobs: %w", err)
+	}
+	return jobs, nil
+}
+
+// ResetStaleProcessing returns jobs stuck in 'processing' (e.g. by a worker
+// that crashed mid-send) to 'pending' so they become claimable again. It
+// returns the number of rows reset.
+func (q *emailQueue) ResetStaleProcessing(ctx context.Context, olderThan time.Time) (int64, error) {
+	tag, err := q.pool.Exec(ctx, `
+		UPDATE email_jobs
+		SET status = 'pending', updated_at = NOW()
+		WHERE status = 'processing' AND updated_at < $1
+	`, olderThan)
+	if err != nil {
+		return 0, fmt.Errorf("reset stale email jobs: %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		log.Warn().Int64("reset", tag.RowsAffected()).Msg("reset stale email jobs")
+	}
+	return tag.RowsAffected(), nil
 }
 
 // ListPending returns pending jobs for a context, newest first.
@@ -273,7 +355,7 @@ func (q *emailQueue) PruneHistory(olderThan time.Time) (int64, error) {
 func (q *emailQueue) CountPending(contextID string) (int, error) {
 	var count int
 	err := q.pool.QueryRow(context.Background(),
-		`SELECT COUNT(*) FROM email_jobs WHERE context_id = $1 AND attempts < max_retries`, contextID,
+		`SELECT COUNT(*) FROM email_jobs WHERE context_id = $1 AND status = 'pending' AND attempts < max_retries`, contextID,
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count pending jobs: %w", err)
