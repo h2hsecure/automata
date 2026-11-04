@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,9 +15,18 @@ type fakeContactRepo struct {
 	contacts   []*ct.Contact
 	activities []ct.Activity
 	updates    int
+	// createErr, when non-nil, makes Create fail without inserting (used
+	// to simulate the unique-index race on hidden contact creation).
+	createErr error
+	// findNilOnce makes the first FindBySourceID call return nil (a row
+	// landing between the read and the insert), so the next call finds it.
+	findNilOnce bool
 }
 
 func (f *fakeContactRepo) Create(c *ct.Contact) error {
+	if f.createErr != nil {
+		return f.createErr
+	}
 	f.contacts = append(f.contacts, c)
 	return nil
 }
@@ -69,6 +79,10 @@ func (f *fakeContactRepo) CountDistinctContactsByActivity(contextID, activityTyp
 }
 
 func (f *fakeContactRepo) FindBySourceID(contextID, source, sourceID string) (*ct.Contact, error) {
+	if f.findNilOnce {
+		f.findNilOnce = false
+		return nil, nil
+	}
 	for _, c := range f.contacts {
 		if c.ContextID == contextID && c.Source == source && c.SourceID == sourceID {
 			return c, nil
@@ -152,6 +166,31 @@ func TestTrackEvent_HiddenContactAndActivity(t *testing.T) {
 	}
 	if len(cr.activities) != 2 {
 		t.Errorf("activities after 2nd call = %d, want 2", len(cr.activities))
+	}
+}
+
+func TestTrackEvent_HiddenContactCreateConflict(t *testing.T) {
+	// Simulate the unique-index race: a competitor inserted the hidden
+	// contact between our lookup and our insert. The first FindBySourceID
+	// misses (findNilOnce), Create hits the unique index (23505), and the
+	// re-read must find the competitor's row so the activity lands on it.
+	cr := &fakeContactRepo{
+		contacts: []*ct.Contact{{
+			ID: "winner-id", ContextID: "ctx-1", Source: "visitor", SourceID: "vid-race", Hidden: true,
+		}},
+		createErr:   fmt.Errorf("duplicate key value violates unique constraint \"idx_contacts_visitor_unique\" (23505)"),
+		findNilOnce: true,
+	}
+	tr := &fakeDashRepo{}
+
+	if err := TrackEvent(cr, nil, tr, "ctx-1", newPageViewEvent("vid-race")); err != nil {
+		t.Fatalf("TrackEvent: %v", err)
+	}
+	if len(cr.activities) != 1 {
+		t.Fatalf("activities = %d, want 1 (activity must be created on the winner contact)", len(cr.activities))
+	}
+	if a := cr.activities[0]; a.ContactID != "winner-id" {
+		t.Errorf("activity contact = %q, want winner-id", a.ContactID)
 	}
 }
 

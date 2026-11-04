@@ -95,3 +95,78 @@ CREATE TABLE IF NOT EXISTS contact_cookie_mappings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cookie_contact ON contact_cookie_mappings(contact_id);
+
+-- Deduplicate visitor contacts (spec 5.1): historical races could create
+-- several hidden contacts for the same (context_id, source_id). Keep the
+-- oldest, reattach every dependent row to it, delete the rest, and add a
+-- partial unique index so duplicates cannot reappear. Idempotent: once the
+-- index exists there are no duplicates left, so every statement below is a
+-- no-op on re-runs.
+WITH dups AS (
+    SELECT id AS dup_id,
+           FIRST_VALUE(id) OVER (
+               PARTITION BY context_id, source_id
+               ORDER BY created_at, id) AS keep_id
+    FROM contacts
+    WHERE source = 'visitor' AND source_id IS NOT NULL
+)
+UPDATE contact_activities SET contact_id = d.keep_id
+FROM dups d
+WHERE contact_activities.contact_id = d.dup_id AND d.dup_id <> d.keep_id;
+
+WITH dups AS (
+    SELECT id AS dup_id,
+           FIRST_VALUE(id) OVER (
+               PARTITION BY context_id, source_id
+               ORDER BY created_at, id) AS keep_id
+    FROM contacts
+    WHERE source = 'visitor' AND source_id IS NOT NULL
+)
+UPDATE contact_tag_memberships SET contact_id = d.keep_id
+FROM dups d
+WHERE contact_tag_memberships.contact_id = d.dup_id AND d.dup_id <> d.keep_id;
+
+WITH dups AS (
+    SELECT id AS dup_id,
+           FIRST_VALUE(id) OVER (
+               PARTITION BY context_id, source_id
+               ORDER BY created_at, id) AS keep_id
+    FROM contacts
+    WHERE source = 'visitor' AND source_id IS NOT NULL
+)
+UPDATE contact_cookie_mappings SET contact_id = d.keep_id
+FROM dups d
+WHERE contact_cookie_mappings.contact_id = d.dup_id AND d.dup_id <> d.keep_id;
+
+-- Guarded: tracking_visitors is owned by the tracking package's migration,
+-- which may not have run yet (migration order differs per binary).
+DO $$
+BEGIN
+    IF to_regclass('tracking_visitors') IS NOT NULL THEN
+        WITH dups AS (
+            SELECT id AS dup_id,
+                   FIRST_VALUE(id) OVER (
+                       PARTITION BY context_id, source_id
+                       ORDER BY created_at, id) AS keep_id
+            FROM contacts
+            WHERE source = 'visitor' AND source_id IS NOT NULL
+        )
+        UPDATE tracking_visitors SET contact_id = d.keep_id::text
+        FROM dups d
+        WHERE tracking_visitors.contact_id = d.dup_id::text AND d.dup_id <> d.keep_id;
+    END IF;
+END $$;
+
+WITH keep AS (
+    SELECT DISTINCT ON (context_id, source_id) id
+    FROM contacts
+    WHERE source = 'visitor' AND source_id IS NOT NULL
+    ORDER BY context_id, source_id, created_at, id
+)
+DELETE FROM contacts c
+WHERE c.source = 'visitor' AND c.source_id IS NOT NULL
+  AND c.id NOT IN (SELECT id FROM keep);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_visitor_unique
+    ON contacts(context_id, source_id)
+    WHERE source = 'visitor' AND source_id IS NOT NULL;

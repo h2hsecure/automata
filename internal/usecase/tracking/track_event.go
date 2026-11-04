@@ -91,8 +91,18 @@ func trackPageVisit(contactRepo ct.Repository, geoLookup geodomain.Lookup, conte
 		}
 		applyGeo(contact, geoLookup, event.IP)
 		if err := contactRepo.Create(contact); err != nil {
-			log.Warn().Err(err).Str("visitor_id", event.VisitorID).Msg("track event: create hidden contact")
-			return
+			// Unique-index race: a concurrent request inserted the hidden
+			// contact between our lookup and insert. Re-read the winner and
+			// continue with it; if it vanished, log and stop.
+			if winner, findErr := contactRepo.FindBySourceID(contextID, "visitor", event.VisitorID); findErr != nil {
+				log.Warn().Err(findErr).Str("visitor_id", event.VisitorID).Msg("track event: re-find visitor contact after create conflict")
+				return
+			} else if winner == nil {
+				log.Warn().Err(err).Str("visitor_id", event.VisitorID).Msg("track event: create hidden contact conflict, contact missing on re-read")
+				return
+			} else {
+				contact = winner
+			}
 		}
 	} else if changed := refreshClientInfo(contact, geoLookup, event); changed {
 		if err := contactRepo.Update(contact); err != nil {
