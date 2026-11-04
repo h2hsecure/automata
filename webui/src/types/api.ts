@@ -1,5 +1,7 @@
 export interface LoginResponse {
-  token: string;
+  // token is stripped by the BFF (stored in the HttpOnly session cookie),
+  // so it is absent from the body the SPA receives.
+  token?: string;
   user_id: string;
   email: string;
   is_admin: boolean;

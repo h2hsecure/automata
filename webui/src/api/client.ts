@@ -32,17 +32,9 @@ const client: AxiosInstance = axios.create({
   },
 })
 
-// Token refresh interceptor
-client.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.set('Authorization', `Bearer ${token}`)
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
+// No Authorization header is sent from the browser: the BFF injects the
+// session JWT server-side. The HttpOnly cookie travels with the request
+// automatically (SameSite=Lax, same-origin).
 
 // Context interceptor: send the selected context ID with every request.
 client.interceptors.request.use(
@@ -60,8 +52,8 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      // Session cookie is missing/invalid: full reload so the router
+      // guard re-verifies and lands on the login page.
       window.location.href = '/login'
     }
     return Promise.reject(error)

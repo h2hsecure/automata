@@ -94,9 +94,6 @@ func main() {
 	// Admin bootstrap
 	bootstrap.Run(dbPool, userRepo)
 
-	// Initialize services
-	authService := auth.NewService(userRepo)
-
 	// Create session manager
 	sessionManager := webui_cookie.New(cookieSecret)
 
@@ -112,7 +109,7 @@ func main() {
 	frontendHandler := webui_handler.NewFrontendHandler(webDir)
 
 	// Auth handler
-	authHandler := webui_handler.NewAuthHandler(authService, userRepo, sessionManager)
+	authHandler := webui_handler.NewAuthHandler(sessionManager)
 
 	// Proxy handler
 	proxyHandler := webui_handler.NewProxyHandler(apiBackendURL, sessionManager)
@@ -120,7 +117,6 @@ func main() {
 	// Register routes
 	r.GET("/", frontendHandler.HandleIndex)
 	r.GET("/login", frontendHandler.HandleLogin)
-	r.POST("/login", authHandler.HandleLoginPost)
 	r.POST("/logout", authHandler.HandleLogout)
 	r.GET("/dashboard", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/")

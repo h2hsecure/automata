@@ -100,47 +100,30 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  const token = localStorage.getItem('token')
+  const { useAuthStore } = await import('@/stores/auth')
+  const authStore = useAuthStore()
 
-  if (to.meta.requiresAuth && !token) {
+  // Cookie-only auth: the session lives in an HttpOnly cookie the browser
+  // can't read, so verify it against the API once before guarding.
+  if (!authStore.sessionChecked) {
+    await authStore.restoreSession()
+  }
+
+  const authed = authStore.isAuthenticated
+  if (to.meta.requiresAuth && !authed) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
     return
   }
-  if (to.meta.guest && token) {
+  if (to.meta.guest && authed) {
     next({ name: 'Dashboard' })
     return
   }
 
   // Onboarding: an authenticated user with no contexts must create a first
   // context before reaching any app route.
-  if (token && to.meta.requiresAuth && to.name !== 'Onboarding') {
-    try {
-      const { useAuthStore } = await import('@/stores/auth')
-      const authStore = useAuthStore()
-      if (authStore.user) {
-        // Store already initialized in this session (SPA navigation).
-        if (authStore.contexts.length === 0) {
-          next({ name: 'Onboarding' })
-          return
-        }
-      } else {
-        // Fresh page load: verify against the API before the layout's init().
-        const { listContexts } = await import('@/api/client')
-        const list = await listContexts()
-        if (list.length === 0) {
-          next({ name: 'Onboarding' })
-          return
-        }
-        authStore.contexts = list.map((c) => ({ id: c.ID, slug: c.Slug, name: c.Name }))
-        localStorage.setItem('contexts', JSON.stringify(authStore.contexts))
-        if (!authStore.contexts.some((c) => c.id === authStore.currentContextId)) {
-          authStore.currentContextId = list[0].ID
-          localStorage.setItem('context_id', list[0].ID)
-        }
-      }
-    } catch {
-      // API unreachable: fall through to normal navigation.
-    }
+  if (authed && to.meta.requiresAuth && to.name !== 'Onboarding' && authStore.contexts.length === 0) {
+    next({ name: 'Onboarding' })
+    return
   }
 
   next()

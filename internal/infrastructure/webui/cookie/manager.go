@@ -19,7 +19,11 @@ type SessionData struct {
 	IsAdmin     bool   `json:"is_admin"`
 	ContextID   string `json:"context_id,omitempty"`
 	ContextName string `json:"context_name,omitempty"`
-	Token       string `json:"token"`
+	// Token is the API JWT the BFF injects as the Bearer credential on
+	// outbound requests (the client never sees it).
+	Token string `json:"token"`
+	// RefreshToken is the opaque refresh token used to rotate the JWT.
+	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
 // Manager handles encryption and decryption of session cookies.

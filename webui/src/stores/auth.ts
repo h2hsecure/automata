@@ -10,50 +10,55 @@ interface Context {
 }
 
 interface AuthState {
-  token: string | null
   user: User | null
   contexts: Context[]
   currentContextId: string
 }
 
+// Cookie-only auth: the API JWT lives in an HttpOnly session cookie managed
+// by the BFF, never in the browser. The SPA cannot read the cookie, so it
+// verifies the session by calling getMe() and tracks that with sessionChecked.
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('token'))
   const user = ref<User | null>(null)
   const contexts = ref<Context[]>([])
   const currentContextId = ref(localStorage.getItem('context_id') || '')
   const loading = ref(false)
   const error = ref<string | null>(null)
   const theme = ref(localStorage.getItem('theme') || 'light')
+  // True once the session has been verified (or found invalid) this session.
+  const sessionChecked = ref(false)
 
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.is_admin ?? false)
   const currentContext = computed(() => contexts.value.find((c) => c.id === currentContextId.value) || null)
+
+  function applyContexts(list: Context[]) {
+    contexts.value = list
+    localStorage.setItem('contexts', JSON.stringify(list))
+    if (!list.some((c) => c.id === currentContextId.value)) {
+      currentContextId.value = list.length > 0 ? list[0].id : ''
+      localStorage.setItem('context_id', currentContextId.value)
+    }
+  }
 
   async function login(email: string, password: string) {
     loading.value = true
     error.value = null
     try {
-      const response = await loginApi(email, password)
-      token.value = response.token
-      localStorage.setItem('token', response.token)
+      // The BFF intercepts this response, stores the JWT in the session
+      // cookie, and strips it from the body — `response.token` is absent.
+      const response: LoginResponse = await loginApi(email, password)
 
-      if (response.user_id) {
-        user.value = {
-          id: response.user_id,
-          email: response.email,
-          is_admin: response.is_admin || false,
-        }
+      user.value = {
+        id: response.user_id,
+        email: response.email,
+        is_admin: response.is_admin || false,
+        created_at: '',
       }
-
       if (response.contexts && response.contexts.length > 0) {
-        contexts.value = response.contexts
-        localStorage.setItem('contexts', JSON.stringify(response.contexts))
-        if (!currentContextId.value) {
-          currentContextId.value = response.contexts[0].id
-          localStorage.setItem('context_id', response.contexts[0].id)
-        }
+        applyContexts(response.contexts)
       }
-
+      sessionChecked.value = true
       return true
     } catch (e: any) {
       error.value = e.response?.data?.error || 'Login failed. Please check your credentials.'
@@ -65,41 +70,51 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      if (token.value) await logoutApi()
+      await logoutApi()
     } catch {
       // Ignore logout errors
     } finally {
-      token.value = null
       user.value = null
       contexts.value = []
       currentContextId.value = ''
-      localStorage.removeItem('token')
+      sessionChecked.value = true
       localStorage.removeItem('context_id')
-      localStorage.removeItem('user')
       localStorage.removeItem('contexts')
     }
   }
 
-  async function init() {
-    if (!token.value) return
+  // restoreSession verifies the cookie-backed session against the API and
+  // populates user + contexts. Idempotent: runs at most once per session.
+  async function restoreSession() {
+    if (sessionChecked.value) return
     try {
-      user.value = await getMe()
+      const me = await getMe()
+      user.value = {
+        id: me.id,
+        email: me.email,
+        is_admin: me.is_admin,
+        created_at: me.created_at,
+      }
       await loadContexts()
     } catch {
-      await logout()
+      user.value = null
+      contexts.value = []
+    } finally {
+      sessionChecked.value = true
     }
+  }
+
+  // init is kept for the AppLayout onMounted hook; it just restores the
+  // session (no-op if already checked by the router guard).
+  async function init() {
+    await restoreSession()
   }
 
   async function loadContexts() {
     try {
       const list = await listContexts()
       if (list.length > 0) {
-        contexts.value = list.map((c) => ({ id: c.ID, slug: c.Slug, name: c.Name }))
-        localStorage.setItem('contexts', JSON.stringify(contexts.value))
-        if (!contexts.value.some((c) => c.id === currentContextId.value)) {
-          currentContextId.value = contexts.value[0].id
-          localStorage.setItem('context_id', currentContextId.value)
-        }
+        applyContexts(list.map((c) => ({ id: c.ID, slug: c.Slug, name: c.Name })))
         return
       }
     } catch {
@@ -122,19 +137,20 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    token,
     user,
     contexts,
     currentContextId,
     loading,
     error,
     theme,
+    sessionChecked,
     isAuthenticated,
     isAdmin,
     currentContext,
     login,
     logout,
     init,
+    restoreSession,
     loadContexts,
     switchContext,
   }
