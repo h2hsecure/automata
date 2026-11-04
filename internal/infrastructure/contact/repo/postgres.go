@@ -841,42 +841,22 @@ type repoTagRepo struct {
 }
 
 // ApplyTags ensures tags exist and assigns them to a contact.
-// Activity creation is handled by the usecase layer.
+// The replace runs in a single transaction so a failure mid-replace cannot
+// leave the contact with a partially applied tag set. Activity creation is
+// handled by the usecase layer.
 func (t *repoTagRepo) ApplyTags(contextID, contactID string, tagNames []string, _ uc.ActivityCloser) error {
 	ctx := context.Background()
 
-	// Delete existing memberships
-	_, err := t.pool.Exec(ctx, "DELETE FROM contact_tag_memberships WHERE contact_id = $1", contactID)
+	tx, err := t.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("delete memberships: %w", err)
+		return fmt.Errorf("begin transaction: %w", err)
 	}
+	defer tx.Rollback(ctx)
 
-	// Ensure tags exist and collect IDs
-	tagIDs := make([]string, 0, len(tagNames))
-	for _, name := range tagNames {
-		tagID, err := ensureTag(ctx, t.pool, contextID, name)
-		if err != nil {
-			return fmt.Errorf("ensure tag %q: %w", name, err)
-		}
-		tagIDs = append(tagIDs, tagID)
+	if _, err := uc.ReplaceMemberships(ctx, tx, contextID, contactID, tagNames); err != nil {
+		return err
 	}
-
-	// Add memberships
-	if len(tagIDs) > 0 {
-		query := `
-			INSERT INTO contact_tag_memberships (contact_id, tag_id)
-			VALUES ($1, $2)
-			ON CONFLICT (contact_id, tag_id) DO NOTHING
-		`
-		for _, tagID := range tagIDs {
-			_, err := t.pool.Exec(ctx, query, contactID, tagID)
-			if err != nil {
-				return fmt.Errorf("add membership: %w", err)
-			}
-		}
-	}
-
-	return nil
+	return tx.Commit(ctx)
 }
 
 // ListTags returns all tags in the context, ordered by name.
@@ -951,34 +931,4 @@ func (t *repoTagRepo) DeleteTag(contextID, tagID string) error {
 	return nil
 }
 
-// ensureTag ensures a tag exists for the context, creating it if necessary.
-func ensureTag(ctx context.Context, pool *pgxpool.Pool, contextID, name string) (string, error) {
-	var tagID string
-	query := "SELECT id FROM contact_tags WHERE context_id = $1 AND name = $2"
-	err := pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
-	if err == nil {
-		return tagID, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("query tag: %w", err)
-	}
 
-	tagID = uuid.New().String()
-	color := "#6366f1"
-	_, err = pool.Exec(ctx,
-		"INSERT INTO contact_tags (id, context_id, name, color) VALUES ($1, $2, $3, $4)",
-		tagID, contextID, name, color,
-	)
-	if err != nil {
-		if strings.Contains(err.Error(), "23505") {
-			err = pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
-			if err != nil {
-				return "", fmt.Errorf("find tag after race: %w", err)
-			}
-			return tagID, nil
-		}
-		return "", fmt.Errorf("create tag: %w", err)
-	}
-
-	return tagID, nil
-}

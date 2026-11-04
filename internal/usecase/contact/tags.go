@@ -10,8 +10,18 @@ import (
 
 	"github.com/google/uuid"
 	ct "github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// DBConn is the slice of *pgxpool.Pool / pgx.Tx used by the tag helpers so
+// they can run inside a caller-provided transaction.
+type DBConn interface {
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, arguments ...interface{}) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, arguments ...interface{}) pgx.Row
+}
 
 // Repository is the interface for contact data persistence used by usecases.
 type Repository interface {
@@ -62,44 +72,31 @@ func newTagRepo(pool *pgxpool.Pool) *tagRepo {
 func (t *tagRepo) ApplyTags(contextID, contactID string, tagNames []string, ac ActivityCloser) error {
 	ctx := context.Background()
 
-	// Get current tag names for this contact
-	currentTags, err := getCurrentTagNames(ctx, t.pool, contactID)
+	// The membership replace runs in a single transaction so a failure
+	// mid-replace cannot leave the contact with a partially applied tag set.
+	tx, err := t.pool.Begin(ctx)
 	if err != nil {
-		_ = fmt.Errorf("get current tags: %w", err)
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Get current tag names for this contact
+	currentTags, err := getCurrentTagNames(ctx, tx, contactID)
+	if err != nil {
+		currentTags = nil
 		// Continue anyway — we can still apply new tags
 	}
 
-	// Delete existing memberships
-	_, err = t.pool.Exec(ctx, "DELETE FROM contact_tag_memberships WHERE contact_id = $1", contactID)
+	tagNamesMap, err := ReplaceMemberships(ctx, tx, contextID, contactID, tagNames)
 	if err != nil {
-		return fmt.Errorf("delete memberships: %w", err)
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit tag replacement: %w", err)
 	}
 
-	// Ensure tags exist and collect IDs
-	tagIDs := make([]string, 0, len(tagNames))
-	tagNamesMap := make(map[string]string) // name -> id
-	for _, name := range tagNames {
-		tagID, err := ensureTag(ctx, t.pool, contextID, name)
-		if err != nil {
-			return fmt.Errorf("ensure tag %q: %w", name, err)
-		}
-		tagIDs = append(tagIDs, tagID)
-		tagNamesMap[name] = tagID
-	}
-
-	// Add memberships
-	if len(tagIDs) > 0 {
-		query := `
-			INSERT INTO contact_tag_memberships (contact_id, tag_id)
-			VALUES ($1, $2)
-			ON CONFLICT (contact_id, tag_id) DO NOTHING
-		`
-		for _, tagID := range tagIDs {
-			_, err := t.pool.Exec(ctx, query, contactID, tagID); if err != nil {
-				return fmt.Errorf("add membership: %w", err)
-			}
-		}
-	}
+	// Activities are written after the commit so a failed replace never
+	// leaves behind misleading activity records.
 
 	// Create tag activities if we have an activity closer
 	if ac != nil {
@@ -150,15 +147,54 @@ func (t *tagRepo) ApplyTags(contextID, contactID string, tagNames []string, ac A
 	return nil
 }
 
+// ReplaceMemberships deletes the contact's existing tag memberships and
+// inserts the new ones, creating the referenced tags if necessary. All
+// steps run on the given connection so callers can wrap the whole replace
+// in a transaction. Returns a name -> tag ID map.
+func ReplaceMemberships(ctx context.Context, conn DBConn, contextID, contactID string, tagNames []string) (map[string]string, error) {
+	// Delete existing memberships
+	if _, err := conn.Exec(ctx, "DELETE FROM contact_tag_memberships WHERE contact_id = $1", contactID); err != nil {
+		return nil, fmt.Errorf("delete memberships: %w", err)
+	}
+
+	// Ensure tags exist and collect IDs
+	tagIDs := make([]string, 0, len(tagNames))
+	tagNamesMap := make(map[string]string) // name -> id
+	for _, name := range tagNames {
+		tagID, err := ensureTag(ctx, conn, contextID, name)
+		if err != nil {
+			return nil, fmt.Errorf("ensure tag %q: %w", name, err)
+		}
+		tagIDs = append(tagIDs, tagID)
+		tagNamesMap[name] = tagID
+	}
+
+	// Add memberships
+	if len(tagIDs) > 0 {
+		query := `
+			INSERT INTO contact_tag_memberships (contact_id, tag_id)
+			VALUES ($1, $2)
+			ON CONFLICT (contact_id, tag_id) DO NOTHING
+		`
+		for _, tagID := range tagIDs {
+			if _, err := conn.Exec(ctx, query, contactID, tagID); err != nil {
+				return nil, fmt.Errorf("add membership: %w", err)
+			}
+		}
+	}
+
+	return tagNamesMap, nil
+}
+
 // getCurrentTagNames retrieves the tag names for a contact.
-func getCurrentTagNames(ctx context.Context, pool *pgxpool.Pool, contactID string) ([]string, error) {
+func getCurrentTagNames(ctx context.Context, conn DBConn, contactID string) ([]string, error) {
 	query := `
 		SELECT t.name FROM contact_tag_memberships tm
 		JOIN contact_tags t ON tm.tag_id = t.id
 		WHERE tm.contact_id = $1
 		ORDER BY t.name
 	`
-	rows, err := pool.Query(ctx, query, contactID)
+	rows, err := conn.Query(ctx, query, contactID)
 	if err != nil {
 		return nil, err
 	}
@@ -176,10 +212,10 @@ func getCurrentTagNames(ctx context.Context, pool *pgxpool.Pool, contactID strin
 }
 
 // ensureTag ensures a tag exists for the context, creating it if necessary.
-func ensureTag(ctx context.Context, pool *pgxpool.Pool, contextID, name string) (string, error) {
+func ensureTag(ctx context.Context, conn DBConn, contextID, name string) (string, error) {
 	var tagID string
 	query := "SELECT id FROM contact_tags WHERE context_id = $1 AND name = $2"
-	err := pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
+	err := conn.QueryRow(ctx, query, contextID, name).Scan(&tagID)
 	if err == nil {
 		return tagID, nil
 	}
@@ -189,13 +225,13 @@ func ensureTag(ctx context.Context, pool *pgxpool.Pool, contextID, name string) 
 
 	tagID = uuid.New().String()
 	color := "#6366f1"
-	_, err = pool.Exec(ctx,
+	_, err = conn.Exec(ctx,
 		"INSERT INTO contact_tags (id, context_id, name, color) VALUES ($1, $2, $3, $4)",
 		tagID, contextID, name, color,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
-			err = pool.QueryRow(ctx, query, contextID, name).Scan(&tagID)
+			err = conn.QueryRow(ctx, query, contextID, name).Scan(&tagID)
 			if err != nil {
 				return "", fmt.Errorf("find tag after race: %w", err)
 			}
