@@ -59,6 +59,19 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 		}
 	}
 
+	// Capture previous values before any mutation, for the activity log.
+	prevEmail := ""
+	if existing.Email != nil {
+		prevEmail = *existing.Email
+	}
+	prevValues := map[string]interface{}{
+		"email":      prevEmail,
+		"first_name": existing.FirstName,
+		"last_name":  existing.LastName,
+		"phone":      existing.Phone,
+		"company":    existing.Company,
+	}
+
 	// Compute changed fields before update
 	var changedFields []string
 	if input.Email != nil && (existing.Email == nil || *existing.Email != *input.Email) {
@@ -80,13 +93,25 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 		changedFields = append(changedFields, "custom_fields")
 	}
 
-	// Update contact fields
-	existing.Email = input.Email
-	existing.FirstName = input.FirstName
-	existing.LastName = input.LastName
-	existing.Phone = input.Phone
-	existing.Company = input.Company
-	existing.CustomFields = input.CustomFields
+	// Update contact fields (partial merge: only apply provided fields)
+	if input.Email != nil {
+		existing.Email = input.Email
+	}
+	if input.FirstName != "" {
+		existing.FirstName = input.FirstName
+	}
+	if input.LastName != "" {
+		existing.LastName = input.LastName
+	}
+	if input.Phone != "" {
+		existing.Phone = input.Phone
+	}
+	if input.Company != "" {
+		existing.Company = input.Company
+	}
+	if input.CustomFields != nil {
+		existing.CustomFields = input.CustomFields
+	}
 
 	if err := existing.Validate(); err != nil {
 		return nil, fmt.Errorf("validate contact: %w", err)
@@ -96,28 +121,21 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 		return nil, fmt.Errorf("update contact: %w", err)
 	}
 
-	// Create activity if fields changed
+	// Create activity if fields changed (prevValues captured before mutation)
 	if len(changedFields) > 0 {
 		now := time.Now().Format(time.RFC3339)
-		prevValues := map[string]interface{}{
-			"email":         existing.Email,
-			"first_name":    input.FirstName,
-			"last_name":     input.LastName,
-			"phone":         input.Phone,
-			"company":       input.Company,
-		}
 		if err := repo.CreateActivity(&contact.Activity{
 			ID:        uuid.New().String(),
 			ContactID: id,
 			ContextID: contextID,
 			Type:      contact.ActivityContactUpdated,
 			Data: map[string]interface{}{
-				"changed_fields": changedFields,
-				"updated_at":     now,
-				"previous_values": prevValues,
+				"changed_fields":    changedFields,
+				"updated_at":        now,
+				"previous_values":   prevValues,
 			},
 		}); err != nil {
-			_ = fmt.Errorf("create activity: %w", err)
+			return nil, fmt.Errorf("create activity: %w", err)
 		}
 	}
 

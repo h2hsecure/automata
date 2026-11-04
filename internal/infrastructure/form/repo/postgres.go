@@ -180,13 +180,29 @@ func (r *repo) Update(f *form.Form) error {
 
 func (r *repo) Delete(id string) error {
 	ctx := context.Background()
-	query := `DELETE FROM forms WHERE id = $1`
-	result, err := r.pool.Exec(ctx, query, id)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+
+	// Cascade: remove submissions first, then the form, atomically.
+	if _, err := tx.Exec(ctx, `DELETE FROM form_submissions WHERE form_id = $1`, id); err != nil {
+		_ = tx.Rollback(ctx)
+		return fmt.Errorf("delete submissions: %w", err)
+	}
+
+	result, err := tx.Exec(ctx, `DELETE FROM forms WHERE id = $1`, id)
+	if err != nil {
+		_ = tx.Rollback(ctx)
 		return fmt.Errorf("delete form: %w", err)
 	}
 	if result.RowsAffected() == 0 {
+		_ = tx.Rollback(ctx)
 		return fmt.Errorf("form not found: %w", sql.ErrNoRows)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
 	}
 	return nil
 }

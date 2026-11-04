@@ -6,11 +6,10 @@ build:
 cicd-tests:
 	go test ./cicd/... -count=1 -timeout 120s
 
-# CI variant: skips two known pre-existing failures so the pipeline
-# is red only for regressions.
+# CI variant: runs the full cicd suite (previously-skipped known failures
+# were fixed, so no skips are needed).
 cicd-tests-ci:
-	go test ./cicd/... -count=1 -timeout 120s -args \
-		-ginkgo.skip="should create a contact via POST /api/contacts|should track multiple events in batch"
+	go test ./cicd/... -count=1 -timeout 120s
 
 cicd-tests-verbose:
 	go test ./cicd/... -count=1 -timeout 120s -v -ginkgo.v

@@ -115,7 +115,9 @@ var _ = Describe("Tracking Server Integration Tests", func() {
 			req.Header.Set("X-Context-ID", tenantID)
 			engine.ServeHTTP(w, req)
 
-			Expect(w.Code).To(Equal(http.StatusNoContent))
+			// Batch tracking returns 200 with accepted/rejected counts.
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Body.String()).To(ContainSubstring(`"accepted":2`))
 		})
 	})
 

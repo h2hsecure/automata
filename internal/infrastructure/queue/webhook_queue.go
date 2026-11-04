@@ -61,8 +61,14 @@ func (q *webhookQueue) Enqueue(ctx context.Context, url string, payload map[stri
 		VALUES ($1, $2, $3, $4, $5, 'pending', 0, 3, NOW(), NOW(), NOW())
 	`
 
+	// form_id is nullable: deliveries without a form (e.g. webhooks_test) bind NULL.
+	var formIDParam interface{}
+	if formID != "" {
+		formIDParam = formID
+	}
+
 	_, err = q.pool.Exec(ctx, query,
-		id, contextID, formID, url, payloadBytes,
+		id, contextID, formIDParam, url, payloadBytes,
 	)
 	if err != nil {
 		return "", fmt.Errorf("enqueue webhook: %w", err)
@@ -75,7 +81,7 @@ func (q *webhookQueue) Enqueue(ctx context.Context, url string, payload map[stri
 // GetPending retrieves pending webhook deliveries ready for processing.
 func (q *webhookQueue) GetPending(limit int) ([]*WebhookDelivery, error) {
 	query := `
-		SELECT id, context_id, form_id, url, payload, status, attempts, max_retries, next_retry, error_msg, created_at, updated_at
+		SELECT id, context_id, COALESCE(form_id::text, ''), url, payload, status, attempts, max_retries, next_retry, error_msg, created_at, updated_at
 		FROM webhook_deliveries
 		WHERE status IN ('pending', 'retrying') AND next_retry <= NOW()
 		ORDER BY created_at ASC

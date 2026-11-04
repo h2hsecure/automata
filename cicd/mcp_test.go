@@ -487,7 +487,7 @@ var _ = Describe("MCP forms tools", func() {
 
 	It("forms_update then forms_delete", func() {
 		slug := "mcp-form-" + support.NewTestUUID()
-		formID, _ := createForm(apiKey, slug)
+		formID, gotSlug := createForm(apiKey, slug)
 
 		w := mcpTool(engine, apiKey, 2, "forms_update", map[string]any{
 			"form_id": formID,
@@ -499,12 +499,26 @@ var _ = Describe("MCP forms tools", func() {
 		Expect(w.Code).To(Equal(http.StatusOK))
 		Expect(mcpToolText(w)).To(ContainSubstring("Renamed Form"))
 
-		w = mcpTool(engine, apiKey, 3, "forms_delete", map[string]any{"form_id": formID})
+		// Submit to the form so the delete must cascade over submissions
+		// (previously failed with an FK violation, 23503).
+		w = mcpTool(engine, apiKey, 3, "forms_submit", map[string]any{
+			"form_id":    gotSlug,
+			"data":       map[string]any{"email": "sub-" + support.NewTestUUID() + "@example.com"},
+			"visitor_id": "visitor-mcp-" + support.NewTestUUID(),
+		})
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		w = mcpTool(engine, apiKey, 4, "forms_delete", map[string]any{"form_id": formID})
 		Expect(w.Code).To(Equal(http.StatusOK))
 		Expect(mcpToolText(w)).To(ContainSubstring(`"deleted":true`))
 
-		_, text := mcpToolResult(mcpTool(engine, apiKey, 4, "forms_get", map[string]any{"form_id": slug}))
+		_, text := mcpToolResult(mcpTool(engine, apiKey, 5, "forms_get", map[string]any{"form_id": slug}))
 		Expect(text).NotTo(ContainSubstring(slug))
+
+		// Submissions must be gone with the form (cascade).
+		var subCount int
+		Expect(pool.QueryRow(ctx, `SELECT COUNT(*) FROM form_submissions WHERE form_id = $1`, formID).Scan(&subCount)).To(Succeed())
+		Expect(subCount).To(BeZero())
 	})
 
 	It("forms_submit then form_submissions_list", func() {
@@ -880,13 +894,12 @@ var _ = Describe("MCP webhook tools", func() {
 		Expect(json.Unmarshal([]byte(mcpToolText(w)), &out)).To(Succeed())
 
 		w = mcpTool(engine, apiKey, 2, "webhooks_test", map[string]any{"webhook_id": out.ID})
-		// Delivery to a dead URL may fail, but the call must be a JSON-RPC
-		// result (success text or isError), never a 500.
+		// The enqueue must succeed (empty form_id binds NULL); delivery to a
+		// dead URL happens later in the worker and does not fail the call.
 		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
 		isErr, text := mcpToolResult(w)
-		if !isErr {
-			Expect(text).To(ContainSubstring(`"message"`))
-		}
+		Expect(isErr).To(BeFalse(), "body: %s", w.Body.String())
+		Expect(text).To(ContainSubstring(`"message"`))
 	})
 })
 
