@@ -6,6 +6,21 @@ import (
 	"fmt"
 )
 
+// sanitizeCSVCell neutralizes CSV formula injection: values that begin with a
+// character spreadsheet applications treat as a formula (or a tab/CR control
+// char) are prefixed with a single quote so they are stored as plain text.
+// Empty and plain values are returned unchanged.
+func sanitizeCSVCell(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + s
+	}
+	return s
+}
+
 // Generate creates a CSV byte slice from a list of contacts.
 //
 // contacts is a slice of maps, each representing a contact with string keys
@@ -32,7 +47,7 @@ func Generate(contacts []map[string]interface{}, fields []string) ([]byte, error
 		row := make([]string, len(fields))
 		for i, field := range fields {
 			if val, ok := contact[field]; ok {
-				row[i] = fmt.Sprintf("%v", val)
+				row[i] = sanitizeCSVCell(fmt.Sprintf("%v", val))
 			} else {
 				row[i] = ""
 			}
