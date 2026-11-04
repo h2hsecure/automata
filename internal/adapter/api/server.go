@@ -83,7 +83,7 @@ func NewServer(
 	api.POST("/auth/logout-all", middleware.AuthMiddleware(authService), authHandler.LogoutAll)
 
 	admin := api.Group("/admin")
-	admin.Use(middleware.AuthMiddleware(authService))
+	admin.Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo))
 	{
 		contextHandler := handler.NewContextHandler(contextRepo, userRepo)
 		userHandler := handler.NewUserHandler(userRepo, contextRepo)
@@ -165,15 +165,15 @@ func NewServer(
 	trackingRepo := trackingRepo.New(pool)
 	pageRepo := pageRepo.New(pool)
 
-	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("", emailHandler.List)
-	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("", emailHandler.Create)
-	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).GET("/:id", emailHandler.Get)
-	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).PUT("/:id", emailHandler.Update)
-	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).DELETE("/:id", emailHandler.Delete)
-	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService)).POST("/:id/test", emailHandler.TestSend)
-	admin.POST("/contexts/:id/email-templates/:tid/send", middleware.AuthMiddleware(authService), emailHandler.SendToContact)
-	admin.GET("/contexts/:id/inbox", middleware.AuthMiddleware(authService), emailHandler.ListInbox)
-	admin.POST("/contexts/:id/inbox/:mid/read", middleware.AuthMiddleware(authService), emailHandler.MarkInboxRead)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).GET("", emailHandler.List)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).POST("", emailHandler.Create)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).GET("/:id", emailHandler.Get)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).PUT("/:id", emailHandler.Update)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).DELETE("/:id", emailHandler.Delete)
+	admin.Group("/email-templates").Use(middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo)).POST("/:id/test", emailHandler.TestSend)
+	admin.POST("/contexts/:id/email-templates/:tid/send", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), emailHandler.SendToContact)
+	admin.GET("/contexts/:id/inbox", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), emailHandler.ListInbox)
+	admin.POST("/contexts/:id/inbox/:mid/read", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), emailHandler.MarkInboxRead)
 
 	// Tracking visitor admin routes (already above)
 
@@ -262,8 +262,8 @@ func NewServer(
 
 	// API keys list/revoke (admin routes)
 	{
-		api.GET("/admin/api-keys", middleware.AuthMiddleware(authService), authHandler.ListAPIKeys)
-		api.DELETE("/admin/api-keys/:id", middleware.AuthMiddleware(authService), authHandler.RevokeAPIKey)
+		api.GET("/admin/api-keys", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), authHandler.ListAPIKeys)
+		api.DELETE("/admin/api-keys/:id", middleware.AuthMiddleware(authService), middleware.RequireAdmin(userRepo), authHandler.RevokeAPIKey)
 	}
 
 	proxy.NewProxy(contextRepo, api)

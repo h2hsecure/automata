@@ -19,16 +19,18 @@ func NewUserHandler(userRepo context.UserRepository, contextRepo context.Reposit
 	return &UserHandler{userRepo: userRepo, contextRepo: contextRepo}
 }
 
+// CreateUserRequest deliberately has no is_admin field: admin status is
+// granted out-of-band (bootstrap) and cannot be set through the API.
 type CreateUserRequest struct {
-	Email   string `json:"email" binding:"required,email"`
+	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
-	IsAdmin bool   `json:"is_admin"`
 }
 
+// UpdateUserRequest deliberately has no is_admin field: the admin flag
+// cannot be changed through the API.
 type UpdateUserRequest struct {
 	Email    *string `json:"email"`
 	Password *string `json:"password"`
-	IsAdmin  *bool   `json:"is_admin"`
 }
 
 type userDTO struct {
@@ -80,7 +82,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 	u := &context.User{
 		Email:        req.Email,
 		PasswordHash: string(hash),
-		IsAdmin:      req.IsAdmin,
+		// IsAdmin intentionally false: the body field no longer exists.
 	}
 	if err := h.userRepo.Create(u); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -135,9 +137,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		}
 		u.PasswordHash = string(hash)
 	}
-	if req.IsAdmin != nil {
-		u.IsAdmin = *req.IsAdmin
-	}
+	// IsAdmin is never modified here: it is not part of the request body.
 	if err := h.userRepo.Update(u); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
