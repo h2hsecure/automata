@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	stdcontext "context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -59,14 +60,17 @@ func (f *fakeAuthService) LogoutAllSessions(userID string) error { return nil }
 
 // fakeApiKeyRepo implements auth_repo.ApiKeyRepository for handler tests.
 type fakeApiKeyRepo struct {
-	createErr error
-	keys      map[string]*auth.APIKey
-	deleted   map[string]int
+	createErr     error
+	keys          map[string]*auth.APIKey
+	deleted       map[string]int
+	listedContext string
+	listedKeys    []*auth.APIKey
 }
 
 func (f *fakeApiKeyRepo) Create(key *auth.APIKey) error { return f.createErr }
 func (f *fakeApiKeyRepo) ListByContext(contextID string) ([]*auth.APIKey, error) {
-	return nil, nil
+	f.listedContext = contextID
+	return f.listedKeys, nil
 }
 func (f *fakeApiKeyRepo) ListAll() ([]*auth.APIKey, error) { return nil, nil }
 func (f *fakeApiKeyRepo) Delete(id string) error {
@@ -208,5 +212,178 @@ func TestRevokeAPIKeyOtherContextReturnsNotFound(t *testing.T) {
 	}
 	if repo.deleted[keyID] != 0 {
 		t.Fatalf("expected Delete not to be called for a foreign-context key, got %d", repo.deleted[keyID])
+	}
+}
+
+// fakeUserRepo implements context.UserRepository for handler tests. Only
+// GetByID is exercised by the API key handlers; the rest are stubs.
+type fakeUserRepo struct {
+	user *context.User
+}
+
+func (f *fakeUserRepo) Create(u *context.User) error { return nil }
+func (f *fakeUserRepo) GetByID(id string) (*context.User, error) {
+	return f.user, nil
+}
+func (f *fakeUserRepo) GetByEmail(contextID, email string) (*context.User, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeUserRepo) GetByEmailGlobal(email string) ([]*context.User, error) {
+	return nil, nil
+}
+func (f *fakeUserRepo) GetByUsername(email string) (*context.User, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeUserRepo) ExistsAnyUser() (bool, error) { return false, nil }
+func (f *fakeUserRepo) ListAll() ([]*context.User, error) { return nil, nil }
+func (f *fakeUserRepo) Update(u *context.User) error { return nil }
+func (f *fakeUserRepo) Delete(id string) error { return nil }
+func (f *fakeUserRepo) UpdateProfile(userID string, displayName, avatarURL *string) error {
+	return nil
+}
+func (f *fakeUserRepo) ChangePassword(userID, passwordHash string) error { return nil }
+func (f *fakeUserRepo) GetPasswordChangedAt(userID string) (time.Time, error) {
+	return time.Time{}, nil
+}
+func (f *fakeUserRepo) UpdatePasswordChangedAt(userID string) error { return nil }
+func (f *fakeUserRepo) GetByUserIDContext(ctx stdcontext.Context, userID, contextID string) (*context.UserContext, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeUserRepo) ListByUser(userID string) ([]context.UserContext, error) {
+	return nil, nil
+}
+func (f *fakeUserRepo) CreateMembership(uc *context.UserContext) error { return nil }
+func (f *fakeUserRepo) UpdateMembership(uc *context.UserContext) error { return nil }
+func (f *fakeUserRepo) DeleteMembership(userID, contextID string) error { return nil }
+func (f *fakeUserRepo) ListMembers(contextID string) ([]context.UserContext, error) {
+	return nil, nil
+}
+
+// fakeContextRepo implements context.Repository for handler tests. Only
+// GetByUserEmail is exercised by the API key handlers; the rest are stubs.
+type fakeContextRepo struct {
+	contextsByUserEmail []*context.Context
+}
+
+func (f *fakeContextRepo) Create(c *context.Context) error { return nil }
+func (f *fakeContextRepo) GetByID(id string) (*context.Context, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeContextRepo) GetBySlug(slug string) (*context.Context, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeContextRepo) List(offset, limit int) ([]*context.Context, error) {
+	return nil, nil
+}
+func (f *fakeContextRepo) Update(c *context.Context) error { return nil }
+func (f *fakeContextRepo) Delete(id string) error { return nil }
+func (f *fakeContextRepo) GetByUserEmail(email string) ([]*context.Context, error) {
+	return f.contextsByUserEmail, nil
+}
+func (f *fakeContextRepo) GetDefaultContext() (*context.Context, error) {
+	return nil, errors.New("not implemented")
+}
+
+// newJWTStyleTestRouter emulates the auth middleware for a
+// JWT-authenticated WebUI request on an /admin route: user_id is set,
+// context_id is NOT (ContextResolver skips /admin paths), and the selected
+// context arrives in the X-Context-ID header — exactly like the real server.
+func newJWTStyleTestRouter(userRepo context.UserRepository, ctxRepo context.Repository, repo *fakeApiKeyRepo) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	h := NewAuthHandler(&fakeAuthService{}, userRepo, ctxRepo, repo, nil)
+	r := gin.New()
+	r.GET("/admin/api-keys", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.ListAPIKeys(c)
+	})
+	r.DELETE("/admin/api-keys/:id", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.RevokeAPIKey(c)
+	})
+	return r
+}
+
+// Regression: the WebUI sends the selected context in X-Context-ID, and
+// CreateAPIKey stores new keys in that context. ListAPIKeys must target the
+// same context — not the user's first context — or freshly created keys are
+// invisible in the list.
+func TestListAPIKeysUsesHeaderContext(t *testing.T) {
+	keyID := "55555555-5555-5555-5555-555555555555"
+	repo := &fakeApiKeyRepo{
+		listedKeys: []*auth.APIKey{
+			{ID: keyID, ContextID: "ctx-selected", Name: "Selected Context Key", KeyHash: "hashedkey"},
+		},
+	}
+	userRepo := &fakeUserRepo{user: &context.User{ID: "user-1", Email: "a@example.com"}}
+	ctxRepo := &fakeContextRepo{contextsByUserEmail: []*context.Context{{ID: "ctx-oldest"}}}
+	r := newJWTStyleTestRouter(userRepo, ctxRepo, repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin/api-keys", nil)
+	req.Header.Set("X-Context-ID", "ctx-selected")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if repo.listedContext != "ctx-selected" {
+		t.Fatalf("expected ListByContext to be called with ctx-selected, got %q", repo.listedContext)
+	}
+
+	var resp struct {
+		Keys []map[string]any `json:"keys"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON body: %v", err)
+	}
+	if len(resp.Keys) != 1 {
+		t.Fatalf("expected 1 key in response, got %d", len(resp.Keys))
+	}
+}
+
+// Regression: a key created in the selected context (via X-Context-ID) must
+// be revokable from the same WebUI session — the handler previously fell back
+// to the user's first context and returned 404 for such keys.
+func TestRevokeAPIKeyUsesHeaderContext(t *testing.T) {
+	keyID := "66666666-6666-6666-6666-666666666666"
+	repo := &fakeApiKeyRepo{
+		keys: map[string]*auth.APIKey{
+			keyID: {ID: keyID, ContextID: "ctx-selected", Name: "Selected Context Key"},
+		},
+	}
+	userRepo := &fakeUserRepo{user: &context.User{ID: "user-1", Email: "a@example.com"}}
+	ctxRepo := &fakeContextRepo{contextsByUserEmail: []*context.Context{{ID: "ctx-oldest"}}}
+	r := newJWTStyleTestRouter(userRepo, ctxRepo, repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/admin/api-keys/"+keyID, nil)
+	req.Header.Set("X-Context-ID", "ctx-selected")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if repo.deleted[keyID] != 1 {
+		t.Fatalf("expected Delete to be called once for %s, got %d", keyID, repo.deleted[keyID])
+	}
+}
+
+// Without the header, list/delete keep the legacy fallback to the user's
+// first context.
+func TestListAPIKeysFallsBackToFirstContextWithoutHeader(t *testing.T) {
+	repo := &fakeApiKeyRepo{}
+	userRepo := &fakeUserRepo{user: &context.User{ID: "user-1", Email: "a@example.com"}}
+	ctxRepo := &fakeContextRepo{contextsByUserEmail: []*context.Context{{ID: "ctx-oldest"}, {ID: "ctx-newer"}}}
+	r := newJWTStyleTestRouter(userRepo, ctxRepo, repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin/api-keys", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if repo.listedContext != "ctx-oldest" {
+		t.Fatalf("expected ListByContext to fall back to ctx-oldest, got %q", repo.listedContext)
 	}
 }

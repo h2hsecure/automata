@@ -407,33 +407,54 @@ func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "all sessions terminated"})
 }
 
+// apiError carries a resolved HTTP status and message for a failed context
+// resolution, so the caller can emit the correct response.
+type apiError struct {
+	status  int
+	message string
+}
+
+// resolveAPIKeyContext determines the context an API-key operation should
+// target. Priority:
+//  1. context_id set in the gin context by the auth middleware (API-key
+//     authenticated requests, non-admin routes).
+//  2. the X-Context-ID header — sent by the WebUI on every request and used
+//     by CreateAPIKey, so list/revoke must target the same context.
+//  3. the user's first (oldest) context, as a legacy fallback for API clients
+//     that do not send the header.
+func (h *AuthHandler) resolveAPIKeyContext(c *gin.Context) (string, *apiError) {
+	if contextID := c.GetString("context_id"); contextID != "" {
+		return contextID, nil
+	}
+	if contextID := c.GetHeader("X-Context-ID"); contextID != "" {
+		return contextID, nil
+	}
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		return "", &apiError{http.StatusUnauthorized, "not authenticated"}
+	}
+	user, err := h.userRepo.GetByID(userID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("get user failed")
+		return "", &apiError{http.StatusInternalServerError, "internal server error"}
+	}
+	if user == nil {
+		return "", &apiError{http.StatusUnauthorized, "user not found"}
+	}
+	contexts, err := h.contextRepo.GetByUserEmail(user.Email)
+	if err != nil || len(contexts) == 0 {
+		return "", &apiError{http.StatusUnauthorized, "no context available"}
+	}
+	return contexts[0].ID, nil
+}
+
 // ListAPIKeys returns all API keys for the current context.
 func (h *AuthHandler) ListAPIKeys(c *gin.Context) {
-	contextID := c.GetString("context_id")
-	if contextID == "" {
-		// Try to resolve from user's first context
-		userID := c.GetString("user_id")
-		if userID == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
-			return
-		}
-		user, err := h.userRepo.GetByID(userID)
-		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Msg("get user failed")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-			return
-		}
-		if user == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
-			return
-		}
-		// Get user's first context
-		contexts, err := h.contextRepo.GetByUserEmail(user.Email)
-		if err != nil || len(contexts) == 0 {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "no context available"})
-			return
-		}
-		contextID = contexts[0].ID
+	contextID, apiErr := h.resolveAPIKeyContext(c)
+	if apiErr != nil {
+		c.JSON(apiErr.status, gin.H{"error": apiErr.message})
+		return
 	}
 
 	keys, err := h.apiKeyRepo.ListByContext(contextID)
@@ -464,30 +485,10 @@ func (h *AuthHandler) RevokeAPIKey(c *gin.Context) {
 		return
 	}
 
-	// Resolve context
-	contextID := c.GetString("context_id")
-	if contextID == "" {
-		userID := c.GetString("user_id")
-		if userID == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
-			return
-		}
-		user, err := h.userRepo.GetByID(userID)
-		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Msg("get user failed")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-			return
-		}
-		if user == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
-			return
-		}
-		contexts, err := h.contextRepo.GetByUserEmail(user.Email)
-		if err != nil || len(contexts) == 0 {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "no context available"})
-			return
-		}
-		contextID = contexts[0].ID
+	contextID, apiErr := h.resolveAPIKeyContext(c)
+	if apiErr != nil {
+		c.JSON(apiErr.status, gin.H{"error": apiErr.message})
+		return
 	}
 
 	// Resolve key by ID, scoped to this context (the webui passes the key ID
