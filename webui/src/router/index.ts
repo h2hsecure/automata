@@ -119,6 +119,13 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
+  // Admin routes: only a user verified as admin (DB-backed is_admin from
+  // /api/auth/me) may enter; everyone else lands on the dashboard.
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next({ path: '/dashboard' })
+    return
+  }
+
   // Onboarding: an authenticated user with no contexts must create a first
   // context before reaching any app route.
   if (authed && to.meta.requiresAuth && to.name !== 'Onboarding' && authStore.contexts.length === 0) {
