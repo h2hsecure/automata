@@ -67,8 +67,9 @@ func ImportContacts(repo Repository, contextID string, input ImportCSVInput) (*c
 				}
 				// Contact not found, proceed with creation
 			} else {
-				// Duplicate found, skip
-				result.Updated++
+				// Duplicate found: the import never updates existing
+				// contacts, so count the row as skipped, not updated.
+				result.Skipped++
 				_ = existing
 				continue
 			}

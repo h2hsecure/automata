@@ -29,9 +29,13 @@ func GetDashboard(repo tracking.Repository, contextID string, opts GetDashboardO
 		opts.TopN = 10
 	}
 
+	// Default each bound independently so a provided value is never
+	// clobbered by the missing one.
 	now := time.Now()
-	if opts.Start.IsZero() || opts.End.IsZero() {
+	if opts.Start.IsZero() {
 		opts.Start = now.AddDate(0, 0, -30)
+	}
+	if opts.End.IsZero() {
 		opts.End = now
 	}
 

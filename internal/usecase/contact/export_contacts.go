@@ -7,6 +7,10 @@ import (
 	"github.com/h2hsecure/automata/pkg/export"
 )
 
+// exportPageLimit bounds the memory of a single export page; pagination
+// continues until the repository returns a short page.
+const exportPageLimit = 1000
+
 // ExportContacts retrieves contacts for a context, converts them to CSV,
 // and returns the CSV bytes.
 func ExportContacts(repo Repository, contextID string, filters contact.FilterOptions, fields []string) ([]byte, error) {
@@ -16,12 +20,30 @@ func ExportContacts(repo Repository, contextID string, filters contact.FilterOpt
 	if len(fields) == 0 {
 		return nil, fmt.Errorf("at least one field is required for export")
 	}
+	return exportContactsPages(repo, contextID, filters, fields, exportPageLimit)
+}
 
-	// Fetch all contacts (no pagination — export everything)
+// exportContactsPages lists contacts in pages of pageSize and exports
+// every row. Pagination continues until a short page is returned, so
+// exports never silently cap at the first page.
+func exportContactsPages(repo Repository, contextID string, filters contact.FilterOptions, fields []string, pageSize int) ([]byte, error) {
+	if pageSize <= 0 {
+		pageSize = exportPageLimit
+	}
+
 	filters.ContextID = contextID
-	contacts, err := repo.List(0, 100000, filters)
-	if err != nil {
-		return nil, fmt.Errorf("list contacts: %w", err)
+	var contacts []*contact.Contact
+	offset := 0
+	for {
+		page, err := repo.List(offset, pageSize, filters)
+		if err != nil {
+			return nil, fmt.Errorf("list contacts: %w", err)
+		}
+		contacts = append(contacts, page...)
+		if len(page) < pageSize {
+			break
+		}
+		offset += len(page)
 	}
 
 	if len(contacts) == 0 {

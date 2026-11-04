@@ -188,7 +188,9 @@ func registerContactTools(s *mcp.Server, d Deps, contextID string) {
 			Phone:        in.Phone,
 			Company:      in.Company,
 			CustomFields: in.CustomFields,
-			Tags:         in.Tags,
+			// Pointer preserves JSON semantics: absent -> nil (untouched),
+			// [] -> empty (clear), values -> replace.
+			Tags: &in.Tags,
 		})
 		if err != nil {
 			return nil, contact.Contact{}, err

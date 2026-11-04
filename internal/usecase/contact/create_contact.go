@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	ct "github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/rs/zerolog/log"
 )
 
 // CreateInput holds the input parameters for creating a contact.
@@ -26,6 +27,12 @@ type CreateInput struct {
 func CreateContact(repo Repository, contextID string, input CreateInput) (*ct.Contact, error) {
 	if contextID == "" {
 		return nil, fmt.Errorf("context_id is required")
+	}
+
+	// Normalize an empty email string to nil so callers that always send
+	// the field don't accidentally create contacts with Email = "".
+	if input.Email != nil && *input.Email == "" {
+		input.Email = nil
 	}
 
 	// Validate email format if provided
@@ -70,6 +77,13 @@ func CreateContact(repo Repository, contextID string, input CreateInput) (*ct.Co
 	}
 
 	if err := repo.Create(c); err != nil {
+		// A 23505 unique-violation means a concurrent create won the race;
+		// re-read and return the winner instead of surfacing a DB error.
+		if c.Email != nil && strings.Contains(err.Error(), "23505") {
+			if existing, findErr := repo.FindByEmail(contextID, *c.Email); findErr == nil {
+				return existing, nil
+			}
+		}
 		return nil, fmt.Errorf("create contact: %w", err)
 	}
 
@@ -86,7 +100,7 @@ func CreateContact(repo Repository, contextID string, input CreateInput) (*ct.Co
 		},
 	}); err != nil {
 		// Non-fatal: log but don't fail the operation
-		_ = fmt.Errorf("create activity: %w", err)
+		log.Error().Err(err).Str("contact_id", id).Msg("create contact activity")
 	}
 
 	// Apply tags if provided

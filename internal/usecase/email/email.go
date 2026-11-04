@@ -144,6 +144,12 @@ func (u *EmailUsecase) SendEmail(contextID string, req email.SendEmailRequest) (
 
 // TestSend renders a template with the given variables and enqueues a test delivery.
 func (u *EmailUsecase) TestSend(contextID string, req email.TestSendRequest) (jobID, renderedSubject, preview string, err error) {
+	// Validate the recipient up front: an empty or malformed address
+	// must not enqueue a job that is guaranteed to bounce.
+	if !cd.IsValidEmail(req.To) {
+		return "", "", "", fmt.Errorf("invalid recipient address: %s", req.To)
+	}
+
 	// Render template
 	subject, body, _, err := u.RenderTemplate(contextID, req.Template, toInterfaceVars(req.Variables))
 	if err != nil {

@@ -52,6 +52,13 @@ func (c *Contact) IsVerified() bool {
 	return c.Email != nil && *c.Email != ""
 }
 
+// IsValidEmail reports whether email is a syntactically valid address.
+// It is exported so other use cases (e.g. email test sends) can validate
+// recipients without duplicating the domain rules.
+func IsValidEmail(email string) bool {
+	return isValidEmail(email)
+}
+
 func isValidEmail(email string) bool {
 	if len(email) == 0 || len(email) > 254 {
 		return false

@@ -8,19 +8,31 @@ import (
 	ct "github.com/h2hsecure/automata/internal/domain/contact"
 )
 
-// fakeRepo implements Repository for update usecase tests.
+// fakeRepo implements Repository for usecase tests.
 type fakeRepo struct {
 	existing        *ct.Contact
+	contacts        map[string]*ct.Contact
 	updated         *ct.Contact
 	activities      []*ct.Activity
+	createErr       error
+	updateErr       error
+	createActivityErr error
 	findByEmailFunc func(contextID, email string) (*ct.Contact, error)
+	listFunc        func(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact, error)
+	tagRepo         TagRepository
 }
 
 var _ Repository = (*fakeRepo)(nil)
 
-func (f *fakeRepo) Create(c *ct.Contact) error { return nil }
+func (f *fakeRepo) Create(c *ct.Contact) error { return f.createErr }
 
 func (f *fakeRepo) GetByID(id string) (*ct.Contact, error) {
+	if f.contacts != nil {
+		if c, ok := f.contacts[id]; ok {
+			return c, nil
+		}
+		return nil, errors.New("contact not found")
+	}
 	if f.existing == nil || f.existing.ID != id {
 		return nil, errors.New("contact not found")
 	}
@@ -28,12 +40,15 @@ func (f *fakeRepo) GetByID(id string) (*ct.Contact, error) {
 }
 
 func (f *fakeRepo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact, error) {
+	if f.listFunc != nil {
+		return f.listFunc(offset, limit, filters)
+	}
 	return nil, nil
 }
 
 func (f *fakeRepo) Update(c *ct.Contact) error {
 	f.updated = c
-	return nil
+	return f.updateErr
 }
 
 func (f *fakeRepo) Delete(id string) error { return nil }
@@ -48,9 +63,32 @@ func (f *fakeRepo) FindByEmail(contextID, email string) (*ct.Contact, error) {
 func (f *fakeRepo) Merge(keepID, mergeIntoID string) error { return nil }
 
 func (f *fakeRepo) CreateActivity(a *ct.Activity) error {
+	if f.createActivityErr != nil {
+		return f.createActivityErr
+	}
 	f.activities = append(f.activities, a)
 	return nil
 }
+
+// TagRepository exposes the fake tag repository, letting applyTags's
+// tagOpener type-assertion succeed in tests.
+func (f *fakeRepo) TagRepository() TagRepository { return f.tagRepo }
+
+// fakeTagRepo records the tag names each ApplyTags call replaces with.
+// applied stays nil when ApplyTags was never called.
+type fakeTagRepo struct {
+	applied []string
+}
+
+var _ TagRepository = (*fakeTagRepo)(nil)
+
+func (f *fakeTagRepo) ApplyTags(contextID, contactID string, tagNames []string, ac ActivityCloser) error {
+	f.applied = tagNames
+	return nil
+}
+func (f *fakeTagRepo) ListTags(contextID string) ([]*ct.Tag, error)              { return nil, nil }
+func (f *fakeTagRepo) CreateTag(contextID, name, color string) (*ct.Tag, error)   { return nil, nil }
+func (f *fakeTagRepo) DeleteTag(contextID, tagID string) error                    { return nil }
 
 func (f *fakeRepo) GetActivity(contactID, contextID string, offset, limit int, activityType *string) ([]ct.Activity, int64, error) {
 	return nil, 0, nil
@@ -214,5 +252,80 @@ func TestUpdateContact_InvalidEmailRejected(t *testing.T) {
 	_, err := UpdateContact(repo, "c-1", "ctx-1", UpdateInput{Email: &badEmail})
 	if err == nil || !strings.Contains(err.Error(), "invalid email") {
 		t.Errorf("expected invalid email error, got %v", err)
+	}
+}
+
+func TestUpdateContact_NilTagsLeaveExistingTagsUntouched(t *testing.T) {
+	tags := &fakeTagRepo{}
+	repo := &fakeRepo{existing: newTestContact("c-1"), tagRepo: tags}
+
+	if _, err := UpdateContact(repo, "c-1", "ctx-1", UpdateInput{FirstName: "New"}); err != nil {
+		t.Fatalf("UpdateContact() error: %v", err)
+	}
+	if tags.applied != nil {
+		t.Errorf("ApplyTags was called with %v, want tags untouched (nil input)", tags.applied)
+	}
+}
+
+func TestUpdateContact_EmptyTagsClearExistingTags(t *testing.T) {
+	tags := &fakeTagRepo{}
+	repo := &fakeRepo{existing: newTestContact("c-1"), tagRepo: tags}
+
+	empty := []string{}
+	if _, err := UpdateContact(repo, "c-1", "ctx-1", UpdateInput{Tags: &empty}); err != nil {
+		t.Fatalf("UpdateContact() error: %v", err)
+	}
+	if tags.applied == nil {
+		t.Fatal("ApplyTags was not called, want tag clearing for empty slice")
+	}
+	if len(tags.applied) != 0 {
+		t.Errorf("ApplyTags called with %v, want empty slice", tags.applied)
+	}
+}
+
+func TestUpdateContact_NonEmptyTagsReplace(t *testing.T) {
+	tags := &fakeTagRepo{}
+	repo := &fakeRepo{existing: newTestContact("c-1"), tagRepo: tags}
+
+	newTags := []string{"vip"}
+	if _, err := UpdateContact(repo, "c-1", "ctx-1", UpdateInput{Tags: &newTags}); err != nil {
+		t.Fatalf("UpdateContact() error: %v", err)
+	}
+	if tags.applied == nil || len(tags.applied) != 1 || tags.applied[0] != "vip" {
+		t.Errorf("ApplyTags called with %v, want [vip]", tags.applied)
+	}
+}
+
+func TestUpdateContact_EmptyStringEmailIgnored(t *testing.T) {
+	repo := &fakeRepo{existing: newTestContact("c-1")}
+	empty := ""
+
+	got, err := UpdateContact(repo, "c-1", "ctx-1", UpdateInput{Email: &empty, FirstName: "New"})
+	if err != nil {
+		t.Fatalf("UpdateContact() error: %v", err)
+	}
+	if got.Email == nil || *got.Email != "old@example.com" {
+		t.Errorf("Email = %v, want old@example.com preserved (empty string must not clear it)", got.Email)
+	}
+}
+
+func TestUpdateContact_UniqueViolationReturnsExisting(t *testing.T) {
+	repo := &fakeRepo{
+		existing:  newTestContact("c-1"),
+		updateErr: errors.New("duplicate key value violates unique constraint (23505)"),
+		findByEmailFunc: func(contextID, email string) (*ct.Contact, error) {
+			if email == "old@example.com" {
+				return newTestContact("c-9"), nil
+			}
+			return nil, errors.New("contact not found")
+		},
+	}
+
+	got, err := UpdateContact(repo, "c-1", "ctx-1", UpdateInput{FirstName: "New"})
+	if err != nil {
+		t.Fatalf("UpdateContact() should re-read on 23505, got error: %v", err)
+	}
+	if got.ID != "c-9" {
+		t.Errorf("returned contact ID = %q, want c-9 (re-read existing)", got.ID)
 	}
 }

@@ -10,6 +10,10 @@ import (
 )
 
 // UpdateInput holds the input parameters for updating a contact.
+// Tags is a pointer so three states are distinguishable:
+//   - nil: leave existing tags untouched
+//   - empty slice: clear all tags
+//   - non-empty slice: replace all tags
 type UpdateInput struct {
 	Email        *string
 	FirstName    string
@@ -17,7 +21,7 @@ type UpdateInput struct {
 	Phone        string
 	Company      string
 	CustomFields map[string]interface{}
-	Tags         []string // replaces all existing tags
+	Tags         *[]string
 }
 
 // UpdateContact updates an existing contact and replaces its tags.
@@ -35,6 +39,13 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 	// Verify contact belongs to context
 	if existing.ContextID != contextID {
 		return nil, fmt.Errorf("contact does not belong to context")
+	}
+
+	// Normalize an empty email string to nil: the API layer cannot
+	// distinguish "field absent" from "empty string", and setting
+	// Email = &"" would leave the contact with a junk address.
+	if input.Email != nil && *input.Email == "" {
+		input.Email = nil
 	}
 
 	// Validate new email if provided
@@ -118,6 +129,13 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 	}
 
 	if err := repo.Update(existing); err != nil {
+		// A 23505 unique-violation means a concurrent create/update claimed
+		// this email; re-read and return that contact instead of failing.
+		if existing.Email != nil && strings.Contains(err.Error(), "23505") {
+			if found, findErr := repo.FindByEmail(contextID, *existing.Email); findErr == nil {
+				return found, nil
+			}
+		}
 		return nil, fmt.Errorf("update contact: %w", err)
 	}
 
@@ -139,9 +157,10 @@ func UpdateContact(repo Repository, id, contextID string, input UpdateInput) (*c
 		}
 	}
 
-	// Update tags (delete old memberships, create new ones)
-	if len(input.Tags) > 0 {
-		if err := applyTags(repo, contextID, id, input.Tags); err != nil {
+	// Update tags: nil leaves them untouched, an empty slice clears all
+	// memberships, and a non-empty slice replaces the full set.
+	if input.Tags != nil {
+		if err := applyTags(repo, contextID, id, *input.Tags); err != nil {
 			return nil, fmt.Errorf("apply tags: %w", err)
 		}
 	}

@@ -223,7 +223,9 @@ func (h *ContactHandler) Update(c *gin.Context) {
 		Phone:        input.Phone,
 		Company:      input.Company,
 		CustomFields: input.CustomFields,
-		Tags:         input.Tags,
+		// Pointer preserves JSON semantics: absent -> nil (untouched),
+		// [] -> empty (clear), values -> replace.
+		Tags: &input.Tags,
 	}
 
 	updated, err := uc.UpdateContact(h.repo, id, contextID, updateInput)

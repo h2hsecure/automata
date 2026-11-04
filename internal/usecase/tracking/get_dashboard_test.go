@@ -16,6 +16,10 @@ type fakeDashRepo struct {
 	activeVis int64
 	events    []*tracking.Event
 	visitors  []*tracking.Visitor
+
+	// capturedRange records the DateRange handed to GetDashboardMetrics so
+	// defaulting behavior can be asserted.
+	capturedRange tracking.DateRange
 }
 
 func (f *fakeDashRepo) CreateEvent(e *tracking.Event) error {
@@ -35,6 +39,10 @@ func (f *fakeDashRepo) UpsertVisitor(v *tracking.Visitor) error {
 }
 
 func (f *fakeDashRepo) GetDashboardMetrics(contextID string, dateRange tracking.DateRange) (*tracking.DashboardMetrics, error) {
+	f.capturedRange = dateRange
+	if f.metrics == nil {
+		return &tracking.DashboardMetrics{}, nil
+	}
 	return f.metrics, nil
 }
 
@@ -138,4 +146,48 @@ func mapsEqual(a, b map[string]int) bool {
 		}
 	}
 	return true
+}
+
+// TestGetDashboard_StartOnlyEndDefaultsIndependently verifies that a
+// non-zero Start is preserved while a zero End is defaulted to now, and
+// that the provided Start is not clobbered by the defaulting.
+func TestGetDashboard_StartOnlyEndDefaultsIndependently(t *testing.T) {
+	repo := &fakeDashRepo{}
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if _, err := GetDashboard(repo, "ctx-1", GetDashboardOptions{Start: start}); err != nil {
+		t.Fatalf("GetDashboard: %v", err)
+	}
+
+	if !repo.capturedRange.Start.Equal(start) {
+		t.Errorf("Start = %v, want %v (must not be defaulted when provided)", repo.capturedRange.Start, start)
+	}
+	if repo.capturedRange.End.IsZero() {
+		t.Error("End is zero, want default (now)")
+	}
+	if repo.capturedRange.End.Before(start) {
+		t.Errorf("End %v is before provided Start %v", repo.capturedRange.End, start)
+	}
+}
+
+// TestGetDashboard_EndOnlyStartDefaultsIndependently is the mirror case: a
+// non-zero End is preserved while a zero Start is defaulted to now-30d.
+func TestGetDashboard_EndOnlyStartDefaultsIndependently(t *testing.T) {
+	repo := &fakeDashRepo{}
+	// End is in the future so the defaulted Start (now-30d) precedes it.
+	end := time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if _, err := GetDashboard(repo, "ctx-1", GetDashboardOptions{End: end}); err != nil {
+		t.Fatalf("GetDashboard: %v", err)
+	}
+
+	if !repo.capturedRange.End.Equal(end) {
+		t.Errorf("End = %v, want %v (must not be defaulted when provided)", repo.capturedRange.End, end)
+	}
+	if repo.capturedRange.Start.IsZero() {
+		t.Error("Start is zero, want default (now - 30d)")
+	}
+	if repo.capturedRange.Start.After(repo.capturedRange.End) {
+		t.Errorf("Start %v is after provided End %v", repo.capturedRange.Start, end)
+	}
 }

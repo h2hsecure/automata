@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/rs/zerolog/log"
 )
 
 // MergeContacts merges one contact into another, keeping the keepID contact and deleting mergeIntoID.
@@ -58,7 +59,8 @@ func MergeContacts(repo Repository, contextID, keepID, mergeIntoID string) error
 			"acted_at":            now,
 		},
 	}); err != nil {
-		_ = fmt.Errorf("create merge activity: %w", err)
+		// Non-fatal: the merge itself already committed, so log and carry on.
+		log.Error().Err(err).Str("keep_id", keepID).Str("merge_into_id", mergeIntoID).Msg("create merge activity")
 	}
 
 	return nil
