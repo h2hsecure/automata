@@ -1,11 +1,16 @@
 package auth
 
 import (
+	"bytes"
+	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 const testJWTSecret = "test-secret-key-for-jwt-signing-32bytes"
@@ -217,5 +222,158 @@ func TestRefreshToken_TrimsBearerPrefix(t *testing.T) {
 	}
 	if !strings.HasPrefix(accessToken, "eyJ") {
 		t.Fatal("expected access token to start with eyJ")
+	}
+}
+
+// stubRefreshStore is an in-memory RefreshTokenStore for service tests.
+type stubRefreshStore struct {
+	mu       sync.Mutex
+	active   map[string]bool
+	revoked  []string
+	inserted []string
+}
+
+func newStubRefreshStore() *stubRefreshStore {
+	return &stubRefreshStore{active: map[string]bool{}}
+}
+
+func (s *stubRefreshStore) Insert(_ context.Context, jti, _ string, _ time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.active[jti] = true
+	s.inserted = append(s.inserted, jti)
+	return nil
+}
+
+func (s *stubRefreshStore) RevokeIfActive(_ context.Context, jti string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.active[jti] {
+		delete(s.active, jti)
+		s.revoked = append(s.revoked, jti)
+		return "ok", nil
+	}
+	for _, r := range s.revoked {
+		if r == jti {
+			return "already_revoked", nil
+		}
+	}
+	return "missing", nil
+}
+
+func (s *stubRefreshStore) Prune(_ context.Context, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (s *stubRefreshStore) activeCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.active)
+}
+
+func (s *stubRefreshStore) isActive(jti string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.active[jti]
+}
+
+func makeRefreshToken(t *testing.T, userID, jti string) string {
+	t.Helper()
+	claims := jwt.MapClaims{
+		"user_id": userID,
+		"type":    "refresh",
+		"exp":     time.Now().Add(7 * 24 * time.Hour).Unix(),
+		"iat":     time.Now().Unix(),
+	}
+	if jti != "" {
+		claims["jti"] = jti
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testJWTSecret))
+	if err != nil {
+		t.Fatalf("failed to create refresh token: %v", err)
+	}
+	return token
+}
+
+func TestRefreshToken_Rotation(t *testing.T) {
+	store := newStubRefreshStore()
+	s := &service{refreshStore: store}
+
+	// Simulate login: handler mints the refresh JWT and registers its jti.
+	token1 := makeRefreshToken(t, "test-user-123", "jti-1")
+	if err := store.Insert(context.Background(), "jti-1", "test-user-123", time.Now().Add(7*24*time.Hour)); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	// First refresh succeeds and rotates.
+	_, token2, err := s.RefreshToken(token1)
+	if err != nil {
+		t.Fatalf("first refresh failed: %v", err)
+	}
+	if store.isActive("jti-1") {
+		t.Error("old jti should be revoked after rotation")
+	}
+	if store.activeCount() != 1 {
+		t.Errorf("expected exactly 1 active refresh token after rotation, got %d", store.activeCount())
+	}
+
+	// The newly issued refresh token works.
+	_, _, err = s.RefreshToken(token2)
+	if err != nil {
+		t.Fatalf("second refresh (with rotated token) failed: %v", err)
+	}
+
+	// Replaying the original token is rejected (reuse detection).
+	_, _, err = s.RefreshToken(token1)
+	if err != ErrRefreshTokenInvalid {
+		t.Fatalf("expected ErrRefreshTokenInvalid for replayed token, got: %v", err)
+	}
+}
+
+func TestRefreshToken_ReuseRejected(t *testing.T) {
+	store := newStubRefreshStore()
+	s := &service{refreshStore: store}
+
+	token := makeRefreshToken(t, "test-user-123", "jti-reuse")
+	store.Insert(context.Background(), "jti-reuse", "test-user-123", time.Now().Add(7*24*time.Hour))
+
+	// Capture warn logs to assert the theft signal is logged.
+	var buf bytes.Buffer
+	origLogger := log.Logger
+	log.Logger = zerolog.New(&buf).Level(zerolog.WarnLevel)
+	defer func() { log.Logger = origLogger }()
+
+	if _, _, err := s.RefreshToken(token); err != nil {
+		t.Fatalf("first refresh failed: %v", err)
+	}
+	if _, _, err := s.RefreshToken(token); err != ErrRefreshTokenInvalid {
+		t.Fatalf("expected ErrRefreshTokenInvalid on reuse, got: %v", err)
+	}
+	if !strings.Contains(buf.String(), "refresh token reuse detected") {
+		t.Errorf("expected reuse warning in logs, got: %s", buf.String())
+	}
+}
+
+func TestRefreshToken_MissingJtiRejectedWithStore(t *testing.T) {
+	store := newStubRefreshStore()
+	s := &service{refreshStore: store}
+
+	// A refresh token without a jti cannot be tracked server-side.
+	token := makeRefreshToken(t, "test-user-123", "")
+	_, _, err := s.RefreshToken(token)
+	if err != ErrRefreshTokenInvalid {
+		t.Fatalf("expected ErrRefreshTokenInvalid for jti-less token with store, got: %v", err)
+	}
+}
+
+func TestRefreshToken_UnknownJtiRejected(t *testing.T) {
+	store := newStubRefreshStore()
+	s := &service{refreshStore: store}
+
+	// jti was never registered (e.g. token minted before rotation existed).
+	token := makeRefreshToken(t, "test-user-123", "jti-unknown")
+	_, _, err := s.RefreshToken(token)
+	if err != ErrRefreshTokenInvalid {
+		t.Fatalf("expected ErrRefreshTokenInvalid for unknown jti, got: %v", err)
 	}
 }

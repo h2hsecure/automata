@@ -145,8 +145,15 @@ func main() {
 		}
 	}
 
-	// Initialize auth service (with API key validation backed by the DB)
-	authService := infraauth.NewServiceWithAPIKeys(userRepo, apiKeyRepo)
+	// Initialize auth service (with API key validation backed by the DB and
+	// server-side refresh token rotation with reuse detection)
+	refreshStore := auth_repo.NewRefreshTokenPostgresStore(pool)
+	if pruned, err := refreshStore.Prune(context.Background(), time.Now().Add(-30*24*time.Hour)); err != nil {
+		log.Warn().Err(err).Msg("refresh token prune failed")
+	} else if pruned > 0 {
+		log.Info().Int64("pruned", pruned).Msg("pruned expired refresh tokens")
+	}
+	authService := infraauth.NewServiceWithRefreshTokens(userRepo, apiKeyRepo, refreshStore)
 
 	// Email templates + queue (shared by admin API and form-submission hook)
 	emailRepo := email_repo.New(pool)

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	stdcontext "context"
 	"fmt"
 	"time"
 
@@ -32,6 +33,10 @@ type ContextInfo struct {
 // AuthService defines the interface for authentication operations.
 type AuthService interface {
 	Login(email, password string) (token string, userID string, contexts []ContextInfo, err error)
+	// InsertRefreshToken registers a refresh token jti minted at login so
+	// RefreshToken can enforce rotation and detect reuse. No-op for services
+	// built without server-side rotation.
+	InsertRefreshToken(ctx stdcontext.Context, jti, userID string, expiresAt time.Time) error
 	RefreshToken(refreshToken string) (accessToken string, newRefreshToken string, err error)
 	VerifyToken(token string) (userID string, contextID string, err error)
 	VerifyTokenUserOnly(token string) (userID string, err error)

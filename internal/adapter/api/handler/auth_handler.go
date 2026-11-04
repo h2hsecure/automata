@@ -59,12 +59,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Generate refresh token
 	secretKey := infraauth.GetJWTSecret()
+	refreshExpiry := time.Now().Add(7 * 24 * time.Hour)
+	refreshJTI := uuid.New().String()
 	refreshClaims := jwt.MapClaims{
 		"user_id": userID,
 		"type":    "refresh",
-		"exp":     time.Now().Add(7 * 24 * time.Hour).Unix(),
+		"exp":     refreshExpiry.Unix(),
 		"iat":     time.Now().Unix(),
-		"jti":     uuid.New().String(),
+		"jti":     refreshJTI,
 	}
 	refresh := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	refreshTokenStr, err := refresh.SignedString([]byte(secretKey))
@@ -72,6 +74,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		log.Error().Err(err).Msg("refresh token generation failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token generation failed"})
 		return
+	}
+
+	// Register the jti so refresh-token rotation and reuse detection work.
+	// A registration failure must not block login: the token will simply be
+	// treated as unknown on first refresh.
+	if err := h.authService.InsertRefreshToken(c.Request.Context(), refreshJTI, userID, refreshExpiry); err != nil {
+		log.Error().Err(err).Str("jti", refreshJTI).Msg("refresh token registration failed")
 	}
 
 	// Encrypt and set refresh cookie

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	stdcontext "context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -21,9 +22,22 @@ type apiKeyLookup interface {
 	ListAll() ([]*domainauth.APIKey, error)
 }
 
+// RefreshTokenStore persists refresh token jtis for server-side rotation
+// with reuse detection (spec 4.6). Satisfied by repo.RefreshTokenPostgresStore.
+type RefreshTokenStore interface {
+	Insert(ctx stdcontext.Context, jti, userID string, expiresAt time.Time) error
+	// RevokeIfActive revokes an active jti. Outcome:
+	//   - "ok"              — was active, now revoked
+	//   - "already_revoked" — reuse attempt (theft signal)
+	//   - "missing"         — unknown jti
+	RevokeIfActive(ctx stdcontext.Context, jti string) (string, error)
+	Prune(ctx stdcontext.Context, olderThan time.Time) (int64, error)
+}
+
 type service struct {
-	userRepo    context.UserRepository
-	apiKeyStore apiKeyLookup
+	userRepo     context.UserRepository
+	apiKeyStore  apiKeyLookup
+	refreshStore RefreshTokenStore // nil = legacy stateless behavior
 }
 
 // NewService creates a new auth service.
@@ -35,6 +49,12 @@ func NewService(userRepo context.UserRepository) domainauth.AuthService {
 // API keys against the database.
 func NewServiceWithAPIKeys(userRepo context.UserRepository, apiKeyStore apiKeyLookup) domainauth.AuthService {
 	return &service{userRepo: userRepo, apiKeyStore: apiKeyStore}
+}
+
+// NewServiceWithRefreshTokens creates an auth service with server-side
+// refresh token rotation enabled.
+func NewServiceWithRefreshTokens(userRepo context.UserRepository, apiKeyStore apiKeyLookup, refreshStore RefreshTokenStore) domainauth.AuthService {
+	return &service{userRepo: userRepo, apiKeyStore: apiKeyStore, refreshStore: refreshStore}
 }
 
 // HashPassword hashes a password using bcrypt.
@@ -296,6 +316,29 @@ func (s *service) RefreshToken(refreshToken string) (string, string, error) {
 	userEmail, _ := claims["user_email"].(string)
 	isAdmin, _ := claims["is_admin"].(bool)
 
+	// Server-side rotation: the presented jti must be active and is revoked
+	// on use. Reuse of an already-revoked token is a theft signal.
+	jti, _ := claims["jti"].(string)
+	if s.refreshStore != nil {
+		if jti == "" {
+			return "", "", ErrRefreshTokenInvalid
+		}
+		outcome, err := s.refreshStore.RevokeIfActive(stdcontext.Background(), jti)
+		if err != nil {
+			log.Error().Err(err).Str("jti", jti).Msg("refresh token revocation check failed")
+			return "", "", fmt.Errorf("revocation check: %w", err)
+		}
+		switch outcome {
+		case "ok":
+			// Rotated — proceed to issue the new pair.
+		case "already_revoked":
+			log.Warn().Str("jti", jti).Str("user_id", userID).Msg("refresh token reuse detected")
+			return "", "", ErrRefreshTokenInvalid
+		default: // "missing"
+			return "", "", ErrRefreshTokenInvalid
+		}
+	}
+
 	// Issue a new access token (24h expiry) with same claims
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":    userID,
@@ -312,12 +355,14 @@ func (s *service) RefreshToken(refreshToken string) (string, string, error) {
 	}
 
 	// Issue a new refresh token (7-day expiry, fresh jti)
+	newJti := uuid.New().String()
+	refreshExpiry := time.Now().Add(7 * 24 * time.Hour)
 	newRefreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":    userID,
-		"type":       "refresh",
-		"exp":        time.Now().Add(7 * 24 * time.Hour).Unix(),
-		"iat":        time.Now().Unix(),
-		"jti":        uuid.New().String(),
+		"user_id": userID,
+		"type":    "refresh",
+		"exp":     refreshExpiry.Unix(),
+		"iat":     time.Now().Unix(),
+		"jti":     newJti,
 	})
 
 	newRefreshTokenStr, err := newRefreshToken.SignedString([]byte(secretKey))
@@ -326,7 +371,24 @@ func (s *service) RefreshToken(refreshToken string) (string, string, error) {
 		return "", "", fmt.Errorf("generate refresh token: %w", err)
 	}
 
+	// Register the rotated jti server-side.
+	if s.refreshStore != nil {
+		if err := s.refreshStore.Insert(stdcontext.Background(), newJti, userID, refreshExpiry); err != nil {
+			log.Error().Err(err).Str("jti", newJti).Msg("refresh token registration failed")
+			return "", "", fmt.Errorf("register refresh token: %w", err)
+		}
+	}
+
 	return accessTokenStr, newRefreshTokenStr, nil
+}
+
+// InsertRefreshToken registers a refresh token jti minted at login.
+// No-op when the service was built without a refresh token store.
+func (s *service) InsertRefreshToken(ctx stdcontext.Context, jti, userID string, expiresAt time.Time) error {
+	if s.refreshStore == nil {
+		return nil
+	}
+	return s.refreshStore.Insert(ctx, jti, userID, expiresAt)
 }
 
 // GetUserByID retrieves a user by their platform ID.

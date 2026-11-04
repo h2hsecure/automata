@@ -40,3 +40,14 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_user_contexts_user ON user_contexts(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_contexts_context ON user_contexts(context_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- Server-side refresh token rotation (jti registry)
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    jti        UUID PRIMARY KEY,
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);

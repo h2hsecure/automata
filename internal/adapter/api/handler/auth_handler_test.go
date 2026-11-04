@@ -21,6 +21,9 @@ type fakeAuthService struct{}
 func (f *fakeAuthService) Login(email, password string) (string, string, []auth.ContextInfo, error) {
 	return "token", "user-1", nil, nil
 }
+func (f *fakeAuthService) InsertRefreshToken(_ stdcontext.Context, jti, userID string, expiresAt time.Time) error {
+	return nil
+}
 func (f *fakeAuthService) RefreshToken(refreshToken string) (string, string, error) {
 	return "token", "refresh", nil
 }
