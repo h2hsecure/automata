@@ -85,14 +85,24 @@ func (h *TrackingHandler) GetEvents(c *gin.Context) {
 		opts.URL = u
 	}
 
+	// Bound the list: default 50, clamp to [1, 100]. The repo only applies a
+	// SQL LIMIT when Limit > 0, so leaving it unset would return every event.
+	opts.Limit = 50
+	opts.Offset = 0
 	if o := c.Query("offset"); o != "" {
-		if p, err := strconv.Atoi(o); err == nil {
+		if p, err := strconv.Atoi(o); err == nil && p > 0 {
 			opts.Offset = p
 		}
 	}
 	if l := c.Query("limit"); l != "" {
 		if p, err := strconv.Atoi(l); err == nil {
-			opts.Limit = p
+			if p < 1 {
+				opts.Limit = 50
+			} else if p > 100 {
+				opts.Limit = 100
+			} else {
+				opts.Limit = p
+			}
 		}
 	}
 
