@@ -36,7 +36,8 @@ func (h *ContextHandler) List(c *gin.Context) {
 
 	contexts, err := h.contextRepo.List(offset, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Msg("list contexts")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list contexts"})
 		return
 	}
 
@@ -64,7 +65,8 @@ func (h *ContextHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.contextRepo.Create(t); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("slug", t.Slug).Msg("create context")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to create context"})
 		return
 	}
 
@@ -136,7 +138,8 @@ func (h *ContextHandler) Update(c *gin.Context) {
 	}
 
 	if err := h.contextRepo.Update(existing); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("id", id).Msg("update context")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update context"})
 		return
 	}
 

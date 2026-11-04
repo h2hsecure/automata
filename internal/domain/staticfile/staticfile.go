@@ -23,8 +23,10 @@ type Repository interface {
 	Create(f *StaticFile) error
 	// GetByName looks up a record by context and URL name.
 	GetByName(contextID, name string) (*StaticFile, error)
-	// List returns all records for a context.
-	List(contextID string) ([]*StaticFile, error)
+	// List returns records for a context, most recent first. limit <= 0
+	// defaults to 100 and is capped at 500; a negative offset is treated
+	// as 0.
+	List(contextID string, limit, offset int) ([]*StaticFile, error)
 	// Delete removes a record by context and URL name.
 	Delete(contextID, name string) error
 }

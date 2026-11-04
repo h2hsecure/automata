@@ -1,13 +1,18 @@
 package handler
 
 import (
+	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/domain/contact"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // fakeContactRepo is an in-memory contact.Repository for handler tests.
@@ -15,6 +20,7 @@ import (
 type fakeContactRepo struct {
 	lastListFilters contact.FilterOptions
 	contacts        []*contact.Contact
+	listErr         error
 }
 
 func (r *fakeContactRepo) Create(c *contact.Contact) error { return nil }
@@ -25,6 +31,9 @@ func (r *fakeContactRepo) GetByID(id string) (*contact.Contact, error) {
 
 func (r *fakeContactRepo) List(offset, limit int, filters contact.FilterOptions) ([]*contact.Contact, error) {
 	r.lastListFilters = filters
+	if r.listErr != nil {
+		return nil, r.listErr
+	}
 	return r.contacts, nil
 }
 
@@ -104,5 +113,35 @@ func TestContactList_InvalidSinceReturns400(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (body: %s)", w.Code, w.Body.String())
+	}
+}
+
+// TestContactList_RepoErrorReturnsGenericMessage asserts that a repository
+// failure surfaces a generic client message (no internal detail) while the
+// real error is written to the server log.
+func TestContactList_RepoErrorReturnsGenericMessage(t *testing.T) {
+	repo := &fakeContactRepo{listErr: errors.New("boom: relation \"contacts\" does not exist (SQLSTATE 42P01)")}
+	router := newContactListRouter(repo)
+
+	var buf bytes.Buffer
+	orig := log.Logger
+	log.Logger = zerolog.New(&buf)
+	defer func() { log.Logger = orig }()
+
+	req := httptest.NewRequest(http.MethodGet, "/context/contacts", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 (body: %s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "failed to list contacts") {
+		t.Errorf("body = %s, want generic message", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "boom") || strings.Contains(w.Body.String(), "42P01") {
+		t.Errorf("raw repository error leaked to client: %s", w.Body.String())
+	}
+	if !strings.Contains(buf.String(), "boom") {
+		t.Errorf("real error not present in server log: %s", buf.String())
 	}
 }

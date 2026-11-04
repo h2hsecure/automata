@@ -35,14 +35,31 @@ func (r *fakeStaticFileRepo) GetByName(contextID, name string) (*staticfile.Stat
 	return nil, os.ErrNotExist
 }
 
-func (r *fakeStaticFileRepo) List(contextID string) ([]*staticfile.StaticFile, error) {
+func (r *fakeStaticFileRepo) List(contextID string, limit, offset int) ([]*staticfile.StaticFile, error) {
 	var out []*staticfile.StaticFile
 	for _, f := range r.files {
 		if f.ContextID == contextID {
 			out = append(out, f)
 		}
 	}
-	return out, nil
+	// Mirror the postgres repo's clamp/slice semantics.
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(out) {
+		return []*staticfile.StaticFile{}, nil
+	}
+	end := offset + limit
+	if end > len(out) {
+		end = len(out)
+	}
+	return out[offset:end], nil
 }
 
 func (r *fakeStaticFileRepo) Delete(contextID, name string) error {

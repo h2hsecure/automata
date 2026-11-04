@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/h2hsecure/automata/internal/domain/contact"
 	uc "github.com/h2hsecure/automata/internal/usecase/contact"
+	"github.com/rs/zerolog/log"
 )
 
 type ContactHandler struct {
@@ -121,7 +122,8 @@ func (h *ContactHandler) List(c *gin.Context) {
 
 	result, err := uc.ListContacts(h.repo, contextID, opts)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Msg("list contacts")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list contacts"})
 		return
 	}
 
@@ -194,7 +196,8 @@ func (h *ContactHandler) Create(c *gin.Context) {
 
 	created, err := uc.CreateContact(h.repo, contextID, createInput)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Msg("create contact")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to create contact"})
 		return
 	}
 
@@ -230,7 +233,8 @@ func (h *ContactHandler) Update(c *gin.Context) {
 
 	updated, err := uc.UpdateContact(h.repo, id, contextID, updateInput)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("contact_id", id).Str("context_id", contextID).Msg("update contact")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update contact"})
 		return
 	}
 
@@ -270,7 +274,8 @@ func (h *ContactHandler) Merge(c *gin.Context) {
 	}
 
 	if err := uc.MergeContacts(h.repo, contextID, keepID, input.MergeWith); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("keep_id", keepID).Str("merge_with", input.MergeWith).Str("context_id", contextID).Msg("merge contacts")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to merge contacts"})
 		return
 	}
 
@@ -383,7 +388,8 @@ func (h *ContactHandler) Import(c *gin.Context) {
 
 	result, err := uc.ImportContacts(h.repo, contextID, uc.ImportCSVInput{CSVData: reader})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Msg("import contacts")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to import contacts"})
 		return
 	}
 
@@ -418,7 +424,8 @@ func (h *ContactHandler) Export(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "no contacts to export"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Msg("export contacts")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to export contacts"})
 		return
 	}
 
@@ -436,7 +443,8 @@ func (h *ContactHandler) ListTags(c *gin.Context) {
 
 	tags, err := uc.ListTags(h.repo, contextID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Msg("list tags")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list tags"})
 		return
 	}
 
@@ -468,7 +476,8 @@ func (h *ContactHandler) CreateTag(c *gin.Context) {
 
 	tag, err := uc.CreateTag(h.repo, contextID, input.Name, input.Color)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Str("name", input.Name).Msg("create tag")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tag"})
 		return
 	}
 

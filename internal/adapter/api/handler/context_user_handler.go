@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/h2hsecure/automata/internal/domain/context"
+	"github.com/rs/zerolog/log"
 )
 
 type ContextUserHandler struct {
@@ -30,7 +31,8 @@ func (h *ContextUserHandler) List(c *gin.Context) {
 	}
 	members, err := h.userRepo.ListMembers(contextID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Msg("list context members")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list context members"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"members": members})
@@ -53,7 +55,8 @@ func (h *ContextUserHandler) Create(c *gin.Context) {
 		Role:      req.Role,
 	}
 	if err := h.userRepo.CreateMembership(uc); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Str("user_id", uc.UserID).Msg("create membership")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add member"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{

@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/domain/staticfile"
 	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	"github.com/h2hsecure/automata/internal/infrastructure/storage"
+	"github.com/rs/zerolog/log"
 )
 
 // StaticFileHandler serves admin CRUD for files linked to a context. Uploads
@@ -39,9 +41,12 @@ func (h *StaticFileHandler) List(c *gin.Context) {
 		return
 	}
 
-	files, err := h.repo.List(contextID)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "0"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	files, err := h.repo.List(contextID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", contextID).Msg("list static files")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list static files"})
 		return
 	}
 	if files == nil {

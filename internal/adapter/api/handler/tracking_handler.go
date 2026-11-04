@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/domain/tracking"
 	trackingUsecase "github.com/h2hsecure/automata/internal/usecase/tracking"
+	"github.com/rs/zerolog/log"
 )
 
 // TrackingHandler handles dashboard and events API endpoints.
@@ -50,7 +51,8 @@ func (h *TrackingHandler) GetDashboard(c *gin.Context) {
 
 	metrics, err := trackingUsecase.GetDashboard(h.repo, ctxID, opts)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", ctxID).Msg("get dashboard")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load dashboard"})
 		return
 	}
 
@@ -108,7 +110,8 @@ func (h *TrackingHandler) GetEvents(c *gin.Context) {
 
 	events, total, err := trackingUsecase.GetEvents(h.repo, ctxID, opts)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", ctxID).Msg("get events")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load events"})
 		return
 	}
 
@@ -144,7 +147,8 @@ func (h *TrackingHandler) ListVisitors(c *gin.Context) {
 
 	visitors, total, err := trackingUsecase.ListVisitors(h.repo, ctxID, opts)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", ctxID).Msg("list visitors")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to list visitors"})
 		return
 	}
 
@@ -219,7 +223,8 @@ func (h *TrackingHandler) GetVisitorEvents(c *gin.Context) {
 
 	events, total, err := trackingUsecase.GetVisitorEvents(h.repo, ctxID, visitorID, opts)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("context_id", ctxID).Str("visitor_id", visitorID).Msg("get visitor events")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to load visitor events"})
 		return
 	}
 

@@ -34,7 +34,7 @@ func (h *ContextSettingsHandler) List(c *gin.Context) {
 	m, err := h.repo.List(contextID)
 	if err != nil {
 		h.log.Error().Err(err).Str("context_id", contextID).Msg("failed to list context settings")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list context settings"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"settings": m})
@@ -63,7 +63,7 @@ func (h *ContextSettingsHandler) Upsert(c *gin.Context) {
 
 	if err := h.repo.Upsert(contextID, req.Key, req.Value); err != nil {
 		h.log.Error().Err(err).Str("context_id", contextID).Str("key", req.Key).Msg("failed to upsert context setting")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save context setting"})
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *ContextSettingsHandler) Delete(c *gin.Context) {
 			return
 		}
 		h.log.Error().Err(err).Str("context_id", contextID).Str("key", key).Msg("failed to delete context setting")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete context setting"})
 		return
 	}
 	c.Status(http.StatusNoContent)

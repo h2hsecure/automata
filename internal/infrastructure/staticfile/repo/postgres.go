@@ -69,15 +69,40 @@ func (r *repo) GetByName(contextID, name string) (*staticfile.StaticFile, error)
 	return f, nil
 }
 
-func (r *repo) List(contextID string) ([]*staticfile.StaticFile, error) {
+// listDefaultLimit and listMaxLimit bound static-file listings: a single
+// call returns at most listMaxLimit records.
+const (
+	listDefaultLimit = 100
+	listMaxLimit     = 500
+)
+
+// NormalizeListParams clamps limit/offset into the supported range:
+// limit <= 0 -> listDefaultLimit, limit > listMaxLimit -> listMaxLimit,
+// offset < 0 -> 0.
+func NormalizeListParams(limit, offset int) (int, int) {
+	if limit <= 0 {
+		limit = listDefaultLimit
+	}
+	if limit > listMaxLimit {
+		limit = listMaxLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return limit, offset
+}
+
+func (r *repo) List(contextID string, limit, offset int) ([]*staticfile.StaticFile, error) {
+	limit, offset = NormalizeListParams(limit, offset)
 	ctx := context.Background()
 	query := `
 		SELECT context_id, name, token, mime, size, created_at
 		FROM static_files
 		WHERE context_id = $1
 		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
 	`
-	rows, err := r.pool.Query(ctx, query, contextID)
+	rows, err := r.pool.Query(ctx, query, contextID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list static files: %w", err)
 	}

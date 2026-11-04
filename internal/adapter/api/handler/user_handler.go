@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/h2hsecure/automata/internal/domain/context"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -43,7 +44,8 @@ type userDTO struct {
 func (h *UserHandler) List(c *gin.Context) {
 	users, err := h.userRepo.ListAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Msg("list users")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list users"})
 		return
 	}
 	dtos := make([]userDTO, 0, len(users))
@@ -85,7 +87,8 @@ func (h *UserHandler) Create(c *gin.Context) {
 		// IsAdmin intentionally false: the body field no longer exists.
 	}
 	if err := h.userRepo.Create(u); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("email", u.Email).Msg("create user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"id": u.ID, "email": u.Email, "is_admin": u.IsAdmin})
@@ -139,7 +142,8 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 	// IsAdmin is never modified here: it is not part of the request body.
 	if err := h.userRepo.Update(u); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Error().Err(err).Str("id", id).Msg("update user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "is_admin": u.IsAdmin})

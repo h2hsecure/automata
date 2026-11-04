@@ -67,7 +67,8 @@ func ContextResolver(contextRepo context.Repository) gin.HandlerFunc {
 		// Try subdomain resolution
 		t, err := resolveBySubdomain(c, contextRepo)
 		if err != nil && err != ErrNoContext {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			log.Error().Err(err).Str("host", c.Request.Host).Msg("resolve context by subdomain")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "context not found"})
 			c.Abort()
 			return
 		}
@@ -88,7 +89,10 @@ func ContextResolver(contextRepo context.Repository) gin.HandlerFunc {
 		if strings.HasPrefix(c.Request.URL.Path, "/context/") || strings.HasPrefix(c.Request.URL.Path, "/t/") {
 			t, err = resolveByPath(c, contextRepo)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				if err != ErrNoContext {
+					log.Error().Err(err).Str("path", c.Request.URL.Path).Msg("resolve context by path")
+				}
+				c.JSON(http.StatusBadRequest, gin.H{"error": "context not found"})
 				c.Abort()
 				return
 			}

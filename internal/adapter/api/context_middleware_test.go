@@ -246,7 +246,7 @@ var _ = Describe("ContextResolver middleware", func() {
 		It("resolves SPA API paths (e.g. /api/context/contacts) to the default context", func() {
 			// The SPA calls /api/context/... without a context header, query
 			// param, or matching subdomain. This must resolve to the default
-			// context rather than aborting with "no context found".
+			// context rather than aborting with "context not found".
 			req := requestWithHost("GET", "/api/context/contacts", "automata.example.com")
 			w, captured := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusOK))
@@ -289,7 +289,7 @@ var _ = Describe("ContextResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			Expect(string(body)).To(ContainSubstring("context not found"))
 		})
 
 		It("returns error for /t/ with empty slug", func() {
@@ -297,7 +297,7 @@ var _ = Describe("ContextResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			Expect(string(body)).To(ContainSubstring("context not found"))
 		})
 
 		It("returns error for non-existent context in path", func() {
@@ -305,7 +305,7 @@ var _ = Describe("ContextResolver middleware", func() {
 			w, _ := runWithCapture(middleware, mockRepo, req)
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			body, _ := io.ReadAll(w.Body)
-			Expect(string(body)).To(ContainSubstring("no context found"))
+			Expect(string(body)).To(ContainSubstring("context not found"))
 		})
 	})
 

@@ -29,7 +29,7 @@ func (r *fakeStaticRepoForTrack) GetByName(contextID, name string) (*staticfile.
 	return nil, os.ErrNotExist
 }
 
-func (r *fakeStaticRepoForTrack) List(contextID string) ([]*staticfile.StaticFile, error) {
+func (r *fakeStaticRepoForTrack) List(contextID string, limit, offset int) ([]*staticfile.StaticFile, error) {
 	return r.files, nil
 }
 

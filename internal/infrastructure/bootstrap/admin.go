@@ -13,10 +13,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Run creates an admin user on first startup if no users exist and writes
-// credentials to stdout. It does not create contexts: the first context is
-// created by the user through the onboarding flow, which grants the creator
-// an owner membership. Returns nil if users already exist.
+// secretFileEnv selects where generated credentials are written;
+// secretFileDefault is used when the env var is unset.
+const (
+	secretFileEnv     = "AUTOMATA_ADMIN_SECRET_FILE"
+	secretFileDefault = ".admin_credentials"
+)
+
+// Run creates an admin user on first startup if no users exist. A
+// generated password is written to a 0600 secret file (path from
+// AUTOMATA_ADMIN_SECRET_FILE, default ".admin_credentials"); credentials
+// are never printed to stdout or logs. It does not create contexts: the
+// first context is created by the user through the onboarding flow, which
+// grants the creator an owner membership. Returns nil if users already
+// exist.
 func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository) error {
 	// Check if any users exist in the users table
 	exists, err := userRepo.ExistsAnyUser()
@@ -39,10 +49,13 @@ func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository) error {
 		adminEmail = "admin@automata.local"
 	}
 
-	// Use provided password or generate random one
+	// Use provided password or generate random one. Track whether we
+	// generated it so we know whether a secret file is required.
 	password := os.Getenv("AUTOMATA_ADMIN_PASSWORD")
+	generated := false
 	if password == "" {
 		password, err = generatePassword(16)
+		generated = true
 	}
 	if err != nil {
 		return fmt.Errorf("generate password: %w", err)
@@ -71,17 +84,32 @@ func Run(pool *pgxpool.Pool, userRepo ctxdomain.UserRepository) error {
 		log.Warn().Err(err).Msg("failed to write admin initialized marker")
 	}
 
-	// Log credentials to stdout
-	fmt.Println("")
-	fmt.Println("╔══════════════════════════════════════════════════╗")
-	fmt.Println("║  ADMIN CREDENTIALS (first startup only)          ║")
-	fmt.Printf("║  Email:    %s                          ║\n", adminEmail)
-	fmt.Printf("║  Password: %s                      ║\n", password)
-	fmt.Println("╚══════════════════════════════════════════════════╝")
-	fmt.Println("")
-
-	log.Info().Str("email", adminEmail).Msg("admin user created via bootstrap")
+	// A generated password must reach the operator without passing through
+	// stdout/logs. Write it to a 0600 secret file and log only the path.
+	// When the operator supplied the password explicitly there is nothing to
+	// disclose, so no file is written.
+	if generated {
+		secretPath := os.Getenv(secretFileEnv)
+		if secretPath == "" {
+			secretPath = secretFileDefault
+		}
+		if err := writeCredentialsFile(secretPath, adminEmail, password); err != nil {
+			return fmt.Errorf("write credentials file: %w", err)
+		}
+		log.Info().Str("email", adminEmail).Str("credentials_file", secretPath).
+			Msg("admin user created via bootstrap; generated password written to secret file")
+	} else {
+		log.Info().Str("email", adminEmail).Msg("admin user created via bootstrap")
+	}
 	return nil
+}
+
+// writeCredentialsFile writes the generated credentials to path with
+// owner-only permissions. It never returns the password through any other
+// channel.
+func writeCredentialsFile(path, email, password string) error {
+	content := fmt.Sprintf("email=%s\npassword=%s\n", email, password)
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 func generatePassword(length int) (string, error) {
