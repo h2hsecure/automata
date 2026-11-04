@@ -113,14 +113,20 @@ func (h *PagePublicHandler) Decision(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.RecordDecision(&pagedomain.Decision{
+	decision := &pagedomain.Decision{
 		ContextID: c.Param("contextID"),
 		PageID:    body.PageID,
 		VisitorID: body.VisitorID,
 		Action:    body.Decision,
 		IPHash:    ipHash(c.ClientIP()),
 		UserAgent: c.GetHeader("User-Agent"),
-	}); err != nil {
+	}
+	if err := decision.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid decision action"})
+		return
+	}
+
+	if err := h.repo.RecordDecision(decision); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record decision"})
 		return
 	}

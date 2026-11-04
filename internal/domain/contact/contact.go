@@ -3,6 +3,7 @@ package contact
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -55,12 +56,13 @@ func isValidEmail(email string) bool {
 	if len(email) == 0 || len(email) > 254 {
 		return false
 	}
-	atIdx := -1
-	for i, ch := range email {
-		if ch == '@' {
-			atIdx = i
-		}
+	// Exactly one '@': multiple '@' (e.g. "user@sub@domain.com") is not a
+	// valid address and used to slip through because the scan kept the
+	// last '@' and the local-part check allowed '@' characters.
+	if strings.Count(email, "@") != 1 {
+		return false
 	}
+	atIdx := strings.Index(email, "@")
 	if atIdx <= 0 || atIdx >= len(email)-1 {
 		return false
 	}

@@ -193,7 +193,15 @@ func (d *netDialer) Dial() (Client, error) {
 // requires CRLF in the DATA payload). When htmlBody is non-empty the message
 // is multipart/alternative with plain and html parts.
 func buildMessage(from string, to []string, subject, body, htmlBody string) []byte {
-	subject = strings.NewReplacer("\n", " ", "\r", " ").Replace(subject)
+	// Header-injection defense: newline characters in from/to/subject would
+	// terminate the header line and allow an attacker to inject arbitrary
+	// headers. Strip them the same way subject was already handled.
+	sanitizeHeader := strings.NewReplacer("\n", " ", "\r", " ")
+	from = sanitizeHeader.Replace(from)
+	for i := range to {
+		to[i] = sanitizeHeader.Replace(to[i])
+	}
+	subject = sanitizeHeader.Replace(subject)
 	toHeader := strings.Join(to, ", ")
 	date := time.Now().UTC().Format(time.RFC1123)
 	if htmlBody == "" {

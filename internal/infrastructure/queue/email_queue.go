@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,7 +91,10 @@ func (q *emailQueue) Enqueue(job *EmailJob) error {
 		job.To = []string{}
 	}
 
-	toStr := "{" + strings.Join(job.To, ",") + "}"
+	// Bind recipients as a proper array parameter (Dims required even for an
+	// empty slice, or pgx encodes NULL) instead of a hand-built SQL literal,
+	// which breaks on addresses containing array syntax characters.
+	toAddresses := toArray(job.To)
 
 	query := `
 		INSERT INTO email_jobs (id, context_id, to_addresses, subject, body, html_body, attempts, max_retries, next_retry, created_at)
@@ -100,7 +102,7 @@ func (q *emailQueue) Enqueue(job *EmailJob) error {
 	`
 
 	_, err := q.pool.Exec(context.Background(), query,
-		job.ID, job.ContextID, toStr, job.Subject, job.Body, job.HTMLBody,
+		job.ID, job.ContextID, toAddresses, job.Subject, job.Body, job.HTMLBody,
 		job.Attempts, job.MaxRetries,
 	)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/h2hsecure/automata/internal/infrastructure/queue"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // TestEmailQueue_ClaimConcurrentSingleWinner proves the claim is atomic:
@@ -52,6 +53,51 @@ func TestEmailQueue_ClaimConcurrentSingleWinner(t *testing.T) {
 	}
 	if total != 1 {
 		t.Fatalf("concurrent claims returned %d jobs, want exactly 1", total)
+	}
+}
+
+// TestEmailQueue_EnqueueToAddressesRoundTrip proves recipients are bound as
+// a proper array parameter (no hand-built SQL literal) and survive a
+// round-trip for both multi-recipient and empty lists.
+func TestEmailQueue_EnqueueToAddressesRoundTrip(t *testing.T) {
+	pool, cleanup := startTestPostgres(t)
+	defer cleanup()
+
+	q := queue.NewEmailQueue(pool)
+	ctx := context.Background()
+
+	multiID := uuid.New().String()
+	if err := q.Enqueue(&queue.EmailJob{
+		ID: multiID, ContextID: uuid.New().String(),
+		To:      []string{"a@example.com", "b@example.com"},
+		Subject: "s", Body: "b",
+	}); err != nil {
+		t.Fatalf("Enqueue multi: %v", err)
+	}
+
+	var multi pgtype.Array[string]
+	if err := pool.QueryRow(ctx, `SELECT to_addresses FROM email_jobs WHERE id = $1`, multiID).Scan(&multi); err != nil {
+		t.Fatalf("scan multi to_addresses: %v", err)
+	}
+	if len(multi.Elements) != 2 || multi.Elements[0] != "a@example.com" || multi.Elements[1] != "b@example.com" {
+		t.Errorf("to_addresses = %v, want [a@example.com b@example.com]", multi.Elements)
+	}
+
+	emptyID := uuid.New().String()
+	if err := q.Enqueue(&queue.EmailJob{
+		ID: emptyID, ContextID: uuid.New().String(),
+		To:      nil,
+		Subject: "s", Body: "b",
+	}); err != nil {
+		t.Fatalf("Enqueue empty: %v", err)
+	}
+
+	var empty pgtype.Array[string]
+	if err := pool.QueryRow(ctx, `SELECT to_addresses FROM email_jobs WHERE id = $1`, emptyID).Scan(&empty); err != nil {
+		t.Fatalf("scan empty to_addresses: %v", err)
+	}
+	if len(empty.Elements) != 0 {
+		t.Errorf("empty to_addresses = %v, want empty (not NULL)", empty.Elements)
 	}
 }
 

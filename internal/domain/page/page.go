@@ -2,6 +2,7 @@ package page
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -76,6 +77,24 @@ type Decision struct {
 	IPHash    string
 	UserAgent string
 	CreatedAt time.Time
+}
+
+// Valid actions for a Decision, mirroring the Button.Action values.
+const (
+	ActionLink           = "link"
+	ActionDismissAccept  = "dismiss_accept"
+	ActionDismissDecline = "dismiss_decline"
+)
+
+// Validate rejects decisions whose action is not one of the documented
+// button actions, so unknown actions cannot be persisted through the
+// public decision endpoint.
+func (d *Decision) Validate() error {
+	switch d.Action {
+	case ActionLink, ActionDismissAccept, ActionDismissDecline:
+		return nil
+	}
+	return fmt.Errorf("unknown decision action %q", d.Action)
 }
 
 // Impression records that a positioned page was shown to a visitor.

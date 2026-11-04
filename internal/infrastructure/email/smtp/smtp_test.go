@@ -57,6 +57,30 @@ func TestBuildMessageMultipart(t *testing.T) {
 	}
 }
 
+func TestBuildMessageFromToSanitized(t *testing.T) {
+	msg := string(buildMessage("from@x.com\r\nBcc: all@x.com", []string{"a@x.com", "b@x.com\nInjected: y"}, "Hello", "body", ""))
+	lines := strings.Split(msg, "\r\n")
+	var fromLine, toLine string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "From: ") {
+			fromLine = l
+		}
+		if strings.HasPrefix(l, "To: ") {
+			toLine = l
+		}
+	}
+	// \r and \n each become a space, so the injected header lands mid-line.
+	if fromLine != "From: from@x.com  Bcc: all@x.com" {
+		t.Errorf("from line = %q, want %q", fromLine, "From: from@x.com  Bcc: all@x.com")
+	}
+	if toLine != "To: a@x.com, b@x.com Injected: y" {
+		t.Errorf("to line = %q, want %q", toLine, "To: a@x.com, b@x.com Injected: y")
+	}
+	if strings.Count(msg, "Bcc: all@x.com") != 1 {
+		t.Errorf("injected Bcc header must not appear as its own line:\n%s", msg)
+	}
+}
+
 func TestBuildMessageSubjectSanitized(t *testing.T) {
 	msg := string(buildMessage("from@x.com", []string{"a@x.com"}, "Hello\nInjected-Header: x", "body", ""))
 	lines := strings.Split(msg, "\r\n")

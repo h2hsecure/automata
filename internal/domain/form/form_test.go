@@ -35,6 +35,11 @@ func TestFormValidation(t *testing.T) {
 			form:    &Form{Slug: "feedback", Fields: []FormField{{Slug: "comment", Type: "textarea"}}, Settings: map[string]interface{}{"webhook_url": "https://example.com"}},
 			wantErr: false,
 		},
+		{
+			name:    "duplicate field slugs",
+			form:    &Form{Slug: "contact", Fields: []FormField{{Slug: "name", Type: "text"}, {Slug: "name", Type: "text"}}},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -49,10 +54,10 @@ func TestFormValidation(t *testing.T) {
 
 func TestSubmissionEntity(t *testing.T) {
 	s := &Submission{
-		FormID:   "550e8400-e29b-41d4-a716-446655440000",
+		FormID:    "550e8400-e29b-41d4-a716-446655440000",
 		ContextID: "550e8400-e29b-41d4-a716-446655440001",
-		Data:     map[string]interface{}{"name": "John", "email": "john@example.com"},
-		Files:    []FileUpload{{Field: "resume", Name: "cv.pdf", Size: 1024, Type: "application/pdf", URL: "/uploads/cv.pdf"}},
+		Data:      map[string]interface{}{"name": "John", "email": "john@example.com"},
+		Files:     []FileUpload{{Field: "resume", Name: "cv.pdf", Size: 1024, Type: "application/pdf", URL: "/uploads/cv.pdf"}},
 	}
 
 	if s.FormID == "" {

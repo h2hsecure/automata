@@ -14,7 +14,7 @@ func TestContactValidation(t *testing.T) {
 			name: "valid contact with email",
 			contact: Contact{
 				ContextID: "550e8400-e29b-41d4-a716-446655440000",
-				Email:    strPtr("user@example.com"),
+				Email:     strPtr("user@example.com"),
 			},
 			wantErr: false,
 		},
@@ -22,7 +22,7 @@ func TestContactValidation(t *testing.T) {
 			name: "valid contact without email (unverified)",
 			contact: Contact{
 				ContextID: "550e8400-e29b-41d4-a716-446655440000",
-				Email:    nil,
+				Email:     nil,
 			},
 			wantErr: false,
 		},
@@ -37,7 +37,7 @@ func TestContactValidation(t *testing.T) {
 			name: "invalid email format",
 			contact: Contact{
 				ContextID: "550e8400-e29b-41d4-a716-446655440000",
-				Email:    strPtr("not-an-email"),
+				Email:     strPtr("not-an-email"),
 			},
 			wantErr: true,
 		},
@@ -45,7 +45,7 @@ func TestContactValidation(t *testing.T) {
 			name: "email with @ but no domain",
 			contact: Contact{
 				ContextID: "550e8400-e29b-41d4-a716-446655440000",
-				Email:    strPtr("user@"),
+				Email:     strPtr("user@"),
 			},
 			wantErr: true,
 		},
@@ -53,7 +53,15 @@ func TestContactValidation(t *testing.T) {
 			name: "email with @ but no local part",
 			contact: Contact{
 				ContextID: "550e8400-e29b-41d4-a716-446655440000",
-				Email:    strPtr("@domain.com"),
+				Email:     strPtr("@domain.com"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "email with multiple @",
+			contact: Contact{
+				ContextID: "550e8400-e29b-41d4-a716-446655440000",
+				Email:     strPtr("user@sub@domain.com"),
 			},
 			wantErr: true,
 		},
@@ -61,7 +69,7 @@ func TestContactValidation(t *testing.T) {
 			name: "empty email string",
 			contact: Contact{
 				ContextID: "550e8400-e29b-41d4-a716-446655440000",
-				Email:    strPtr(""),
+				Email:     strPtr(""),
 			},
 			wantErr: false,
 		},
@@ -69,7 +77,7 @@ func TestContactValidation(t *testing.T) {
 			name: "email too long",
 			contact: Contact{
 				ContextID: "550e8400-e29b-41d4-a716-446655440000",
-				Email:    strPtr("a" + string(make([]byte, 255)) + "@example.com"),
+				Email:     strPtr("a" + string(make([]byte, 255)) + "@example.com"),
 			},
 			wantErr: true,
 		},

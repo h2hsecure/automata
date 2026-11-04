@@ -2,6 +2,7 @@ package form
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -28,13 +29,22 @@ type Form struct {
 	UpdatedAt   time.Time
 }
 
-// Validate checks that the Form has all required fields set.
+// Validate checks that the Form has all required fields set and that no
+// field slug is duplicated (duplicate slugs make submission values
+// ambiguous and corrupt stored data).
 func (f *Form) Validate() error {
 	if f.Slug == "" {
 		return errors.New("slug required")
 	}
 	if len(f.Fields) == 0 {
 		return errors.New("at least one field required")
+	}
+	seen := make(map[string]struct{}, len(f.Fields))
+	for _, field := range f.Fields {
+		if _, ok := seen[field.Slug]; ok {
+			return fmt.Errorf("duplicate field slug %q", field.Slug)
+		}
+		seen[field.Slug] = struct{}{}
 	}
 	return nil
 }
