@@ -184,6 +184,27 @@ func TestUpload_FormNotFound(t *testing.T) {
 	}
 }
 
+// TestUpload_UnknownFieldRejected is the regression test for the body-size
+// finding: a ?field= slug that does not exist on the form used to fall
+// through with no constraints (unbounded upload); it must now be rejected
+// with 400.
+func TestUpload_UnknownFieldRejected(t *testing.T) {
+	store, _ := storage.New(t.TempDir())
+	repo := &uploadTestRepo{bySlug: map[string]*form.Form{
+		"ctx1/contact": {ID: "f1", ContextID: "ctx1", Slug: "contact", Name: "C",
+			Fields: []form.FormField{{Slug: "resume", Type: "file"}}},
+	}}
+	r := newUploadTestServer(t, store, repo)
+
+	req := multipartUpload(t, "nonexistent", "big.bin", []byte("x"), "")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestUpload_MissingFilePart(t *testing.T) {
 	store, _ := storage.New(t.TempDir())
 	repo := &uploadTestRepo{bySlug: map[string]*form.Form{

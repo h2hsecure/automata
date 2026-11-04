@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/domain/staticfile"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	"github.com/h2hsecure/automata/internal/infrastructure/storage"
 )
 
@@ -252,6 +253,36 @@ func TestStaticFileDelete_RemovesRecordAndFile(t *testing.T) {
 	}
 	if _, err := store.Open(token); err == nil {
 		t.Fatal("expected file removed from store")
+	}
+}
+
+// TestStaticFileUpload_DeclaredSizeOverCap is the regression test for the
+// body-size finding: the multipart part's declared size is compared against
+// max_body_bytes before the body is read; over-cap uploads get 413 and
+// nothing is stored.
+func TestStaticFileUpload_DeclaredSizeOverCap(t *testing.T) {
+	config.Set("max_body_bytes", "100")
+	t.Cleanup(func() { config.Set("max_body_bytes", "") })
+
+	store := newTestStaticStore(t)
+	repo := &fakeStaticFileRepo{}
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body, ct := multipartBody(t, "big.bin", "", strings.Repeat("x", 200))
+	c.Request = httptest.NewRequest("POST", "/api/context/static-files", body)
+	c.Request.Header.Set("Content-Type", ct)
+	c.Set("context_id", "ctx-1")
+
+	h := NewStaticFileHandler(repo, store)
+	h.Upload(c)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", w.Code, w.Body.String())
+	}
+	if len(repo.files) != 0 {
+		t.Fatalf("expected no record, got %d", len(repo.files))
 	}
 }
 

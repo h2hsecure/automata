@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	webui_cookie "github.com/h2hsecure/automata/internal/infrastructure/webui/cookie"
 	"github.com/rs/zerolog/log"
 )
@@ -76,6 +77,15 @@ func (b *bufferWriter) Flush() {}
 
 // HandleProxy forwards the request to the backend with session-based auth.
 func (h *ProxyHandler) HandleProxy(c *gin.Context) {
+	// Cap the request body so the proxy never forwards an unbounded upload
+	// to the backend (max_body_bytes, 10 MB default).
+	limit := int64(config.GetInt("max_body_bytes", 10*1024*1024))
+	if cl := c.Request.ContentLength; cl > limit {
+		c.AbortWithStatus(http.StatusRequestEntityTooLarge)
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+
 	// Strip any client-supplied Authorization: the SPA no longer sends it,
 	// and the session cookie is the only credential the proxy honors.
 	c.Request.Header.Del("Authorization")

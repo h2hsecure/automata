@@ -6,7 +6,9 @@ import (
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/adapter/api/handler"
+	"github.com/h2hsecure/automata/internal/adapter/api/middleware"
 	geodomain "github.com/h2hsecure/automata/internal/domain/geo"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 )
 
 // NewServer creates a new tracking server with public-facing endpoints.
@@ -19,6 +21,9 @@ func NewServer(formHandler *handler.FormHandler, trackingRepo Repository, geoLoo
 
 	// Compress responses for clients that accept gzip (JSON, JS, HTML).
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
+
+	// Cap request bodies on public endpoints (max_body_bytes, 10 MB default).
+	r.Use(middleware.LimitBody(int64(config.GetInt("max_body_bytes", 10*1024*1024))))
 
 	trackHandler := &TrackHandler{repo: trackingRepo, geoLookup: geoLookup}
 	if len(contactRepo) > 0 && contactRepo[0] != nil {

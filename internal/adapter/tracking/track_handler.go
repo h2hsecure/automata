@@ -13,6 +13,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// maxBatchEvents caps the number of events a single /track/batch request may
+// carry, bounding the per-request memory and fan-out cost.
+const maxBatchEvents = 100
+
 // TrackHandler handles event tracking endpoints.
 type TrackHandler struct {
 	repo        Repository
@@ -162,6 +166,11 @@ func (h *TrackHandler) TrackBatch(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.Events) > maxBatchEvents {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "batch too large: max 100 events per request"})
 		return
 	}
 

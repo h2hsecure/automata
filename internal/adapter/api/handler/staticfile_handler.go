@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/h2hsecure/automata/internal/domain/staticfile"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	"github.com/h2hsecure/automata/internal/infrastructure/storage"
 )
 
@@ -68,6 +69,13 @@ func (h *StaticFileHandler) Upload(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+
+	// Compare the multipart part's declared size to the cap before reading,
+	// so an over-cap upload is rejected without buffering the body.
+	if header.Size > int64(config.GetInt("max_body_bytes", 10*1024*1024)) {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+		return
+	}
 
 	name := c.PostForm("name")
 	if name == "" {

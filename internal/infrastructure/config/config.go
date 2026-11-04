@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -22,6 +23,20 @@ func Get(key string) string {
 	global.mu.RLock()
 	defer global.mu.RUnlock()
 	return global.values[key]
+}
+
+// GetInt returns the integer value for the given key, or def if the key is
+// unset or the value is not a valid integer.
+func GetInt(key string, def int) int {
+	v := Get(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
 }
 
 // Set stores a key-value pair.

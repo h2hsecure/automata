@@ -34,6 +34,13 @@ type ImportError struct {
 // extracted CSV cell values as string values.  The caller (use case layer)
 // is responsible for converting these into domain objects and performing
 // any database operations.
+// maxCSVFieldLine caps a single CSV field (1 MB) and maxCSVRows caps the
+// number of data rows (100,000), bounding memory use on malicious uploads.
+const (
+	maxCSVFieldLine = 1 << 20 // 1 MB
+	maxCSVRows      = 100000
+)
+
 func ParseCSV(r io.Reader, mapping FieldMapping, tenantID string) ([]map[string]string, *ImportResult, error) {
 	reader := csv.NewReader(r)
 	reader.FieldsPerRecord = -1 // allow variable number of fields
@@ -59,6 +66,7 @@ func ParseCSV(r io.Reader, mapping FieldMapping, tenantID string) ([]map[string]
 
 	var contacts []map[string]string
 	result := &ImportResult{}
+	rows := 0
 
 	for {
 		record, err := reader.Read()
@@ -72,6 +80,20 @@ func ParseCSV(r io.Reader, mapping FieldMapping, tenantID string) ([]map[string]
 				Reason: fmt.Sprintf("read row: %v", err),
 			})
 			continue
+		}
+
+		rows++
+		if rows > maxCSVRows {
+			return nil, nil, fmt.Errorf("CSV exceeds %d rows", maxCSVRows)
+		}
+
+		// stdlib csv has no per-field line limit, so enforce it here: the
+		// reader buffers one record at a time, so rejecting an over-cap
+		// field keeps memory bounded by the largest single record.
+		for _, f := range record {
+			if len(f) > maxCSVFieldLine {
+				return nil, nil, fmt.Errorf("CSV field exceeds %d bytes", maxCSVFieldLine)
+			}
 		}
 
 		rowNum := result.Created + result.Updated + result.Skipped + 1

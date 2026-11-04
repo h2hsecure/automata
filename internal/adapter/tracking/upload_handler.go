@@ -51,6 +51,13 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	// A ?field= slug that doesn't exist on the form used to fall through
+	// with no constraints (unbounded upload); reject it.
+	if field := c.Query("field"); field != "" && !hasField(f, field) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown field"})
+		return
+	}
+
 	accept, maxSize := fieldConstraints(f, c.Query("field"))
 
 	file, header, err := c.Request.FormFile("file")
@@ -91,8 +98,19 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 	})
 }
 
+// hasField reports whether the form defines a field with the given slug.
+func hasField(f *form.Form, slug string) bool {
+	for i := range f.Fields {
+		if f.Fields[i].Slug == slug {
+			return true
+		}
+	}
+	return false
+}
+
 // fieldConstraints extracts accept patterns and max size from the form
-// field's validation map. Unknown or missing fields have no constraints.
+// field's validation map. Unknown slugs are rejected before this is called;
+// a missing (empty) field slug has no constraints.
 func fieldConstraints(f *form.Form, fieldSlug string) (accept []string, maxSize int64) {
 	if fieldSlug == "" || f == nil {
 		return nil, 0

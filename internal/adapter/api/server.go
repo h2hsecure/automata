@@ -15,6 +15,7 @@ import (
 	"github.com/h2hsecure/automata/internal/domain/context"
 	infraauth "github.com/h2hsecure/automata/internal/infrastructure/auth"
 	auth_repo "github.com/h2hsecure/automata/internal/infrastructure/auth/repo"
+	"github.com/h2hsecure/automata/internal/infrastructure/config"
 	config_repo "github.com/h2hsecure/automata/internal/infrastructure/config/repo"
 	crepo "github.com/h2hsecure/automata/internal/infrastructure/contact/repo"
 	email_repo "github.com/h2hsecure/automata/internal/infrastructure/email/repo"
@@ -50,6 +51,11 @@ func NewServer(
 	parent.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	api := parent.Group(prefix)
+
+	// Cap request bodies (max_body_bytes, 10 MB default). Applied to the
+	// group before route registration so it covers every /api route,
+	// including the MCP endpoint and all admin subgroups.
+	api.Use(middleware.LimitBody(int64(config.GetInt("max_body_bytes", 10*1024*1024))))
 
 	// HEAD is registered explicitly: gin >= 1.12 no longer auto-maps HEAD
 	// to GET, so a GET-only route 404s health checks that use HEAD.
