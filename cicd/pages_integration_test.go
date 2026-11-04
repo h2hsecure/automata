@@ -120,12 +120,21 @@ var _ = Describe("Pages end-to-end", func() {
 		Expect(impCount).To(Equal(1))
 
 		// 2. Decision is recorded (text/plain body, as the snippet posts it).
+		// The snippet posts the button action, not a friendly alias.
+		req = httptest.NewRequest(http.MethodPost, "/page/decision/"+contextID,
+			bytes.NewBufferString(`{"page_id":"`+bannerPageID+`","decision":"dismiss_accept","visitor_id":"v1"}`))
+		req.Header.Set("Content-Type", "text/plain")
+		w = httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusNoContent))
+
+		// Unknown decision actions are rejected (17a whitelist).
 		req = httptest.NewRequest(http.MethodPost, "/page/decision/"+contextID,
 			bytes.NewBufferString(`{"page_id":"`+bannerPageID+`","decision":"accept","visitor_id":"v1"}`))
 		req.Header.Set("Content-Type", "text/plain")
 		w = httptest.NewRecorder()
 		engine.ServeHTTP(w, req)
-		Expect(w.Code).To(Equal(http.StatusNoContent))
+		Expect(w.Code).To(Equal(http.StatusBadRequest))
 
 		decisions, total, err := pageRepo.ListDecisions(bannerPageID, 0, 0)
 		Expect(err).NotTo(HaveOccurred())

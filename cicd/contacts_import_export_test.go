@@ -50,7 +50,7 @@ var _ = Describe("MCP contacts import/export tools", func() {
 		Expect(count).To(Equal(2))
 	})
 
-	It("reports duplicate emails as updated via contacts_import", func() {
+	It("reports duplicate emails as skipped via contacts_import", func() {
 		contactID := support.NewTestUUID()
 		customFields, _ := json.Marshal(map[string]interface{}{})
 		_, err := pool.Exec(ctx, `
@@ -68,10 +68,11 @@ var _ = Describe("MCP contacts import/export tools", func() {
 		var result struct {
 			Created int
 			Updated int
+			Skipped int
 		}
 		Expect(json.Unmarshal([]byte(mcpToolText(w)), &result)).To(Succeed())
 		Expect(result.Created).To(Equal(1))
-		Expect(result.Updated).To(Equal(1))
+		Expect(result.Skipped).To(Equal(1))
 	})
 
 	It("exports contacts as base64 CSV via contacts_export", func() {

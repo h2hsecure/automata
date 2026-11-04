@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -219,7 +220,9 @@ func ensureTag(ctx context.Context, conn DBConn, contextID, name string) (string
 	if err == nil {
 		return tagID, nil
 	}
-	if err != sql.ErrNoRows {
+	// pgx v5 returns a proxy wrapping sql.ErrNoRows, so direct comparison
+	// fails; use errors.Is.
+	if !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("query tag: %w", err)
 	}
 

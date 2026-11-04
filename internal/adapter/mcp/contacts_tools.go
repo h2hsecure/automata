@@ -243,7 +243,7 @@ func registerContactTools(s *mcp.Server, d Deps, contextID string) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:          "contacts_import",
-		Description:   "Import contacts from CSV data (header row plus data rows). Returns created/updated/skipped counts and per-row errors. Duplicate emails are counted as updated.",
+		Description:   "Import contacts from CSV data (header row plus data rows). Returns created/updated/skipped counts and per-row errors. Duplicate emails are counted as skipped.",
 		InputSchema:   json.RawMessage(schemaContactsImport),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in contactsImportIn) (*mcp.CallToolResult, any, error) {
 		result, err := contactusecase.ImportContacts(d.ContactRepo, contextID, contactusecase.ImportCSVInput{
