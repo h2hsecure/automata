@@ -214,23 +214,20 @@ two releases do not fight over the CRDs.
 ## 3) Deploy
 
 ```bash
-SHA=fc9c654
-CHART_VERSION=2026.11.05-fc9c654
-
 # Preflight — fail fast if either artifact is missing from GHCR. A bad chart
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version "$CHART_VERSION" >/dev/null && echo "chart $CHART_VERSION OK"
+  --version 2026.11.05-fc9c654 >/dev/null && echo "chart 2026.11.05-fc9c654 OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/$SHA" && echo "image $SHA OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/fc9c654" && echo "image fc9c654 OK"
 
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version "$CHART_VERSION" -n automata \
-  -f values.prod.yaml --set image.tag="$SHA"
+  --version 2026.11.05-fc9c654 -n automata \
+  -f values.prod.yaml --set image.tag=fc9c654
 ```
 
 ## 4) Verify rollout
