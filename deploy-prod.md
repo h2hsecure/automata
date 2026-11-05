@@ -8,10 +8,13 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:fc9c654` |
-| Chart | `2026.11.05-fc9c654` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:6828dae` |
+| Chart | `2026.11.05-6828dae` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-The release is CI-verified. New in this release: the 2026-11-04 security-fix
+The release is CI-verified. The chart now defaults `image.tag` to the
+chart's `appVersion` (the CI release SHA), so `helm upgrade --version
+<tag>` alone pins the image — no `--set image.tag` needed. New in this
+release: the 2026-11-04 security-fix
 batch (35 findings — 17 Major + 18 Medium). WebUI auth is now cookie-only: the
 BFF strips client-supplied `Authorization`, injects the session JWT itself,
 and stores the API JWT + refresh token in an encrypted `automata_session`
@@ -218,16 +221,18 @@ two releases do not fight over the CRDs.
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-fc9c654 >/dev/null && echo "chart 2026.11.05-fc9c654 OK"
+  --version 2026.11.05-6828dae >/dev/null && echo "chart 2026.11.05-6828dae OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/fc9c654" && echo "image fc9c654 OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/6828dae" && echo "image 6828dae OK"
 
+# The chart's appVersion is 6828dae, so image.tag resolves to the
+# matching image automatically — no --set image.tag.
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-fc9c654 -n automata \
-  -f values.prod.yaml --set image.tag=fc9c654
+  --version 2026.11.05-6828dae -n automata \
+  -f values.prod.yaml
 ```
 
 ## 4) Verify rollout
