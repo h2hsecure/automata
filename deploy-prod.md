@@ -8,12 +8,24 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:4d88fb9` |
-| Chart | `2026.11.05-4d88fb9` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:ddb34caa` |
+| Chart | `2026.11.05-ddb34caa` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-The release is CI-verified. The chart now defaults `image.tag` to the
-chart's `appVersion` (the CI release SHA), so `helm upgrade --version
-<tag>` alone pins the image — no `--set image.tag` needed. New in this
+The release is CI-verified. **Fixes the post-deploy login lockout
+(incident 3):** the `password_changed_at` migration stamped every
+pre-existing user row with the database clock (`NOW()`); when the app
+server clock ran behind the database clock, the session-revocation
+check (JWT `iat` < `password_changed_at`) self-revoked every fresh
+login instantly — every user bounced back to the login screen right
+after a successful login (401 "session revoked" on the first
+dashboard call). Login now clamps the token's `iat`/`exp` base to
+`max(now, password_changed_at)` so the comparison shares a single time
+source: a fresh login is never self-revoked, and a password change
+*after* login still revokes the session as intended. No data cleanup
+required — the first login after this deploy works. The chart now
+defaults `image.tag` to the chart's `appVersion` (the CI release SHA),
+so `helm upgrade --version <tag>` alone pins the image — no `--set
+image.tag` needed. New in this
 release: the 2026-11-04 security-fix
 batch (35 findings — 17 Major + 18 Medium). WebUI auth is now cookie-only: the
 BFF strips client-supplied `Authorization`, injects the session JWT itself,
@@ -221,17 +233,17 @@ two releases do not fight over the CRDs.
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-4d88fb9 >/dev/null && echo "chart 2026.11.05-4d88fb9 OK"
+  --version 2026.11.05-ddb34caa >/dev/null && echo "chart 2026.11.05-ddb34caa OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/4d88fb9" && echo "image 4d88fb9 OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/ddb34caa" && echo "image ddb34caa OK"
 
-# The chart's appVersion is 4d88fb9, so image.tag resolves to the
+# The chart's appVersion is ddb34caa, so image.tag resolves to the
 # matching image automatically — no --set image.tag.
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-4d88fb9 -n automata \
+  --version 2026.11.05-ddb34caa -n automata \
   -f values.prod.yaml
 ```
 
