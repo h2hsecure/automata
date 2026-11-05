@@ -1,4 +1,77 @@
-# Automata — Full Codebase Review
+# Automata — Security Fixes (2026-11-04 review) — RESOLVED
+
+**Date:** 2026-11-05
+**Branch:** `security-fixes` (base `b339eae` on main, 21 commits)
+**Status:** All **17 Major + 18 Medium** findings from the 2026-11-04 code review are fixed and regression-tested. A fresh-context whole-branch review verified every finding against the diff, then surfaced two fix-introduced regressions (R1, R2) — both fixed in `fc024f0`.
+
+## Resolution table
+
+Spec § = `docs/superpowers/specs/2026-11-04-security-fixes-design.md`.
+
+| Finding (spec §) | Fix commit(s) | Regression test(s) |
+|---|---|---|
+| M1 — `/admin` has no admin gate; `is_admin` settable from request body (§3.1) | `bcce804` | `RequireAdmin` DB-verified; `is_admin` stripped from Create/Update DTOs |
+| M2 — `X-Context-ID` trusted, any tenant reachable (§3.2) | `f37134a`, `5daba04` | `RequireContextMembership` middleware (DB-verified admin bypass; skipped for `auth_via_api_key`); `RequireContextAccess` on explicit-ID routes |
+| M3 — cross-tenant inbox mutation (§3.2) | `f37134a`, `5daba04` | `MarkInboxRead` SQL scoped `AND context_id = $2`; 404 on mismatch |
+| M4 — anonymous snippet XSS (§3.5) | `0276219` | Anchored lowercase-UUID regex → 404 + `escapeJS` in `generateSnippet` |
+| M5 — webhook SSRF + plaintext signing secret (§3.6) | `65c3672`, `45cf6ea` | Anchored host allowlist; `signing_secret_enc` AES-GCM (plaintext column dropped); URL re-checked at dispatch |
+| M6 — no request-size limits anywhere (§4.1) | `689bb93` | `LimitBody` (10 MB default) on api group + BFF proxy; batch ≤100 → 422; CSV 1 MB field / 100 k rows; staticfile 413 |
+| M7 — BFF auth-injection code path dead (§3.4) | `3794055`, `fc024f0` | Proxy strips client `Authorization`, injects session JWT, captures/strips login/refresh tokens into encrypted cookie; gzip-capture fix (R1) |
+| M17 — long-lived JWT in `localStorage` (§3.4) | `3794055`, `e06dfb8` | Zero `localStorage` token refs in SPA; session via `/me` hydration |
+| Frontend — no admin route guard (§3.3) | `e06dfb8` | Router `requiresAdmin` guard + session restore on reload |
+| §4.2 — no rate limiting on brute-force-prone endpoints | `f7d78b8` | Stdlib token bucket (per-pod, documented): login/refresh 10/min per IP+email; `/track/*` 300/min per IP; health & MCP routes exempt |
+| §4.3 — unbounded tracking events query | `25cb388` | Default 50, clamp [1,100] |
+| §4.4 — CSV formula injection on export | `f848013` | `sanitizeCSVCell` prefixes `'` on `=,+,-,@,\t,\r` |
+| §4.5 — session cookie missing `Secure` | `31ddc8c` | `Secure` by default; `insecure_cookie=true` escape hatch |
+| §4.5 — PII (email) in login logs | `31ddc8c` | Hashed email logged |
+| §4.5 — BFF no graceful shutdown; fatal migration errors ignored | `31ddc8c` | `http.Server` + signal handling + `Shutdown`; `RunMigrations` → `log.Fatal` |
+| §4.6 — refresh tokens never rotate/revoke | `f48157f` | `refresh_tokens` (jti PK); revoke-old/issue-new; reuse → reject + warn; startup prune |
+| §5.1 — duplicate hidden (visitor) contacts | `108c6ce`, `fc024f0` | Dedupe keeps oldest (FIRST_VALUE CTE), reattaches 4 tables, partial unique index, 23505 re-read; PK-collision guard (R2) |
+| §5.2 — visitor merge not atomic | `5a0f672` | `WithTx`/`MergeTx` + `ReassignVisitorContactIDTx` in one transaction |
+| §5.3 — tag replace not transactional | `979a1c2`, `3a2eda8` | `ReplaceMemberships` in one tx; `errors.Is(err, sql.ErrNoRows)` in `ensureTag` |
+| §5.4 — queue duplicate delivery | `45cf6ea` | Atomic `Claim` (`FOR UPDATE SKIP LOCKED` inside CTE, verified on PG16), stale-`processing` reaper, `CountPending` filters `status='pending'` |
+| §5.5 — activity-creation errors swallowed | `13912df` | create/merge contact paths |
+| §5.5 — import duplicates silently update existing | `13912df` | Duplicates counted `Skipped`, never updated |
+| §5.5 — empty tag array doesn't clear tags | `13912df` | `UpdateInput.Tags *[]string` three-state (nil/empty/replace), wired API + MCP |
+| §5.5 — `""` email stored | `13912df` | `""` → nil; 23505 re-read on create/update |
+| §5.5 — `TestSend` lacks recipient validation | `13912df` | Email gate added |
+| §5.5 — dashboard default bounds interdependent | `13912df` | Independent defaults |
+| §5.5 — export truncates at 100 k | `13912df` | Paginate to exhaustion, 1000/page |
+| §5.5 — duplicate form slugs | `25a1d82` | `Form.Validate()` rejects duplicates |
+| §5.5 — weak email validation | `25a1d82` | Exactly-one-`@` rule; exported `IsValidEmail` |
+| §5.5 — `Decision.Validate` accepts any action | `25a1d82` | Whitelist `link`/`dismiss_accept`/`dismiss_decline`; handler 400 |
+| §5.5 — SMTP from/to header injection | `25a1d82` | CRLF sanitization |
+| §5.5 — hand-built SQL literal for `to_addresses` | `25a1d82` | Real `pgtype.Array` param |
+| §5.5 — bootstrap admin password to stdout | `5daba04` | 0600 file (`AUTOMATA_ADMIN_SECRET_FILE`, default `.admin_credentials`); no file for operator-supplied passwords |
+| §5.5 — staticfile `List` unbounded | `5daba04` | Default 100 / cap 500 (`NormalizeListParams`), newest-first |
+| §5.5 — raw `err.Error()` in HTTP responses | `5daba04` | Generic client messages in contact/context/settings/user/tracking/staticfile handlers + context middleware; real error to zerolog |
+| §6 — DashboardView stale-response race | `12e3cea` | Generation counters on `loadOverview`/`loadMapData`; late-response test |
+| §6 — swallowed delete errors in Users/Websites panels | `12e3cea` | `deleteError` banner; vitest specs |
+
+## Review-regression fixes (`fc024f0`)
+
+- **R1 (HIGH)** — `internal/adapter/webui/handler/proxy.go`: on auth paths the proxy forwarded the browser's `Accept-Encoding: gzip`, so the API's gzip middleware compressed the login/refresh body; the transport only decompresses gzip it requested itself, so token capture saw raw gzip, failed to parse, and leaked the JWT + refresh token to the browser with no session cookie set (401 loop for every real browser). Fix: drop `Accept-Encoding` on auth paths. Test: `TestProxy_LoginGzippedClient`.
+- **R2 (MEDIUM)** — `internal/infrastructure/contact/migration.sql`: the dedupe tag-reattach `UPDATE` could violate PK `(contact_id, tag_id)` when the kept contact already carries the duplicate's tag, failing the whole migration set and blocking startup. Fix: `NOT EXISTS` guard with an aliased target (inner subquery must not shadow it). Cookie mappings need no guard — their PK `(context_id, cookie)` structurally rules out the collision. Test: PK-collision migration spec.
+
+## Open non-blocking notes
+
+- Body lying about `Content-Length` beyond the cap → 400 (not 413); cap is enforced.
+- SPA client has no 401 → refresh → retry; on 401 it redirects to `/login` (pre-branch behavior).
+- Rate limiter is per-pod in-process (documented, spec §9).
+- Deploy: refresh rotation has no rows for pre-existing refresh tokens → one-time re-login after deploy.
+
+## Final gates (all green)
+
+- `go build ./... && go vet ./...` — clean
+- `go test ./...` — exit 0 (39 packages incl. cicd)
+- `make cicd-tests` — 428/428
+- webui: vitest 59/59, `vite build` clean
+
+---
+
+# Automata — Full Codebase Review (2026-09-28 — superseded)
+
+> **Note:** All findings below were fixed on main prior to the 2026-11-04 review (branch base `b339eae`). Retained for history; the resolution table above supersedes it.
 
 **Date:** 2026-09-28  
 **Scope:** All production Go code across `internal/`, `pkg/`, and `cmd/` (202 Go files, ~4,000+ lines)  
