@@ -1,7 +1,8 @@
 # Production Deployment — Automata
 
 Run these commands on a machine that has access to the production cluster.
-Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`).
+The production domain is `m.h2hsecure.com`; the only value to fill in is
+the prod kube context name in §0 (`<prod-context>`).
 
 ## Current release
 
@@ -125,7 +126,7 @@ ingress:
   # maxBodySize: 52428800   # 50 MiB
 secretKey: "<random 32+ chars>"
 cookieSecret: "<random 32+ chars>"
-adminEmail: admin@<PROD-DOMAIN>
+adminEmail: admin@m.h2hsecure.com
 adminPassword: "<strong password>"
 postgresql:
   auth:
@@ -244,10 +245,10 @@ kubectl -n automata get pods
 Then check health, the HTTP→HTTPS redirect, and TLS over the public domain:
 
 ```bash
-curl -s https://<PROD-DOMAIN>/api/health        # expect {"status":"ok"}
-curl -sI http://<PROD-DOMAIN>/                  # expect 301 -> https
-curl -sI https://<PROD-DOMAIN>/api/health       # expect 200 over TLS
-curl -sI -X HEAD https://<PROD-DOMAIN>/api/health   # expect 200 (gin 1.12: HEAD is not auto-mapped to GET)
+curl -s https://m.h2hsecure.com/api/health        # expect {"status":"ok"}
+curl -sI http://m.h2hsecure.com/                  # expect 301 -> https
+curl -sI https://m.h2hsecure.com/api/health       # expect 200 over TLS
+curl -sI -X HEAD https://m.h2hsecure.com/api/health   # expect 200 (gin 1.12: HEAD is not auto-mapped to GET)
 # cert issued and ready (READY=True)
 kubectl -n automata get certificate automata-tls
 ```
