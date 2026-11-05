@@ -8,8 +8,8 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:b768232` |
-| Chart | `2026.11.05-b768232` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:4d88fb9` |
+| Chart | `2026.11.05-4d88fb9` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
 The release is CI-verified. The chart now defaults `image.tag` to the
 chart's `appVersion` (the CI release SHA), so `helm upgrade --version
@@ -221,17 +221,17 @@ two releases do not fight over the CRDs.
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-b768232 >/dev/null && echo "chart 2026.11.05-b768232 OK"
+  --version 2026.11.05-4d88fb9 >/dev/null && echo "chart 2026.11.05-4d88fb9 OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/b768232" && echo "image b768232 OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/4d88fb9" && echo "image 4d88fb9 OK"
 
-# The chart's appVersion is b768232, so image.tag resolves to the
+# The chart's appVersion is 4d88fb9, so image.tag resolves to the
 # matching image automatically — no --set image.tag.
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-b768232 -n automata \
+  --version 2026.11.05-4d88fb9 -n automata \
   -f values.prod.yaml
 ```
 
