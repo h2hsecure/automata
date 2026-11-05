@@ -25,6 +25,16 @@ import type {
   PageDecision,
 } from '@/types/api'
 
+// Per-request opt-out for the 401 full-reload backstop. Session-verification
+// calls (e.g. /auth/me in the router guard) must NOT navigate: with no valid
+// session, navigating to /login (a server-side 302 back to /) would restart
+// the app, 401 again, and loop forever. The guard redirects client-side.
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean
+  }
+}
+
 const client: AxiosInstance = axios.create({
   baseURL: '/api',
   headers: {
@@ -51,9 +61,11 @@ client.interceptors.request.use(
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Session cookie is missing/invalid: full reload so the router
-      // guard re-verifies and lands on the login page.
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
+      // Session cookie is missing/invalid on a mid-session data call: full
+      // reload so the router guard re-verifies and lands on the login page.
+      // Session-verification calls are flagged skipAuthRedirect: the guard
+      // itself redirects (client-side) when it finds no session.
       window.location.href = '/login'
     }
     return Promise.reject(error)
@@ -71,7 +83,7 @@ export async function logout() {
 }
 
 export async function getMe(): Promise<User> {
-  const response = await client.get('/auth/me')
+  const response = await client.get('/auth/me', { skipAuthRedirect: true })
   return response.data
 }
 
