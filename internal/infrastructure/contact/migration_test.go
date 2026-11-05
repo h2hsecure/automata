@@ -229,6 +229,80 @@ var _ = Describe("Contact Migration", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("dedupe does not fail on a PK collision when the kept contact already has the same tag", func() {
+			err := contact.RunMigrations(pool)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Simulate a historical database: drop the unique index so
+			// duplicate visitor contacts can exist before the dedupe runs.
+			_, err = pool.Exec(ctx, "DROP INDEX IF EXISTS idx_contacts_visitor_unique")
+			Expect(err).NotTo(HaveOccurred())
+
+			var contextID string
+			err = pool.QueryRow(ctx, "SELECT gen_random_uuid()::text").Scan(&contextID)
+			Expect(err).NotTo(HaveOccurred())
+
+			var oldest, mid, young string
+			for _, ts := range []string{
+				"NOW() - interval '3 days'",
+				"NOW() - interval '2 days'",
+				"NOW() - interval '1 day'",
+			} {
+				_, err = pool.Exec(ctx, `
+					INSERT INTO contacts (context_id, source, source_id, hidden, created_at, updated_at)
+					VALUES ($1, 'visitor', 'visitor-pk', TRUE, `+ts+`, `+ts+`)
+				`, contextID)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			rows, err := pool.Query(ctx,
+				"SELECT id::text FROM contacts WHERE context_id=$1 AND source_id='visitor-pk' ORDER BY created_at, id", contextID)
+			Expect(err).NotTo(HaveOccurred())
+			defer rows.Close()
+			for _, id := range []any{&oldest, &mid, &young} {
+				Expect(rows.Next()).To(BeTrue())
+				Expect(rows.Scan(id)).To(Succeed())
+			}
+			Expect(rows.Err()).ToNot(HaveOccurred())
+
+			// Both the kept contact and a duplicate carry the same tag:
+			// the naive reattach UPDATE would violate PK (contact_id, tag_id).
+			var tagID string
+			err = pool.QueryRow(ctx, `
+				INSERT INTO contact_tags (context_id, name) VALUES ($1, 'vip') RETURNING id::text
+			`, contextID).Scan(&tagID)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = pool.Exec(ctx, `
+				INSERT INTO contact_tag_memberships (contact_id, tag_id) VALUES ($1, $2), ($3, $2)
+			`, oldest, tagID, young)
+			Expect(err).NotTo(HaveOccurred())
+
+			// (A cookie-mapping collision is unseedable: the PK
+			// (context_id, cookie) means the kept contact and a duplicate
+			// can never both hold the same (context, cookie) row, so no
+			// guard is needed on contact_cookie_mappings.)
+
+			// Re-run the migration: the PK collision must not fail the
+			// migration set. Conflicting dependent rows are already on the
+			// kept contact and are dropped with the duplicate.
+			err = contact.RunMigrations(pool)
+			Expect(err).NotTo(HaveOccurred())
+
+			var keptID string
+			err = pool.QueryRow(ctx, `
+				SELECT id::text FROM contacts
+				WHERE context_id = $1 AND source = 'visitor' AND source_id = 'visitor-pk'
+			`, contextID).Scan(&keptID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(keptID).To(Equal(oldest), "oldest duplicate must survive")
+
+			var tagCount int
+			err = pool.QueryRow(ctx, `
+				SELECT COUNT(*) FROM contact_tag_memberships WHERE tag_id = $1 AND contact_id = $2
+			`, tagID, keptID).Scan(&tagCount)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tagCount).To(Equal(1), "kept contact keeps a single membership for the tag")
+		})
+
 		It("creates unique constraint on context+email", func() {
 			err := contact.RunMigrations(pool)
 			Expect(err).NotTo(HaveOccurred())

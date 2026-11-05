@@ -15,7 +15,7 @@ type FileUpload struct {
 type Submission struct {
 	ID        string
 	FormID    string
-	ContextID  string
+	ContextID string
 	Data      map[string]interface{}
 	Files     []FileUpload
 	CreatedAt time.Time

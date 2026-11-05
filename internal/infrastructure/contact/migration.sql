@@ -122,9 +122,19 @@ WITH dups AS (
     FROM contacts
     WHERE source = 'visitor' AND source_id IS NOT NULL
 )
-UPDATE contact_tag_memberships SET contact_id = d.keep_id
+UPDATE contact_tag_memberships t
+SET contact_id = d.keep_id
 FROM dups d
-WHERE contact_tag_memberships.contact_id = d.dup_id AND d.dup_id <> d.keep_id;
+WHERE t.contact_id = d.dup_id AND d.dup_id <> d.keep_id
+  -- If the kept contact already carries the tag, skip the reattach: the
+  -- UPDATE would violate PK (contact_id, tag_id) and fail the whole
+  -- migration set. The duplicate's row is dropped with the contact
+  -- (ON DELETE CASCADE). (t = the row being updated; the inner alias k
+  -- must not shadow the outer table name.)
+  AND NOT EXISTS (
+      SELECT 1 FROM contact_tag_memberships k
+      WHERE k.contact_id = d.keep_id AND k.tag_id = t.tag_id
+  );
 
 WITH dups AS (
     SELECT id AS dup_id,
@@ -134,6 +144,9 @@ WITH dups AS (
     FROM contacts
     WHERE source = 'visitor' AND source_id IS NOT NULL
 )
+-- contact_cookie_mappings needs no collision guard: its PK is
+-- (context_id, cookie), so the kept contact and a duplicate (always in
+-- the same context) can never both hold the same (context, cookie) row.
 UPDATE contact_cookie_mappings SET contact_id = d.keep_id
 FROM dups d
 WHERE contact_cookie_mappings.contact_id = d.dup_id AND d.dup_id <> d.keep_id;

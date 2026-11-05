@@ -109,6 +109,14 @@ func (h *ProxyHandler) HandleProxy(c *gin.Context) {
 	}
 
 	if isAuthPath(c.Request.URL.Path) {
+		// The capturing writer parses the response as JSON. A client
+		// Accept-Encoding: gzip would make the backend (gzip middleware)
+		// compress the body, and the transport only transparently
+		// decompresses gzip it requested itself — so the capture would see
+		// raw gzip bytes, fail to parse, and leak the tokens to the browser
+		// with no session cookie set. Drop the header so the proxy's own
+		// transport requests gzip and decompresses it.
+		c.Request.Header.Del("Accept-Encoding")
 		h.proxyAuth(c, session)
 		return
 	}

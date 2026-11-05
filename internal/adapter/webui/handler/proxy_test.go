@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"compress/gzip"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,6 +126,63 @@ func TestProxy_LoginResponseStripsTokens(t *testing.T) {
 	}
 	if !strings.Contains(body, `"user_id":"u1"`) {
 		t.Errorf("other response fields must be preserved, got %s", body)
+	}
+}
+
+// TestProxy_LoginGzippedClient: real browsers send Accept-Encoding: gzip
+// and the API compresses the login/refresh response in that case. The
+// capturing writer must still see plain JSON, so the tokens are stripped
+// from the client body and the session cookie is set. Without this the
+// JWT + refresh token leak to the browser and no session is ever
+// established (login is a 401 loop).
+func TestProxy_LoginGzippedClient(t *testing.T) {
+	const payload = `{"token":"jwt-token-1","refresh_token":"refresh-1","user_id":"u1","email":"a@b.c"}`
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	if _, err := gw.Write([]byte(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	gzipped := buf.Bytes()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Header.Get("Accept-Encoding") == "gzip" {
+			w.Header().Set("Content-Encoding", "gzip")
+			w.Write(gzipped)
+			return
+		}
+		w.Write([]byte(payload))
+	})
+	ph, mgr := newTestProxy(t, mux)
+	engine := newTestEngine(ph)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	req.Header.Set("Accept-Encoding", "gzip") // what every real browser sends
+	w := &closeNotifyRecorder{ResponseRecorder: httptest.NewRecorder(), notify: make(chan bool)}
+	engine.ServeHTTP(w, req)
+	rec := w.ResponseRecorder
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "jwt-token-1") || strings.Contains(body, "refresh-1") {
+		t.Fatalf("client response must not contain tokens, got %q", body)
+	}
+	cookieVal := rec.Header().Get("Set-Cookie")
+	if !strings.Contains(cookieVal, "automata_session=") {
+		t.Fatalf("expected Set-Cookie automata_session, got %q", cookieVal)
+	}
+	data, err := mgr.Decrypt(extractSession(cookieVal))
+	if err != nil {
+		t.Fatalf("decrypt session cookie: %v", err)
+	}
+	if data.Token != "jwt-token-1" || data.RefreshToken != "refresh-1" {
+		t.Fatalf("session tokens not captured: %+v", data)
 	}
 }
 
