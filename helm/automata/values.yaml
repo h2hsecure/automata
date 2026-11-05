@@ -3,7 +3,10 @@
 
 image:
   repository: ghcr.io/h2hsecure/automata
-  tag: "latest"
+  # Empty by default: templates fall back to the chart's appVersion, which
+  # CI stamps with the release short SHA (so `helm upgrade --version
+  # <YYYY.MM.DD>-<sha>` deploys the matching image without --set image.tag).
+  tag: ""
   pullPolicy: Always
   pullSecrets:
     - name: ghcr-registry
