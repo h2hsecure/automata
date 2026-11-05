@@ -7,8 +7,8 @@ Only one value is unknown ahead of time: your production domain (`<PROD-DOMAIN>`
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:fc9c6547` |
-| Chart | `2026.11.05-fc9c6547` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:fc9c654` |
+| Chart | `2026.11.05-fc9c654` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
 The release is CI-verified. New in this release: the 2026-11-04 security-fix
 batch (35 findings — 17 Major + 18 Medium). WebUI auth is now cookie-only: the
@@ -214,8 +214,8 @@ two releases do not fight over the CRDs.
 
 ```bash
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-fc9c6547 -n automata \
-  -f values.prod.yaml --set image.tag=fc9c6547
+  --version 2026.11.05-fc9c654 -n automata \
+  -f values.prod.yaml --set image.tag=fc9c654
 ```
 
 ## 4) Verify rollout
