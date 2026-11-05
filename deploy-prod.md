@@ -8,8 +8,13 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:ddb34caa` |
-| Chart | `2026.11.05-ddb34caa` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:b8ebaa0` |
+| Chart | `2026.11.05-b8ebaa0` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+
+Tag note: the P3 fix landed in commit `ddb34ca`, but its CI run never
+published; the docs-only follow-up `b8ebaa0` (tree identical apart from
+this file) did. Image `b8ebaa0` is therefore byte-for-byte the same Go
+and WebUI code.
 
 The release is CI-verified. **Fixes the post-deploy login lockout
 (incident 3):** the `password_changed_at` migration stamped every
@@ -233,17 +238,17 @@ two releases do not fight over the CRDs.
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-ddb34caa >/dev/null && echo "chart 2026.11.05-ddb34caa OK"
+  --version 2026.11.05-b8ebaa0 >/dev/null && echo "chart 2026.11.05-b8ebaa0 OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/ddb34caa" && echo "image ddb34caa OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/b8ebaa0" && echo "image b8ebaa0 OK"
 
-# The chart's appVersion is ddb34caa, so image.tag resolves to the
+# The chart's appVersion is b8ebaa0, so image.tag resolves to the
 # matching image automatically — no --set image.tag.
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-ddb34caa -n automata \
+  --version 2026.11.05-b8ebaa0 -n automata \
   -f values.prod.yaml
 ```
 
