@@ -128,8 +128,22 @@ func (s *service) Login(email, password string) (string, string, []domainauth.Co
 		})
 	}
 
-	// Generate JWT with is_admin claim
+	// Generate JWT with is_admin claim.
+	//
+	// The session-revocation check compares this token's `iat` against the
+	// user's `password_changed_at`. Those two values are stamped by different
+	// clocks: `iat` by the app server (time.Now) and `password_changed_at` by
+	// the database (NOW()). When the app clock runs behind the database clock
+	// (e.g. a K8s node with drifted NTP), a fresh token's iat lands before
+	// password_changed_at and every new login is instantly self-revoked.
+	// Clamping iat to at least the user's current password_changed_at makes
+	// the comparison use a single time source, so a fresh login is never
+	// revoked — while a later password change (which moves password_changed_at
+	// past this iat) still revokes the token as intended.
 	now := time.Now()
+	if u.PasswordChangedAt.After(now) {
+		now = u.PasswordChangedAt
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":    u.ID,
 		"user_email": email,

@@ -106,4 +106,34 @@ var _ = Describe("Session Revocation Integration Tests", func() {
 		Expect(json.Unmarshal(w.Body.Bytes(), &errResp)).To(Succeed())
 		Expect(errResp["error"]).To(Equal("session revoked"))
 	})
+
+	It("does not self-revoke a fresh login when password_changed_at is ahead of the app clock (clock skew)", func() {
+		userID = support.NewTestUUID()
+		passwordHash, err := authSvc.HashPassword("REDACTED")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Simulate clock skew: the database clock (which stamped
+		// password_changed_at via NOW() — e.g. the migration default) is ahead
+		// of the app server clock (which stamps the token's iat). This is the
+		// exact condition that locked every user out after the migration.
+		_, err = pool.Exec(ctx, `
+			INSERT INTO users (id, email, password_hash, is_admin, password_changed_at, created_at, updated_at)
+			VALUES ($1, $2, $3, false, NOW() + interval '10 minutes', NOW(), NOW())
+		`, userID, "skew@example.com", passwordHash)
+		Expect(err).NotTo(HaveOccurred())
+
+		// A fresh login must succeed and the token must be immediately usable —
+		// it must NOT be self-revoked by the iat < password_changed_at check.
+		w := do("POST", "/api/auth/login", "", `{"email":"skew@example.com","password":"REDACTED"}`)
+		Expect(w.Code).To(Equal(http.StatusOK), "body: %s", w.Body.String())
+
+		var response map[string]interface{}
+		Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+		token, ok := response["token"].(string)
+		Expect(ok).To(BeTrue())
+		Expect(token).NotTo(BeEmpty())
+
+		w = do("GET", "/api/whoami", token, "")
+		Expect(w.Code).To(Equal(http.StatusOK), "fresh login must not be self-revoked; body: %s", w.Body.String())
+	})
 })
