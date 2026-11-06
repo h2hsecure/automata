@@ -8,15 +8,29 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:3d9731a` |
-| Chart | `2026.11.06-3d9731a` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:dc6b599` |
+| Chart | `2026.11.06-dc6b599` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-Tag note: `3d9731a` is the first code commit after the runbook repoint at
-`476c6a0` (image `b8ebaa0`); it carries the admin-global API-key listing
-described below.
+Tag note: `dc6b599` fixes the second post-deploy login lockout
+(incident 4); `3d9731a` (below) carried the admin-global API-key listing.
 
-The release is CI-verified. **New: admin-global API-key listing with a
-Website column** — the WebUI's API keys table now shows every website's
+The release is CI-verified. **New: BFF session-cookie fix — login
+lockout (incident 4).** After a successful login every dashboard API
+call returned 401 and users bounced back to the login screen. Cause:
+the BFF's auth-path response handler sets the encrypted
+`automata_session` cookie, then copies the API backend's response
+headers with `c.Header` (Gin `Set` semantics); the backend's own
+`Set-Cookie: automata_refresh` header from the login response
+**replaced** the session cookie, so the browser never received it.
+With no session cookie the BFF injects no `Authorization` header and
+every subsequent API call fails with 401 "missing authorization
+header". The copy now appends `Set-Cookie`, so both cookies reach the
+browser. Regression test:
+`TestProxy_LoginBackendSetCookieSurvives`. No data cleanup required —
+simply log in again after this deploy. The previous release
+(`3d9731a`) added the **admin-global API-key listing with a
+Website column** — the WebUI's API keys table now shows every
+website's
 keys in one list, each labeled with its website (context) name; creating
 a key still targets the selected website, and revoking works for any key
 in the global list (the routes stay admin-only). `GET /api/admin/api-keys`
