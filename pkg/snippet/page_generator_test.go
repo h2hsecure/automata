@@ -113,3 +113,31 @@ func TestGeneratePageConfigSnippetValidation(t *testing.T) {
 		t.Error("expected error for empty contextID")
 	}
 }
+
+// TestGeneratePageConfigSnippet_NoncePassthrough verifies the snippet applies
+// the page's per-request CSP nonce to any inline <script> in the injected
+// content. innerHTML-inserted scripts are inert, so the snippet must recreate
+// each script as a live element carrying the nonce (window.__CSP_NONCE__, set
+// by the site front) before it runs; when no nonce is available it must skip
+// (remove) the script rather than let it run un-nonce'd.
+func TestGeneratePageConfigSnippet_NoncePassthrough(t *testing.T) {
+	js, err := GeneratePageConfigSnippet("ctx-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		// Reads the per-request nonce exposed by the site front.
+		`window.__CSP_NONCE__`,
+		// Finds every inline script in the injected content.
+		`querySelectorAll("script")`,
+		// Recreates the script as a live element and sets the nonce attribute.
+		`setAttribute("nonce"`,
+		`replaceChild`,
+		// No-nonce guard: skip (remove) the script instead of running it.
+		`removeChild`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("GeneratePageConfigSnippet() missing nonce passthrough %q", want)
+		}
+	}
+}

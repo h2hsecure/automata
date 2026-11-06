@@ -34,6 +34,7 @@ var configUrl=__AUTOMATA_CONFIG_URL__;
 var decisionUrl=__AUTOMATA_DECISION_URL__;
 function _getCookie(n){var m=n+"=";var c=document.cookie.split(";");for(var i=0;i<c.length;i++){var v=c[i].trim();if(v.indexOf(m)===0)return v.substring(m.length,v.length)}return null}
 function _setCookie(n,v,days){var d=new Date();d.setTime(d.getTime()+days*24*60*60*1000);document.cookie=n+"="+v+";expires="+d.toUTCString()+";SameSite=Lax;Path=/";}
+function _applyScriptNonce(c){var s=c.querySelectorAll("script");var n=window.__CSP_NONCE__;for(var i=0;i<s.length;i++){var o=s[i];if(!o.parentNode)continue;if(n){var e=document.createElement("script");var a=o.attributes;for(var j=0;j<a.length;j++){if(a[j].name!=="nonce")e.setAttribute(a[j].name,a[j].value);}e.textContent=o.textContent;e.setAttribute("nonce",n);o.parentNode.replaceChild(e,o);}else{o.parentNode.removeChild(o);}}}
 var visitorId=_getCookie("automata_visitor");
 if(!visitorId){var _h="";for(var _i=0;_i<16;_i++){_h+="0123456789abcdef"[Math.floor(Math.random()*16)];}visitorId=_h;_setCookie("automata_visitor",visitorId,365);}
 function positionCss(p){
@@ -62,6 +63,7 @@ card.style.cssText="font-family:sans-serif;padding:12px 16px;border:1px solid #d
 wrap.appendChild(card);
 var content=document.createElement("div");
 content.innerHTML=p.content+(p.page?p.page:"");
+_applyScriptNonce(content);
 card.appendChild(content);
 var btns=document.createElement("div");
 btns.style.cssText="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;";
