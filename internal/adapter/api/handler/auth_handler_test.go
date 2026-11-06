@@ -70,11 +70,13 @@ func (f *fakeAuthService) LogoutAllSessions(userID string) error { return nil }
 
 // fakeApiKeyRepo implements auth_repo.ApiKeyRepository for handler tests.
 type fakeApiKeyRepo struct {
-	createErr     error
-	keys          map[string]*auth.APIKey
-	deleted       map[string]int
-	listedContext string
-	listedKeys    []*auth.APIKey
+	createErr            error
+	keys                 map[string]*auth.APIKey
+	deleted              map[string]int
+	listedContext        string
+	listedKeys           []*auth.APIKey
+	listAllWithContexts  []*auth.APIKey
+	listAllWithContextsCalls int
 }
 
 func (f *fakeApiKeyRepo) Create(key *auth.APIKey) error { return f.createErr }
@@ -83,6 +85,10 @@ func (f *fakeApiKeyRepo) ListByContext(contextID string) ([]*auth.APIKey, error)
 	return f.listedKeys, nil
 }
 func (f *fakeApiKeyRepo) ListAll() ([]*auth.APIKey, error) { return nil, nil }
+func (f *fakeApiKeyRepo) ListAllWithContexts() ([]*auth.APIKey, error) {
+	f.listAllWithContextsCalls++
+	return f.listAllWithContexts, nil
+}
 func (f *fakeApiKeyRepo) Delete(id string) error {
 	if f.deleted == nil {
 		f.deleted = map[string]int{}
@@ -98,6 +104,12 @@ func (f *fakeApiKeyRepo) GetByPrefix(prefix, contextID string) (*auth.APIKey, er
 }
 func (f *fakeApiKeyRepo) GetByID(id, contextID string) (*auth.APIKey, error) {
 	if key, ok := f.keys[id]; ok && key.ContextID == contextID {
+		return key, nil
+	}
+	return nil, errors.New("not found")
+}
+func (f *fakeApiKeyRepo) GetByIDOnly(id string) (*auth.APIKey, error) {
+	if key, ok := f.keys[id]; ok {
 		return key, nil
 	}
 	return nil, errors.New("not found")
@@ -204,24 +216,29 @@ func TestRevokeAPIKeyUnknownKeyReturnsNotFound(t *testing.T) {
 	}
 }
 
-func TestRevokeAPIKeyOtherContextReturnsNotFound(t *testing.T) {
+func TestRevokeAPIKeyAcrossContextsSucceeds(t *testing.T) {
 	keyID := "33333333-3333-3333-3333-333333333333"
 	repo := &fakeApiKeyRepo{
 		keys: map[string]*auth.APIKey{
 			keyID: {ID: keyID, ContextID: "other-ctx", Name: "Other Context Key"},
 		},
 	}
-	r := newRevokeAPIKeyTestRouter(repo)
+	userRepo := &fakeUserRepo{user: &context.User{ID: "user-1", Email: "a@example.com"}}
+	ctxRepo := &fakeContextRepo{}
+	r := newJWTStyleTestRouter(userRepo, ctxRepo, repo)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodDelete, "/admin/api-keys/"+keyID, nil)
+	req.Header.Set("X-Context-ID", "ctx-selected")
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d (body: %s)", w.Code, w.Body.String())
+	// The listing is admin-global (Website column), so a key from a context
+	// other than the WebUI's selected one must be revokable too.
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
 	}
-	if repo.deleted[keyID] != 0 {
-		t.Fatalf("expected Delete not to be called for a foreign-context key, got %d", repo.deleted[keyID])
+	if repo.deleted[keyID] != 1 {
+		t.Fatalf("expected Delete to be called once for %s, got %d", keyID, repo.deleted[keyID])
 	}
 }
 
@@ -313,88 +330,56 @@ func newJWTStyleTestRouter(userRepo context.UserRepository, ctxRepo context.Repo
 	return r
 }
 
-// Regression: the WebUI sends the selected context in X-Context-ID, and
-// CreateAPIKey stores new keys in that context. ListAPIKeys must target the
-// same context — not the user's first context — or freshly created keys are
-// invisible in the list.
-func TestListAPIKeysUsesHeaderContext(t *testing.T) {
-	keyID := "55555555-5555-5555-5555-555555555555"
+// The API-key listing is admin-global: it returns keys from every context,
+// each labeled with its context (Website) name, and ignores X-Context-ID —
+// the WebUI renders one table with a Website column.
+func TestListAPIKeysIsGlobalWithContextNames(t *testing.T) {
 	repo := &fakeApiKeyRepo{
-		listedKeys: []*auth.APIKey{
-			{ID: keyID, ContextID: "ctx-selected", Name: "Selected Context Key", KeyHash: "hashedkey"},
+		listAllWithContexts: []*auth.APIKey{
+			{ID: "55555555-5555-5555-5555-555555555555", ContextID: "ctx-a", Name: "Key A",
+				KeyHash: "hashedkey", ContextName: "Website A", ContextSlug: "website-a"},
+			{ID: "66666666-6666-6666-6666-666666666666", ContextID: "ctx-b", Name: "Key B",
+				KeyHash: "hashedkey", ContextName: "Website B", ContextSlug: "website-b"},
 		},
 	}
 	userRepo := &fakeUserRepo{user: &context.User{ID: "user-1", Email: "a@example.com"}}
-	ctxRepo := &fakeContextRepo{contextsByUserEmail: []*context.Context{{ID: "ctx-oldest"}}}
+	ctxRepo := &fakeContextRepo{}
 	r := newJWTStyleTestRouter(userRepo, ctxRepo, repo)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/admin/api-keys", nil)
-	req.Header.Set("X-Context-ID", "ctx-selected")
+	req.Header.Set("X-Context-ID", "ctx-b") // must be ignored
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
 	}
-	if repo.listedContext != "ctx-selected" {
-		t.Fatalf("expected ListByContext to be called with ctx-selected, got %q", repo.listedContext)
+	if repo.listAllWithContextsCalls != 1 {
+		t.Fatalf("expected ListAllWithContexts to be called once, got %d", repo.listAllWithContextsCalls)
 	}
 
 	var resp struct {
-		Keys []map[string]any `json:"keys"`
+		Keys []struct {
+			ID          string `json:"id"`
+			ContextName string `json:"context_name"`
+			ContextSlug string `json:"context_slug"`
+		} `json:"keys"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("invalid JSON body: %v", err)
 	}
-	if len(resp.Keys) != 1 {
-		t.Fatalf("expected 1 key in response, got %d", len(resp.Keys))
+	if len(resp.Keys) != 2 {
+		t.Fatalf("expected 2 keys in response, got %d", len(resp.Keys))
 	}
-}
-
-// Regression: a key created in the selected context (via X-Context-ID) must
-// be revokable from the same WebUI session — the handler previously fell back
-// to the user's first context and returned 404 for such keys.
-func TestRevokeAPIKeyUsesHeaderContext(t *testing.T) {
-	keyID := "66666666-6666-6666-6666-666666666666"
-	repo := &fakeApiKeyRepo{
-		keys: map[string]*auth.APIKey{
-			keyID: {ID: keyID, ContextID: "ctx-selected", Name: "Selected Context Key"},
-		},
+	names := map[string]string{}
+	for _, k := range resp.Keys {
+		names[k.ID] = k.ContextName
 	}
-	userRepo := &fakeUserRepo{user: &context.User{ID: "user-1", Email: "a@example.com"}}
-	ctxRepo := &fakeContextRepo{contextsByUserEmail: []*context.Context{{ID: "ctx-oldest"}}}
-	r := newJWTStyleTestRouter(userRepo, ctxRepo, repo)
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/admin/api-keys/"+keyID, nil)
-	req.Header.Set("X-Context-ID", "ctx-selected")
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	if names["55555555-5555-5555-5555-555555555555"] != "Website A" {
+		t.Fatalf("expected context_name Website A, got %q", names["55555555-5555-5555-5555-555555555555"])
 	}
-	if repo.deleted[keyID] != 1 {
-		t.Fatalf("expected Delete to be called once for %s, got %d", keyID, repo.deleted[keyID])
-	}
-}
-
-// Without the header, list/delete keep the legacy fallback to the user's
-// first context.
-func TestListAPIKeysFallsBackToFirstContextWithoutHeader(t *testing.T) {
-	repo := &fakeApiKeyRepo{}
-	userRepo := &fakeUserRepo{user: &context.User{ID: "user-1", Email: "a@example.com"}}
-	ctxRepo := &fakeContextRepo{contextsByUserEmail: []*context.Context{{ID: "ctx-oldest"}, {ID: "ctx-newer"}}}
-	r := newJWTStyleTestRouter(userRepo, ctxRepo, repo)
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/admin/api-keys", nil)
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
-	}
-	if repo.listedContext != "ctx-oldest" {
-		t.Fatalf("expected ListByContext to fall back to ctx-oldest, got %q", repo.listedContext)
+	if names["66666666-6666-6666-6666-666666666666"] != "Website B" {
+		t.Fatalf("expected context_name Website B, got %q", names["66666666-6666-6666-6666-666666666666"])
 	}
 }
 

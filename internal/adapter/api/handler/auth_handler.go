@@ -468,17 +468,13 @@ func (h *AuthHandler) resolveAPIKeyContext(c *gin.Context) (string, *apiError) {
 	return contexts[0].ID, nil
 }
 
-// ListAPIKeys returns all API keys for the current context.
+// ListAPIKeys returns API keys for all websites (contexts), each labeled
+// with its owning context (the WebUI's Website column). The route is
+// admin-only, so the listing is admin-global by design.
 func (h *AuthHandler) ListAPIKeys(c *gin.Context) {
-	contextID, apiErr := h.resolveAPIKeyContext(c)
-	if apiErr != nil {
-		c.JSON(apiErr.status, gin.H{"error": apiErr.message})
-		return
-	}
-
-	keys, err := h.apiKeyRepo.ListByContext(contextID)
+	keys, err := h.apiKeyRepo.ListAllWithContexts()
 	if err != nil {
-		log.Error().Err(err).Str("context_id", contextID).Msg("list api keys failed")
+		log.Error().Err(err).Msg("list api keys failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -486,11 +482,13 @@ func (h *AuthHandler) ListAPIKeys(c *gin.Context) {
 	result := make([]gin.H, 0, len(keys))
 	for _, k := range keys {
 		result = append(result, gin.H{
-			"id":         k.ID,
-			"name":       k.Name,
-			"key":        k.KeyHash[:8] + "...",
-			"expires_at": k.ExpiresAt,
-			"created_at": k.CreatedAt,
+			"id":           k.ID,
+			"name":         k.Name,
+			"key":          k.KeyHash[:8] + "...",
+			"context_name": k.ContextName,
+			"context_slug": k.ContextSlug,
+			"expires_at":   k.ExpiresAt,
+			"created_at":   k.CreatedAt,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"keys": result})
@@ -504,16 +502,11 @@ func (h *AuthHandler) RevokeAPIKey(c *gin.Context) {
 		return
 	}
 
-	contextID, apiErr := h.resolveAPIKeyContext(c)
-	if apiErr != nil {
-		c.JSON(apiErr.status, gin.H{"error": apiErr.message})
-		return
-	}
-
-	// Resolve key by ID, scoped to this context (the webui passes the key ID
-	// returned by ListAPIKeys; plaintext-prefix lookup would never match a
-	// bcrypt hash).
-	if _, err := h.apiKeyRepo.GetByID(keyID, contextID); err != nil {
+	// Resolve the key by ID across all contexts: the listing is
+	// admin-global (Website column), so a key from any website must be
+	// revocable. The webui passes the key ID returned by ListAPIKeys
+	// (plaintext-prefix lookup would never match a bcrypt hash).
+	if _, err := h.apiKeyRepo.GetByIDOnly(keyID); err != nil {
 		log.Error().Err(err).Str("key_id", keyID).Msg("api key not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "api key not found"})
 		return

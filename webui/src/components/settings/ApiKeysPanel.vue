@@ -30,6 +30,7 @@ const justCreated = ref(false)
 
 const columns = [
   { key: 'name', label: 'Name' },
+  { key: 'website', label: 'Website' },
   { key: 'key', label: 'Key' },
   { key: 'status', label: 'Status' },
   { key: 'expires_at', label: 'Expires' },
@@ -129,7 +130,7 @@ onMounted(loadKeys)
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold">API Keys</h1>
-        <p class="text-muted-foreground">Manage API access keys</p>
+        <p class="text-muted-foreground">Manage API access keys across all websites</p>
       </div>
       <Button @click="openCreate">
         <Plus class="mr-2 h-4 w-4" />
@@ -149,6 +150,9 @@ onMounted(loadKeys)
             <Key class="h-4 w-4 text-muted-foreground" />
             <span class="font-medium">{{ row.name }}</span>
           </div>
+        </template>
+        <template #website="{ row }: { row: ApiKey }">
+          <span class="text-muted-foreground">{{ row.context_name || '—' }}</span>
         </template>
         <template #key="{ row }: { row: ApiKey }">
           <code class="text-sm bg-muted px-1.5 py-0.5 rounded">{{ row.key || '••••••' }}</code>

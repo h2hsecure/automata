@@ -44,7 +44,7 @@ x-automata-api-keys:
     | Operation | Route |
     |---|---|
     | Create | `POST /api/admin/api-keys` |
-    | List (current context) | `GET /api/admin/api-keys` |
+    | List (all websites, labeled per context) | `GET /api/admin/api-keys` |
     | Revoke | `DELETE /api/admin/api-keys/:id` |
 
     ## Create

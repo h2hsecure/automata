@@ -20,6 +20,10 @@ type APIKey struct {
 	Name      string
 	ExpiresAt *time.Time
 	CreatedAt time.Time
+	// ContextName/ContextSlug are display-only fields populated by
+	// ListAllWithContexts for the admin listing (WebUI Website column).
+	ContextName string
+	ContextSlug string
 }
 
 // ContextInfo holds context details returned during login.

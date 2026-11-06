@@ -136,6 +136,8 @@ export interface ApiKey {
   id: string;
   name: string;
   key: string;
+  context_name: string | null;
+  context_slug: string | null;
   expires_at: string | null;
   created_at: string;
 }

@@ -24,10 +24,16 @@ type ApiKeyRepository interface {
 	Create(key *auth.APIKey) error
 	ListByContext(contextID string) ([]*auth.APIKey, error)
 	ListAll() ([]*auth.APIKey, error)
+	// ListAllWithContexts returns every API key joined with its owning
+	// context (Website), for the admin-global listing.
+	ListAllWithContexts() ([]*auth.APIKey, error)
 	Delete(id string) error
 	GetByHash(hash string) (*auth.APIKey, error)
 	GetByPrefix(prefix string, contextID string) (*auth.APIKey, error)
 	GetByID(id string, contextID string) (*auth.APIKey, error)
+	// GetByIDOnly resolves a key by ID across all contexts, for revocation
+	// from the admin-global listing.
+	GetByIDOnly(id string) (*auth.APIKey, error)
 }
 
 func (r *apiKeyPostgresRepo) Create(key *auth.APIKey) error {
@@ -169,6 +175,63 @@ func (r *apiKeyPostgresRepo) ListAll() ([]*auth.APIKey, error) {
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func (r *apiKeyPostgresRepo) ListAllWithContexts() ([]*auth.APIKey, error) {
+	query := `
+		SELECT k.id, k.context_id, k.user_id, k.key_hash, k.name, k.expires_at, k.created_at,
+		       c.name, c.slug
+		FROM api_keys k
+		LEFT JOIN contexts c ON c.id = k.context_id
+		ORDER BY k.created_at DESC
+	`
+
+	rows, err := r.pool.Query(context.Background(), query)
+	if err != nil {
+		return nil, fmt.Errorf("list api keys with contexts: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []*auth.APIKey
+	for rows.Next() {
+		key := &auth.APIKey{}
+		var contextName, contextSlug *string
+		err := rows.Scan(
+			&key.ID, &key.ContextID, &key.UserID, &key.KeyHash,
+			&key.Name, &key.ExpiresAt, &key.CreatedAt,
+			&contextName, &contextSlug,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan api key with context: %w", err)
+		}
+		if contextName != nil {
+			key.ContextName = *contextName
+		}
+		if contextSlug != nil {
+			key.ContextSlug = *contextSlug
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
+}
+
+func (r *apiKeyPostgresRepo) GetByIDOnly(id string) (*auth.APIKey, error) {
+	key := &auth.APIKey{}
+
+	query := `
+		SELECT id, context_id, user_id, key_hash, name, expires_at, created_at
+		FROM api_keys WHERE id = $1
+	`
+
+	err := r.pool.QueryRow(context.Background(), query, id).Scan(
+		&key.ID, &key.ContextID, &key.UserID, &key.KeyHash,
+		&key.Name, &key.ExpiresAt, &key.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get api key by id: %w", err)
+	}
+
+	return key, nil
 }
 
 func (r *apiKeyPostgresRepo) Delete(id string) error {
