@@ -8,16 +8,21 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:b8ebaa0` |
-| Chart | `2026.11.05-b8ebaa0` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:3d9731a` |
+| Chart | `2026.11.06-3d9731a` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-Tag note: the P3 fix landed in commit `ddb34ca`, but its CI run never
-published; the docs-only follow-up `b8ebaa0` (tree identical apart from
-this file) did. Image `b8ebaa0` is therefore byte-for-byte the same Go
-and WebUI code.
+Tag note: `3d9731a` is the first code commit after the runbook repoint at
+`476c6a0` (image `b8ebaa0`); it carries the admin-global API-key listing
+described below.
 
-The release is CI-verified. **Fixes the post-deploy login lockout
-(incident 3):** the `password_changed_at` migration stamped every
+The release is CI-verified. **New: admin-global API-key listing with a
+Website column** — the WebUI's API keys table now shows every website's
+keys in one list, each labeled with its website (context) name; creating
+a key still targets the selected website, and revoking works for any key
+in the global list (the routes stay admin-only). `GET /api/admin/api-keys`
+now returns `context_name`/`context_slug` per key. The previous release
+(`b8ebaa0`) fixed the post-deploy login lockout
+(incident 3): the `password_changed_at` migration stamped every
 pre-existing user row with the database clock (`NOW()`); when the app
 server clock ran behind the database clock, the session-revocation
 check (JWT `iat` < `password_changed_at`) self-revoked every fresh
@@ -238,17 +243,17 @@ two releases do not fight over the CRDs.
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-b8ebaa0 >/dev/null && echo "chart 2026.11.05-b8ebaa0 OK"
+  --version 2026.11.06-3d9731a >/dev/null && echo "chart 2026.11.06-3d9731a OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/b8ebaa0" && echo "image b8ebaa0 OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/3d9731a" && echo "image 3d9731a OK"
 
-# The chart's appVersion is b8ebaa0, so image.tag resolves to the
+# The chart's appVersion is 3d9731a, so image.tag resolves to the
 # matching image automatically — no --set image.tag.
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.05-b8ebaa0 -n automata \
+  --version 2026.11.06-3d9731a -n automata \
   -f values.prod.yaml
 ```
 
