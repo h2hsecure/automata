@@ -186,6 +186,43 @@ func TestProxy_LoginGzippedClient(t *testing.T) {
 	}
 }
 
+// TestProxy_LoginBackendSetCookieSurvives: the API backend sets its own
+// Set-Cookie (automata_refresh) on a successful login. The backend-header
+// copy in proxyAuth must APPEND backend cookies, not replace the BFF's
+// session cookie: with Set semantics the automata_session cookie is
+// silently dropped, no Bearer token is ever injected, and every post-login
+// API call 401s (login lockout).
+func TestProxy_LoginBackendSetCookieSurvives(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Add("Set-Cookie", "automata_refresh=encrypted-refresh-jwt; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax")
+		w.Write([]byte(`{"token":"jwt-token-1","refresh_token":"refresh-1","user_id":"u1","email":"a@b.c"}`))
+	})
+	ph, _ := newTestProxy(t, mux)
+	engine := newTestEngine(ph)
+
+	w := doRequest(t, engine, http.MethodPost, "/api/auth/login", "", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var sessionCookie, refreshCookie string
+	for _, c := range w.Header().Values("Set-Cookie") {
+		if strings.HasPrefix(c, "automata_session=") {
+			sessionCookie = c
+		}
+		if strings.HasPrefix(c, "automata_refresh=") {
+			refreshCookie = c
+		}
+	}
+	if sessionCookie == "" {
+		t.Fatalf("automata_session cookie missing from login response (clobbered by backend Set-Cookie): %v", w.Header().Values("Set-Cookie"))
+	}
+	if refreshCookie == "" {
+		t.Errorf("backend automata_refresh cookie must pass through: %v", w.Header().Values("Set-Cookie"))
+	}
+}
+
 // TestProxy_StripsClientAuthorization: any client-supplied Authorization
 // header is replaced by the session JWT (defense in depth; the SPA stops
 // sending it, but the proxy must not trust it).

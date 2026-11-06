@@ -176,12 +176,20 @@ func (h *ProxyHandler) proxyAuth(c *gin.Context, session *webui_cookie.SessionDa
 	}
 
 	// Copy backend headers (except Content-Length, which we recompute).
+	// Set-Cookie must be APPENDED: http.SetCookie above already added the
+	// BFF's session cookie, and c.Header uses Set semantics, which would
+	// silently replace it with the backend's refresh cookie — dropping the
+	// session and turning every post-login API call into a 401.
 	for k, vs := range bw.header {
 		if k == "Content-Length" {
 			continue
 		}
 		for _, v := range vs {
-			c.Header(k, v)
+			if k == "Set-Cookie" {
+				c.Writer.Header().Add(k, v)
+			} else {
+				c.Header(k, v)
+			}
 		}
 	}
 	c.Header("Content-Length", strconv.Itoa(len(body)))
