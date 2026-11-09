@@ -13,9 +13,16 @@
 # Binds to the GatewayClass named in ingress.gatewayClass
 # (default: traefik; `kubectl get gatewayclass`).
 #
-# Routing (unchanged from the old IngressRoute):
+# Routing (unchanged from the old IngressRoute, plus the MCP bypass):
 #   /snippet, /track, /form/, /static/, /page/ -> tracking :8081
+#   /api/mcp, /api/mcp-skill.md                -> API :8080 (ExactPath)
 #   /                                   -> BFF service :8082
+#
+# The MCP endpoints bypass the BFF deliberately: the BFF strips
+# client-supplied Authorization headers (token custodian — the session
+# cookie is its only credential), so a Bearer API key sent through it
+# never reaches the backend (401 "missing api key"). Auth for /api/mcp is
+# the Bearer API key itself, enforced at the API layer.
 #
 # Upload body limit: Gateway API has no standard body-limit filter type, so
 # each rule carries an ExtensionRef filter (the spec's vendor-extension
@@ -110,6 +117,24 @@ spec:
       backendRefs:
         - name: {{ include "automata.fullname" $ }}-automata
           port: 8081
+    {{- end }}
+    # MCP endpoints: exact paths straight to the API engine (:8080), before
+    # the BFF catch-all — the BFF would strip the client's Authorization
+    # header (see routing note above) and break Bearer API key auth.
+    {{- range list "/api/mcp" "/api/mcp-skill.md" }}
+    - matches:
+        - path:
+            type: ExactPath
+            value: {{ . }}
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: {{ include "automata.fullname" $ }}-body-limit
+      backendRefs:
+        - name: {{ include "automata.fullname" $ }}-automata
+          port: 8080
     {{- end }}
     - matches:
         - path:

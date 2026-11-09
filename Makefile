@@ -26,6 +26,7 @@ cicd-tests-full:
 # invented CRD fields/types that client-side checks cannot see.
 helm-lint: helm-validate
 	helm lint helm/automata
+	@bash scripts/helm-mcp-route.sh
 	helm template automata helm/automata --namespace automata > /dev/null
 	helm template automata helm/automata --namespace automata \
 		--set ingress.tls[0].hosts=m.example.com \

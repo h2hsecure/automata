@@ -19,6 +19,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # Renders the chart and asserts the MCP endpoints route to the API
+      # backend (:8080) ahead of the BFF catch-all — the BFF strips
+      # client Authorization headers, which would break MCP API key auth.
+      - name: Verify MCP ingress routing
+        run: bash scripts/helm-mcp-route.sh
       # Skips two known pre-existing failures (handler_test.go:73,
       # tracking_server_test.go:138) so CI is red only for regressions.
       - name: Run cicd suite
