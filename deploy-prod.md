@@ -8,15 +8,30 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:dc6b599` |
-| Chart | `2026.11.06-dc6b599` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:5907327` |
+| Chart | `2026.11.09-5907327` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-Tag note: `dc6b599` fixes the second post-deploy login lockout
-(incident 4); `3d9731a` (below) carried the admin-global API-key listing.
+Tag note: `5907327` adds the `Secure` flag to the tracking visitor
+cookie; `a192f27` (in the same release) routes `/api/mcp` past the
+BFF; `dc6b599` (below) was the BFF session-cookie fix.
 
-The release is CI-verified. **New: BFF session-cookie fix — login
-lockout (incident 4).** After a successful login every dashboard API
-call returned 401 and users bounced back to the login screen. Cause:
+The release is CI-verified. **New: tracking visitor cookie is
+`Secure`.** The tracking snippet (`GET /snippet/<ctx>.js`) sets the
+per-context visitor-ID cookie as `path=/; expires=...; SameSite=Lax;
+Secure`; the site is HTTPS-only, so the flag keeps the cookie from
+ever traveling over plaintext. Regression test:
+`TestGenerate_VisitorCookieIsSecure`. **MCP Bearer auth now works
+through the prod ingress.** The BFF strips client-supplied
+`Authorization` headers (the session cookie is its only credential),
+so an MCP client sending `Authorization: Bearer <api key>` through
+the BFF reached the backend with no key and got 401 "missing api
+key". The ingress now routes `/api/mcp` and `/api/mcp-skill.md`
+directly to the API engine (`:8080`), ahead of the BFF catch-all,
+with the same body-limit middleware; API-key auth is enforced at the
+API layer. The previous release (`dc6b599`) fixed the second
+post-deploy login lockout (incident 4). After a successful login
+every dashboard API call returned 401 and users bounced back to the
+login screen. Cause:
 the BFF's auth-path response handler sets the encrypted
 `automata_session` cookie, then copies the API backend's response
 headers with `c.Header` (Gin `Set` semantics); the backend's own
@@ -257,17 +272,17 @@ two releases do not fight over the CRDs.
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.06-3d9731a >/dev/null && echo "chart 2026.11.06-3d9731a OK"
+  --version 2026.11.09-5907327 >/dev/null && echo "chart 2026.11.09-5907327 OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/3d9731a" && echo "image 3d9731a OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/5907327" && echo "image 5907327 OK"
 
-# The chart's appVersion is 3d9731a, so image.tag resolves to the
+# The chart's appVersion is 5907327, so image.tag resolves to the
 # matching image automatically — no --set image.tag.
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.06-3d9731a -n automata \
+  --version 2026.11.09-5907327 -n automata \
   -f values.prod.yaml
 ```
 
