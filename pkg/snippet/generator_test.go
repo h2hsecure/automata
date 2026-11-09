@@ -76,6 +76,18 @@ func TestGenerate_FlushesQueueOnPageUnload(t *testing.T) {
 	}
 }
 
+func TestGenerate_VisitorCookieIsSecure(t *testing.T) {
+	// The site is HTTPS-only; the visitor cookie must carry Secure so it can
+	// never travel over plaintext.
+	js, err := Generate(testContextID, "https://www.example.com", nil)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if !strings.Contains(js, `SameSite=Lax; Secure`) {
+		t.Error("Generate() visitor cookie must carry the Secure flag")
+	}
+}
+
 func TestGenerate_KeepsBatchOptions(t *testing.T) {
 	js, err := Generate(testContextID, "http://track.example.com", map[string]interface{}{
 		"batchSize":     float64(5),
