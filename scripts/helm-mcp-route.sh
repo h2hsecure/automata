@@ -22,12 +22,23 @@ render() { # $1=output, rest=extra helm flags
 check() { # $1=file $2=variant
   local f="$1" v="$2"
 
-  # 1. Both MCP paths are present as ExactPath matches (exact, not prefix —
+  # 1. Both MCP paths are present as Exact matches (exact, not prefix —
   #    a prefix would also swallow /api/mcp-* admin-ish paths if any appear).
-  grep -A1 'type: ExactPath' "$f" | grep -q 'value: /api/mcp$' \
-    || { echo "$v: FAIL — no ExactPath rule for /api/mcp" >&2; exit 1; }
-  grep -A1 'type: ExactPath' "$f" | grep -q 'value: /api/mcp-skill.md$' \
-    || { echo "$v: FAIL — no ExactPath rule for /api/mcp-skill.md" >&2; exit 1; }
+  #    "Exact" is the Gateway API enum value (there is no "ExactPath" — the
+  #    cluster's CRD schema rejects it, which CI cannot catch without a
+  #    server-side apply).
+  grep -A1 'type: Exact$' "$f" | grep -q 'value: /api/mcp$' \
+    || { echo "$v: FAIL — no Exact rule for /api/mcp" >&2; exit 1; }
+  grep -A1 'type: Exact$' "$f" | grep -q 'value: /api/mcp-skill.md$' \
+    || { echo "$v: FAIL — no Exact rule for /api/mcp-skill.md" >&2; exit 1; }
+
+  # 1b. Every path match in the render uses a valid Gateway API enum value
+  #     (Exact | PathPrefix | RegularExpression) — schema validation only
+  #     happens server-side, so enforce the enum here.
+  bad=$(awk '/^[[:space:]]*-?[[:space:]]*path:[[:space:]]*$/{p=1} p && /type:/{print $2; p=0}' "$f" \
+    | grep -vE '^(Exact|PathPrefix|RegularExpression)$' | sort -u || true)
+  [ -z "$bad" ] \
+    || { echo "$v: FAIL — invalid path.match type(s): $bad" >&2; exit 1; }
 
   # 2. The /api/mcp rule targets the API backend port 8080 (not 8081
   #    tracking, not 8082 BFF).

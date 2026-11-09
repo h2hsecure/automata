@@ -15,7 +15,7 @@
 #
 # Routing (unchanged from the old IngressRoute, plus the MCP bypass):
 #   /snippet, /track, /form/, /static/, /page/ -> tracking :8081
-#   /api/mcp, /api/mcp-skill.md                -> API :8080 (ExactPath)
+#   /api/mcp, /api/mcp-skill.md                -> API :8080 (Exact)
 #   /                                   -> BFF service :8082
 #
 # The MCP endpoints bypass the BFF deliberately: the BFF strips
@@ -124,7 +124,7 @@ spec:
     {{- range list "/api/mcp" "/api/mcp-skill.md" }}
     - matches:
         - path:
-            type: ExactPath
+            type: Exact
             value: {{ . }}
       filters:
         - type: ExtensionRef
