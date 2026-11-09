@@ -8,15 +8,25 @@ the prod kube context name in §0 (`<prod-context>`).
 
 | Artifact | Tag |
 |---|---|
-| Image | `ghcr.io/h2hsecure/automata:5907327` |
-| Chart | `2026.11.09-5907327` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
+| Image | `ghcr.io/h2hsecure/automata:801dec0` |
+| Chart | `2026.11.09-801dec0` (OCI: `oci://ghcr.io/h2hsecure/automata-chart/automata`) |
 
-Tag note: `5907327` adds the `Secure` flag to the tracking visitor
-cookie; `a192f27` (in the same release) routes `/api/mcp` past the
-BFF; `dc6b599` (below) was the BFF session-cookie fix.
+Tag note: `801dec0` fixes the invalid Gateway API path match type in
+the MCP rules introduced by `a192f27` (below) — the `5907327` chart
+failed server-side validation on upgrade; `dc6b599` was the BFF
+session-cookie fix.
 
-The release is CI-verified. **New: tracking visitor cookie is
-`Secure`.** The tracking snippet (`GET /snippet/<ctx>.js`) sets the
+The release is CI-verified. **New: MCP route path type fixed for
+Gateway API.** `a192f27` (below) rendered the MCP rules with
+`path.match.type: ExactPath`, which is not a Gateway API value
+(valid: `Exact` | `PathPrefix` | `RegularExpression`); `helm
+template` has no schema, so CI passed, and the `5907327` upgrade
+failed server-side ("Unsupported value: ExactPath"). The type is now
+`Exact` (same semantics — exact path match), and
+`scripts/helm-mcp-route.sh` rejects any rendered `path.match.type`
+outside the enum. The failed patch was rejected atomically, so the
+live cluster stayed on the previous release — this is a clean
+upgrade. **Tracking visitor cookie is `Secure`.** The tracking snippet (`GET /snippet/<ctx>.js`) sets the
 per-context visitor-ID cookie as `path=/; expires=...; SameSite=Lax;
 Secure`; the site is HTTPS-only, so the flag keeps the cookie from
 ever traveling over plaintext. Regression test:
@@ -272,17 +282,17 @@ two releases do not fight over the CRDs.
 # tag only surfaces mid-upgrade; a bad image tag surfaces later as
 # ImagePullBackOff after pods are already scheduled.
 helm show chart oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.09-5907327 >/dev/null && echo "chart 2026.11.09-5907327 OK"
+  --version 2026.11.09-801dec0 >/dev/null && echo "chart 2026.11.09-801dec0 OK"
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:h2hsecure/automata:pull" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 curl -sf -o /dev/null -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/h2hsecure/automata/manifests/5907327" && echo "image 5907327 OK"
+  "https://ghcr.io/v2/h2hsecure/automata/manifests/801dec0" && echo "image 801dec0 OK"
 
-# The chart's appVersion is 5907327, so image.tag resolves to the
+# The chart's appVersion is 801dec0, so image.tag resolves to the
 # matching image automatically — no --set image.tag.
 helm upgrade -i automata oci://ghcr.io/h2hsecure/automata-chart/automata \
-  --version 2026.11.09-5907327 -n automata \
+  --version 2026.11.09-801dec0 -n automata \
   -f values.prod.yaml
 ```
 
