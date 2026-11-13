@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
 	"github.com/h2hsecure/automata/internal/domain/form"
 	"github.com/h2hsecure/automata/internal/domain/tracking"
 	"github.com/h2hsecure/automata/internal/infrastructure/storage"
@@ -245,18 +247,51 @@ func (h *FormHandler) SubmitForm(c *gin.Context) {
 		return
 	}
 
-	if body.VisitorID != "" && h.contactRepo != nil && h.trackingRepo != nil {
-		if _, err := uc.IdentifyVisitor(h.contactRepo, h.trackingRepo, contextID, slug, body.VisitorID, data); err != nil {
-			log.Warn().Err(err).Msg("identify visitor from form submission")
+	// Load the form once; it is reused for the activity record and the
+	// form-integrated email send.
+	needForm := h.emailUC != nil || (body.VisitorID != "" && h.contactRepo != nil && h.trackingRepo != nil)
+	var submitForm *form.Form
+	if needForm {
+		if f, err := h.repo.GetBySlug(contextID, slug); err == nil {
+			submitForm = f
+		} else {
+			log.Warn().Err(err).Msg("load form for submission side effects")
 		}
 	}
 
-	if h.emailUC != nil {
-		if f, err := h.repo.GetBySlug(contextID, slug); err == nil {
-			h.emailUC.SendForSubmission(f, sub)
-		} else {
-			log.Warn().Err(err).Msg("load form for email send")
+	var contactID string
+	if body.VisitorID != "" && h.contactRepo != nil && h.trackingRepo != nil {
+		if contact, err := uc.IdentifyVisitor(h.contactRepo, h.trackingRepo, contextID, slug, body.VisitorID, data); err != nil {
+			log.Warn().Err(err).Msg("identify visitor from form submission")
+		} else if contact != nil {
+			contactID = contact.ID
 		}
+	}
+
+	// Record the submission on the contact's activity feed. The contact is
+	// nil when the form data carries no email, so no activity is recorded.
+	if contactID != "" {
+		formName := ""
+		if submitForm != nil {
+			formName = submitForm.Name
+		}
+		if err := h.contactRepo.CreateActivity(&ct.Activity{
+			ID:        uuid.New().String(),
+			ContactID: contactID,
+			ContextID: contextID,
+			Type:      ct.ActivityFormSubmission,
+			Data: map[string]interface{}{
+				"form_name":     formName,
+				"form_slug":     slug,
+				"submission_id": sub.ID,
+			},
+		}); err != nil {
+			log.Warn().Err(err).Str("contact_id", contactID).Msg("create form submission activity")
+		}
+	}
+
+	if h.emailUC != nil && submitForm != nil {
+		h.emailUC.SendForSubmission(submitForm, sub)
 	}
 
 	if h.webhookNotifier != nil {

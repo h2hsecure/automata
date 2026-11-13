@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
 	pagedomain "github.com/h2hsecure/automata/internal/domain/page"
 )
 
@@ -92,6 +94,60 @@ func (r *fakePagePublicRepo) DecisionCounts(pageID string) (map[string]int64, er
 		}
 	}
 	return counts, nil
+}
+
+// --- fake contact repo (implements ct.Repository) ---
+
+type fakeContactRepo struct {
+	contacts   []*ct.Contact
+	activities []*ct.Activity
+}
+
+func (r *fakeContactRepo) Create(c *ct.Contact) error {
+	r.contacts = append(r.contacts, c)
+	return nil
+}
+func (r *fakeContactRepo) GetByID(id string) (*ct.Contact, error) {
+	for _, c := range r.contacts {
+		if c.ID == id {
+			return c, nil
+		}
+	}
+	return nil, nil
+}
+func (r *fakeContactRepo) List(offset, limit int, filters ct.FilterOptions) ([]*ct.Contact, error) {
+	return r.contacts, nil
+}
+func (r *fakeContactRepo) Update(c *ct.Contact) error { return nil }
+func (r *fakeContactRepo) Delete(id string) error    { return nil }
+func (r *fakeContactRepo) FindByEmail(contextID, email string) (*ct.Contact, error) {
+	return nil, nil
+}
+func (r *fakeContactRepo) Merge(keepID, mergeIntoID string) error { return nil }
+func (r *fakeContactRepo) CreateActivity(a *ct.Activity) error {
+	r.activities = append(r.activities, a)
+	return nil
+}
+func (r *fakeContactRepo) GetActivity(contactID, contextID string, offset, limit int, activityType *string) ([]ct.Activity, int64, error) {
+	return nil, 0, nil
+}
+func (r *fakeContactRepo) GetActivityCount(contactID string) (int64, error) { return 0, nil }
+func (r *fakeContactRepo) CountByContext(contextID string) (int64, error) {
+	return int64(len(r.contacts)), nil
+}
+func (r *fakeContactRepo) CountDistinctContactsByActivity(contextID, activityType string, since *time.Time) (int, error) {
+	return 0, nil
+}
+func (r *fakeContactRepo) FindBySourceID(contextID, source, sourceID string) (*ct.Contact, error) {
+	for _, c := range r.contacts {
+		if c.ContextID == contextID && c.Source == source && c.SourceID == sourceID {
+			return c, nil
+		}
+	}
+	return nil, nil
+}
+func (r *fakeContactRepo) Count(contextID string, filters ct.FilterOptions) (int64, error) {
+	return int64(len(r.contacts)), nil
 }
 
 // --- helpers ---
@@ -193,6 +249,67 @@ func TestPagePublicHandler_Decision(t *testing.T) {
 	}
 	if len(repo.decisions) != 1 || repo.decisions[0].Action != "dismiss_accept" {
 		t.Fatalf("decision not recorded correctly: %+v", repo.decisions)
+	}
+}
+
+func TestPagePublicHandler_Decision_CreatesPageClickActivity(t *testing.T) {
+	cr := &fakeContactRepo{contacts: []*ct.Contact{
+		{ID: "c-1", ContextID: "ctx-1", Source: "visitor", SourceID: "v1", Hidden: true},
+	}}
+	repo := newFakePagePublicRepo()
+	repo.pages["banner-1"] = &pagedomain.Page{
+		ID: "banner-1", ContextID: "ctx-1", Slug: "cookie", Title: "Cookie",
+		IsActive: true, Position: "bottom",
+	}
+	h := NewPagePublicHandler(repo, cr)
+	c, w := pagePublicTestContext("POST", "/page/decision/ctx-1",
+		`{"page_id":"banner-1","decision":"dismiss_accept","visitor_id":"v1"}`, nil)
+	c.Params = gin.Params{{Key: "contextID", Value: "ctx-1"}}
+	h.Decision(c)
+	// Gin's engine flushes a deferred status (e.g. 204) at the end of the
+	// request cycle; mirror that since we call the handler directly.
+	c.Writer.WriteHeaderNow()
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if len(repo.decisions) != 1 {
+		t.Fatalf("expected 1 decision recorded, got %d", len(repo.decisions))
+	}
+	if len(cr.activities) != 1 {
+		t.Fatalf("expected 1 activity, got %d", len(cr.activities))
+	}
+	a := cr.activities[0]
+	if a.Type != ct.ActivityPageClick {
+		t.Errorf("activity type = %q, want page_clicked", a.Type)
+	}
+	if a.ContactID != "c-1" || a.ContextID != "ctx-1" {
+		t.Errorf("activity = %+v, want contact c-1 in ctx-1", a)
+	}
+	if a.Data["page_name"] != "Cookie" || a.Data["page_slug"] != "cookie" || a.Data["action"] != "dismiss_accept" {
+		t.Errorf("activity data = %v, want page_name Cookie / page_slug cookie / action dismiss_accept", a.Data)
+	}
+}
+
+func TestPagePublicHandler_Decision_NoContact_NoActivity(t *testing.T) {
+	cr := &fakeContactRepo{}
+	repo := newFakePagePublicRepo()
+	repo.pages["banner-1"] = &pagedomain.Page{
+		ID: "banner-1", ContextID: "ctx-1", Slug: "cookie", Title: "Cookie",
+		IsActive: true, Position: "bottom",
+	}
+	h := NewPagePublicHandler(repo, cr)
+	c, w := pagePublicTestContext("POST", "/page/decision/ctx-1",
+		`{"page_id":"banner-1","decision":"dismiss_accept","visitor_id":"v1"}`, nil)
+	c.Params = gin.Params{{Key: "contextID", Value: "ctx-1"}}
+	h.Decision(c)
+	c.Writer.WriteHeaderNow()
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if len(cr.activities) != 0 {
+		t.Fatalf("expected no activity without a visitor contact, got %+v", cr.activities)
 	}
 }
 

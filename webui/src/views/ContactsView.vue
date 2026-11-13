@@ -70,6 +70,8 @@ watch(
   }
 )
 
+watch(page, loadContacts)
+
 function handleSearch() {
   page.value = 1
   loadContacts()

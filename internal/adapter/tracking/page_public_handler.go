@@ -8,8 +8,11 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	ct "github.com/h2hsecure/automata/internal/domain/contact"
 	pagedomain "github.com/h2hsecure/automata/internal/domain/page"
 	"github.com/h2hsecure/automata/pkg/snippet"
+	"github.com/rs/zerolog/log"
 )
 
 // ipHash returns the hex-encoded SHA-256 of an IP address.
@@ -22,12 +25,19 @@ func ipHash(ip string) string {
 // decisions for positioned pages. Trust model matches the existing
 // /track/* and /form/* endpoints (anonymous visitor_id, hashed IP, no PII).
 type PagePublicHandler struct {
-	repo pagedomain.Repository
+	repo        pagedomain.Repository
+	contactRepo ContactRepository
 }
 
-// NewPagePublicHandler creates a PagePublicHandler.
-func NewPagePublicHandler(repo pagedomain.Repository) *PagePublicHandler {
-	return &PagePublicHandler{repo: repo}
+// NewPagePublicHandler creates a PagePublicHandler. contactRepo is optional;
+// when provided, visitor decisions record a page_clicked activity on the
+// visitor's contact.
+func NewPagePublicHandler(repo pagedomain.Repository, contactRepo ...ContactRepository) *PagePublicHandler {
+	h := &PagePublicHandler{repo: repo}
+	if len(contactRepo) > 0 {
+		h.contactRepo = contactRepo[0]
+	}
+	return h
 }
 
 // RegisterPagePublicRoutes registers the public page endpoints.
@@ -130,7 +140,38 @@ func (h *PagePublicHandler) Decision(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record decision"})
 		return
 	}
+	h.recordClickActivity(c.Param("contextID"), p, body.Decision, body.VisitorID)
 	c.Status(http.StatusNoContent)
+}
+
+// recordClickActivity records a page_clicked activity on the visitor's
+// contact, if one exists (created by pageview tracking). Failures are
+// logged and never fail the decision request.
+func (h *PagePublicHandler) recordClickActivity(contextID string, p *pagedomain.Page, action, visitorID string) {
+	if h.contactRepo == nil || visitorID == "" {
+		return
+	}
+	contact, err := h.contactRepo.FindBySourceID(contextID, "visitor", visitorID)
+	if err != nil {
+		log.Warn().Err(err).Str("visitor_id", visitorID).Msg("page decision: find visitor contact")
+		return
+	}
+	if contact == nil {
+		return
+	}
+	if err := h.contactRepo.CreateActivity(&ct.Activity{
+		ID:        uuid.New().String(),
+		ContactID: contact.ID,
+		ContextID: contextID,
+		Type:      ct.ActivityPageClick,
+		Data: map[string]interface{}{
+			"page_name": p.Title,
+			"page_slug": p.Slug,
+			"action":    action,
+		},
+	}); err != nil {
+		log.Warn().Err(err).Str("contact_id", contact.ID).Msg("page decision: create page_clicked activity")
+	}
 }
 
 // ServeSnippet responds with the self-contained page snippet JavaScript
