@@ -227,7 +227,7 @@ onMounted(loadContacts)
           </div>
         </template>
         <template #created_at="{ row }: { row: Contact }">
-          {{ new Date(row.CreatedAt).toLocaleDateString() }}
+          {{ new Date(row.CreatedAt).toLocaleString() }}
         </template>
         <template #actions="{ row }: { row: Contact }">
           <div class="flex gap-1">

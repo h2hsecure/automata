@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -92,5 +92,38 @@ describe('ContactsView hidden filter', () => {
     await allBtn!.trigger('click')
     await flushPromises()
     expect(lastHiddenArg()).toBeUndefined()
+  })
+})
+
+describe('ContactsView created column', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('shows the time alongside the date in the Created column', async () => {
+    mocks.listContacts.mockResolvedValueOnce({
+      data: [
+        {
+          ID: 'c1',
+          Email: 'jane@example.com',
+          FirstName: 'Jane',
+          LastName: 'Doe',
+          CreatedAt: '2026-11-14T15:30:00Z',
+          Tags: [],
+          CustomFields: {},
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 20,
+    })
+    vi.spyOn(Date.prototype, 'toLocaleString').mockReturnValue('14/11/2026, 15:30:00')
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain('15:30:00')
   })
 })
