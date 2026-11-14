@@ -104,6 +104,10 @@ func (r *fakeRepo) DecisionCounts(pageID string) (map[string]int64, error) {
 	return map[string]int64{}, nil
 }
 
+func (r *fakeRepo) DecisionCountsByContext(contextID string) (map[string]int64, error) {
+	return map[string]int64{}, nil
+}
+
 func TestCreatePage_PositionAndButtons_Stored(t *testing.T) {
 	repo := newFakeRepo()
 

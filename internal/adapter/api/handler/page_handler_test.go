@@ -133,6 +133,20 @@ func (r *fakePageRepo) DecisionCounts(pageID string) (map[string]int64, error) {
 	return counts, nil
 }
 
+func (r *fakePageRepo) DecisionCountsByContext(contextID string) (map[string]int64, error) {
+	pageCtx := make(map[string]string, len(r.pages))
+	for _, p := range r.pages {
+		pageCtx[p.ID] = p.ContextID
+	}
+	counts := map[string]int64{}
+	for _, d := range r.decisions {
+		if pageCtx[d.PageID] == contextID {
+			counts[d.PageID]++
+		}
+	}
+	return counts, nil
+}
+
 func newPageTestContext(method, path, body string, params gin.Params, contextID string) (*gin.Context, *httptest.ResponseRecorder) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -165,6 +179,47 @@ func TestPageHandler_List(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestPageHandler_List_IncludesDecisionsCounts(t *testing.T) {
+	repo := newFakePageRepo()
+	repo.pages["page-1"] = &page.Page{ID: "page-1", ContextID: "ctx-1", Slug: "a", Title: "A"}
+	repo.pages["page-2"] = &page.Page{ID: "page-2", ContextID: "ctx-1", Slug: "b", Title: "B"}
+	repo.decisions = []page.Decision{
+		{PageID: "page-1", Action: page.ActionLink},
+		{PageID: "page-1", Action: page.ActionDismissAccept},
+		{PageID: "page-2", Action: page.ActionDismissDecline},
+	}
+
+	h := NewPageHandler(repo)
+	c, w := newPageTestContext("GET", "/context/pages", "", nil, "ctx-1")
+	h.List(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Pages []struct {
+			ID             string `json:"ID"`
+			DecisionsCount int64  `json:"DecisionsCount"`
+		} `json:"pages"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Pages) != 2 {
+		t.Fatalf("expected 2 pages, got %d", len(resp.Pages))
+	}
+	byID := map[string]int64{}
+	for _, p := range resp.Pages {
+		byID[p.ID] = p.DecisionsCount
+	}
+	if byID["page-1"] != 2 {
+		t.Errorf("page-1 DecisionsCount = %d, want 2", byID["page-1"])
+	}
+	if byID["page-2"] != 1 {
+		t.Errorf("page-2 DecisionsCount = %d, want 1", byID["page-2"])
 	}
 }
 

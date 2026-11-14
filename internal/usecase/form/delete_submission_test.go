@@ -48,6 +48,9 @@ func (r *deleteTestRepo) DeleteSubmission(id string) error {
 	r.deletedID = id
 	return r.deleteErr
 }
+func (r *deleteTestRepo) SubmissionCountsByContext(contextID string) (map[string]int64, error) {
+	return nil, nil
+}
 
 func TestDeleteSubmission_EmptyID(t *testing.T) {
 	repo := &deleteTestRepo{}

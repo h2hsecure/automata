@@ -12,6 +12,9 @@ type Repository interface {
 	GetSubmission(id string) (*Submission, error)
 	ListSubmissions(formID string, opts ListSubmissionsOptions) ([]*Submission, int64, error)
 	DeleteSubmission(id string) error
+	// SubmissionCountsByContext returns per-form submission counts for a
+	// context (forms with no submissions are absent from the map).
+	SubmissionCountsByContext(contextID string) (map[string]int64, error)
 }
 
 // ListSubmissionsOptions holds pagination options for listing submissions.

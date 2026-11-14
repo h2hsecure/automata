@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,9 +20,11 @@ import (
 // fakeFormRepo is an in-memory form.Repository for handler tests.
 type fakeFormRepo struct {
 	bySlug      *form.Form
+	forms       []*form.Form
 	submissions []*form.Submission
 	sub         *form.Submission
 	deletedIDs  []string
+	subCounts   map[string]int64
 }
 
 func (r *fakeFormRepo) Create(f *form.Form) error { return nil }
@@ -32,7 +35,19 @@ func (r *fakeFormRepo) GetBySlug(contextID, slug string) (*form.Form, error) {
 	return r.bySlug, nil
 }
 
-func (r *fakeFormRepo) List(contextID string) ([]*form.Form, error) { return nil, nil }
+func (r *fakeFormRepo) List(contextID string) ([]*form.Form, error) {
+	var out []*form.Form
+	for _, f := range r.forms {
+		if f.ContextID == contextID {
+			out = append(out, f)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeFormRepo) SubmissionCountsByContext(contextID string) (map[string]int64, error) {
+	return r.subCounts, nil
+}
 
 func (r *fakeFormRepo) Update(f *form.Form) error { return nil }
 
@@ -392,5 +407,48 @@ func TestDeleteSubmission_Success_204(t *testing.T) {
 	}
 	if len(repo.deletedIDs) != 1 || repo.deletedIDs[0] != "sub-1" {
 		t.Fatalf("expected sub-1 deleted, got %v", repo.deletedIDs)
+	}
+}
+
+func TestFormHandler_List_IncludesSubmissionsCounts(t *testing.T) {
+	repo := &fakeFormRepo{
+		forms: []*form.Form{
+			{ID: "form-1", ContextID: "ctx-1", Slug: "a", Name: "A"},
+			{ID: "form-2", ContextID: "ctx-1", Slug: "b", Name: "B"},
+		},
+		subCounts: map[string]int64{"form-1": 3},
+	}
+	h := NewFormHandler(repo)
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/context/forms", nil)
+	c.Set("context_id", "ctx-1")
+	h.List(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Forms []struct {
+			ID               string `json:"ID"`
+			SubmissionsCount int64  `json:"SubmissionsCount"`
+		} `json:"forms"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Forms) != 2 {
+		t.Fatalf("expected 2 forms, got %d", len(resp.Forms))
+	}
+	byID := map[string]int64{}
+	for _, f := range resp.Forms {
+		byID[f.ID] = f.SubmissionsCount
+	}
+	if byID["form-1"] != 3 {
+		t.Errorf("form-1 SubmissionsCount = %d, want 3", byID["form-1"])
+	}
+	if byID["form-2"] != 0 {
+		t.Errorf("form-2 SubmissionsCount = %d, want 0", byID["form-2"])
 	}
 }

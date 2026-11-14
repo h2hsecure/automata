@@ -41,6 +41,9 @@ func (r *uploadTestRepo) ListSubmissions(formID string, opts form.ListSubmission
 	return nil, 0, nil
 }
 func (r *uploadTestRepo) DeleteSubmission(id string) error { return nil }
+func (r *uploadTestRepo) SubmissionCountsByContext(contextID string) (map[string]int64, error) {
+	return nil, nil
+}
 
 var errNotFound = errors.New("not found")
 

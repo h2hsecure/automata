@@ -326,3 +326,29 @@ func (r *repo) ListSubmissions(formID string, opts form.ListSubmissionsOptions) 
 	}
 	return submissions, total, nil
 }
+
+// SubmissionCountsByContext returns per-form submission counts for a
+// context. Forms with no submissions are absent from the map.
+func (r *repo) SubmissionCountsByContext(contextID string) (map[string]int64, error) {
+	ctx := context.Background()
+	query := `SELECT form_id, COUNT(*) FROM form_submissions WHERE context_id = $1 GROUP BY form_id`
+	rows, err := r.pool.Query(ctx, query, contextID)
+	if err != nil {
+		return nil, fmt.Errorf("submission counts: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var formID string
+		var count int64
+		if err := rows.Scan(&formID, &count); err != nil {
+			return nil, fmt.Errorf("scan submission count: %w", err)
+		}
+		counts[formID] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate submission counts: %w", err)
+	}
+	return counts, nil
+}

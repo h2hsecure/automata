@@ -85,6 +85,8 @@ export interface Form {
   Settings: Record<string, unknown> | null;
   CreatedAt: string;
   UpdatedAt: string;
+  // Present on list responses only (count of submissions for this form).
+  SubmissionsCount?: number;
 }
 
 export interface FormInput {
@@ -298,6 +300,8 @@ export interface Page {
   Buttons: PageButton[];
   CreatedAt: string;
   UpdatedAt: string;
+  // Present on list responses only (total decisions for this page).
+  DecisionsCount?: number;
 }
 
 export interface PageInput {

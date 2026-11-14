@@ -41,7 +41,7 @@ const copied = ref(false)
 const columns = [
   { key: 'name', label: 'Name' },
   { key: 'slug', label: 'Slug' },
-  { key: 'fields_count', label: 'Fields' },
+  { key: 'SubmissionsCount', label: 'Submissions' },
   { key: 'created_at', label: 'Created' },
   { key: 'actions', label: 'Actions', width: '140px' },
 ]
@@ -247,9 +247,6 @@ onMounted(loadForms)
         </template>
         <template #slug="{ row }: { row: Form }">
           <code class="text-sm bg-muted px-1.5 py-0.5 rounded">{{ row.Slug }}</code>
-        </template>
-        <template #fields_count="{ row }: { row: Form }">
-          {{ row.Fields?.length || 0 }}
         </template>
         <template #created_at="{ row }: { row: Form }">
           {{ new Date(row.CreatedAt).toLocaleDateString() }}

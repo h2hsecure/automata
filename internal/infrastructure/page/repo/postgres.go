@@ -217,6 +217,32 @@ func (r *repo) DecisionCounts(pageID string) (map[string]int64, error) {
 	return counts, nil
 }
 
+// DecisionCountsByContext returns total decision counts per page for a
+// context. Pages with no decisions are absent from the map.
+func (r *repo) DecisionCountsByContext(contextID string) (map[string]int64, error) {
+	ctx := context.Background()
+	query := `SELECT page_id, COUNT(*) FROM page_decisions WHERE context_id = $1 GROUP BY page_id`
+	rows, err := r.pool.Query(ctx, query, contextID)
+	if err != nil {
+		return nil, fmt.Errorf("decision counts by context: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var pageID string
+		var count int64
+		if err := rows.Scan(&pageID, &count); err != nil {
+			return nil, fmt.Errorf("scan decision count: %w", err)
+		}
+		counts[pageID] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate decision counts: %w", err)
+	}
+	return counts, nil
+}
+
 // encodeButtons marshals the buttons for storage; an empty/nil slice is
 // stored as an empty JSON array.
 func encodeButtons(buttons []page.Button) []byte {

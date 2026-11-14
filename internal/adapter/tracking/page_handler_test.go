@@ -76,6 +76,10 @@ func (r *fakePageRepoForTrack) DecisionCounts(pageID string) (map[string]int64, 
 	return map[string]int64{}, nil
 }
 
+func (r *fakePageRepoForTrack) DecisionCountsByContext(contextID string) (map[string]int64, error) {
+	return map[string]int64{}, nil
+}
+
 func TestPageServeHandler_ServesActivePage(t *testing.T) {
 	repo := &fakePageRepoForTrack{pages: []*page.Page{{
 		ID: "p1", ContextID: "ctx-1", Slug: "cookie-policy", Title: "Cookie Policy",

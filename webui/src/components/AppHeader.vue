@@ -25,11 +25,6 @@ async function handleLogout() {
       <Menu class="h-5 w-5" />
     </button>
 
-    <!-- Title -->
-    <h1 class="text-lg font-semibold hidden sm:block">
-      {{ $route.meta.title || 'Automata' }}
-    </h1>
-
     <!-- Spacer -->
     <div class="flex-1" />
 

@@ -85,7 +85,7 @@ describe('PagesView', () => {
     expect(wrapper.text()).toContain('/page/ctx-1/cookie-policy')
   })
 
-  it('shows a position badge and buttons count for positioned pages', async () => {
+  it('shows a position badge and click count for positioned pages', async () => {
     mocks.listPages.mockImplementation(async () => [
       {
         ID: '1',
@@ -98,6 +98,7 @@ describe('PagesView', () => {
           { label: 'Accept', action: 'dismiss_accept', href: '', variant: 'primary' },
           { label: 'Decline', action: 'dismiss_decline', href: '', variant: 'secondary' },
         ],
+        DecisionsCount: 7,
         IsActive: true,
         CreatedAt: '2026-01-01T00:00:00Z',
         UpdatedAt: '2026-01-01T00:00:00Z',
@@ -105,7 +106,12 @@ describe('PagesView', () => {
     ])
     const wrapper = await mountView()
     expect(wrapper.text()).toContain('left')
-    expect(wrapper.text()).toContain('2 buttons')
+    expect(wrapper.text()).toContain('Clicks')
+    // The Clicks cell is rendered by the DataTable default slot.
+    const clicksCell = Array.from(document.body.querySelectorAll('td')).find(
+      (td) => td.textContent?.trim() === '7',
+    )
+    expect(clicksCell).toBeTruthy()
   })
 
   it('creates a page sending position and buttons in the payload', async () => {

@@ -29,6 +29,12 @@ type pageInput struct {
 	Buttons  []page.Button `json:"buttons"`
 }
 
+// pageListItem wraps a page with its total decision count for list responses.
+type pageListItem struct {
+	*page.Page
+	DecisionsCount int64 `json:"DecisionsCount"`
+}
+
 func (h *PageHandler) List(c *gin.Context) {
 	contextID := c.GetString("context_id")
 	if contextID == "" {
@@ -42,7 +48,18 @@ func (h *PageHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"pages": pages, "total": len(pages)})
+	counts, err := h.repo.DecisionCountsByContext(contextID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	items := make([]pageListItem, 0, len(pages))
+	for _, p := range pages {
+		items = append(items, pageListItem{Page: p, DecisionsCount: counts[p.ID]})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"pages": items, "total": len(items)})
 }
 
 func (h *PageHandler) Get(c *gin.Context) {

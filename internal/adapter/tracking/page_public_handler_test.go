@@ -95,6 +95,9 @@ func (r *fakePagePublicRepo) DecisionCounts(pageID string) (map[string]int64, er
 	}
 	return counts, nil
 }
+func (r *fakePagePublicRepo) DecisionCountsByContext(contextID string) (map[string]int64, error) {
+	return map[string]int64{}, nil
+}
 
 // --- fake contact repo (implements ct.Repository) ---
 

@@ -13,4 +13,7 @@ type Repository interface {
 	RecordDecision(d *Decision) error
 	ListDecisions(pageID string, offset, limit int) ([]*Decision, int64, error)
 	DecisionCounts(pageID string) (map[string]int64, error)
+	// DecisionCountsByContext returns total decision counts per page for a
+	// context (pages with no decisions are absent from the map).
+	DecisionCountsByContext(contextID string) (map[string]int64, error)
 }

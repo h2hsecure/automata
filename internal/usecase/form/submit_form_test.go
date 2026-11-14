@@ -36,6 +36,9 @@ func (r *submitTestRepo) DeleteSubmission(id string) error { return nil }
 func (r *submitTestRepo) GetSubmission(id string) (*domain.Submission, error) {
 	return nil, nil
 }
+func (r *submitTestRepo) SubmissionCountsByContext(contextID string) (map[string]int64, error) {
+	return nil, nil
+}
 
 type fakeResolver struct {
 	calls  []string

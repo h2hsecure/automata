@@ -89,6 +89,12 @@ type SubmitFormBody struct {
 	VisitorID string                 `json:"visitor_id"`
 }
 
+// formListItem wraps a form with its submission count for list responses.
+type formListItem struct {
+	*form.Form
+	SubmissionsCount int64 `json:"SubmissionsCount"`
+}
+
 func (h *FormHandler) List(c *gin.Context) {
 	contextID := c.GetString("context_id")
 	if contextID == "" {
@@ -102,7 +108,18 @@ func (h *FormHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"forms": forms})
+	counts, err := h.repo.SubmissionCountsByContext(contextID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	items := make([]formListItem, 0, len(forms))
+	for _, f := range forms {
+		items = append(items, formListItem{Form: f, SubmissionsCount: counts[f.ID]})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"forms": items})
 }
 
 func (h *FormHandler) Get(c *gin.Context) {

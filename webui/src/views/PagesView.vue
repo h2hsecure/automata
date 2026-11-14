@@ -48,7 +48,7 @@ const columns = [
   { key: 'title', label: 'Title' },
   { key: 'url', label: 'Public URL' },
   { key: 'position', label: 'Position' },
-  { key: 'buttons', label: 'Buttons' },
+  { key: 'DecisionsCount', label: 'Clicks' },
   { key: 'status', label: 'Status' },
   { key: 'updated_at', label: 'Updated' },
   { key: 'actions', label: 'Actions', width: '130px' },
@@ -205,9 +205,6 @@ onMounted(loadPages)
         <template #position="{ row }: { row: Page }">
           <Badge v-if="row.Position" variant="info">{{ row.Position }}</Badge>
           <span v-else class="text-muted-foreground">—</span>
-        </template>
-        <template #buttons="{ row }: { row: Page }">
-          {{ row.Buttons?.length || 0 }} buttons
         </template>
         <template #status="{ row }: { row: Page }">
           <Badge :variant="row.IsActive ? 'success' : 'default'">
