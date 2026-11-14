@@ -57,6 +57,7 @@ unauthenticated.
 | `/api/auth/*` | login, `me`, profile, password change, logout-all (no context) |
 | `/api/admin/*` | admin-authenticated tenant/context/CRUD routes |
 | `/api/mcp` | MCP streamable HTTP (stateless POST); `/api/mcp-skill.md` (auth) |
+| `/api/webui/mcp-skill.md` | same skill file, for the Web UI (session cookie via BFF; external agents use `/api/mcp-skill.md` with an API key) |
 | `/api/context/...` | context-resolved routes (forms, email, settings, …) |
 | `/api/form/*path`, `/api/snippet/*path`, `/api/static/*path` | `adapter/proxy` — **placeholder stubs** (see Gaps) |
 

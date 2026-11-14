@@ -55,6 +55,28 @@ var _ = Describe("NewServer contact import/export/tag routes", func() {
 	})
 })
 
+// The MCP skill file is served at two paths with different credential models:
+//   /api/mcp-skill.md       — direct to the API engine (Bearer API key; external agents)
+//   /api/webui/mcp-skill.md — via the BFF (session cookie → injected JWT; the Web UI)
+// The Web UI only ever holds a session cookie, and the ingress routes the BFF
+// catch-all for /api/* except the two Exact-match MCP bypass paths, so the SPA
+// must use the webui path. Both are registered on the engine.
+var _ = Describe("NewServer MCP skill file routes", func() {
+	var engine *gin.Engine
+
+	BeforeEach(func() {
+		engine = newTestServer()
+	})
+
+	It("registers the API-key path /api/mcp-skill.md", func() {
+		Expect(routeExists(engine, "GET", "/api/mcp-skill.md")).To(BeTrue())
+	})
+
+	It("registers the Web UI path /api/webui/mcp-skill.md", func() {
+		Expect(routeExists(engine, "GET", "/api/webui/mcp-skill.md")).To(BeTrue())
+	})
+})
+
 // gin >= 1.12 no longer auto-maps HEAD to GET, so the public health endpoint
 // is registered for both methods (same fix as the tracking server, b2746ec).
 var _ = Describe("NewServer health route", func() {

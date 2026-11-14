@@ -306,9 +306,12 @@ export async function fetchApiDocs(which: 'swagger' | 'swagger-public'): Promise
   return response.data as string
 }
 
-// MCP skill file (auth required — same as the MCP endpoint itself)
+// MCP skill file. Fetched through the BFF-routed path: the SPA only holds a
+// session cookie (the BFF injects the JWT). The /api/mcp-skill.md path is
+// reserved for external agents authenticating with a Bearer API key — the
+// ingress routes it straight to the API engine, where a cookie is useless.
 export async function fetchMcpSkill(): Promise<string> {
-  const response = await client.get('/mcp-skill.md', { responseType: 'text' })
+  const response = await client.get('/webui/mcp-skill.md', { responseType: 'text' })
   return response.data as string
 }
 

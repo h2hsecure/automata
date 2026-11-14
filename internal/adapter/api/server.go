@@ -211,9 +211,17 @@ func NewServer(
 		PageRepo:      pageRepo,
 	}
 	api.POST("/mcp", gin.WrapH(mcpadapter.NewHandler(mcpDeps)))
-	api.GET("/mcp-skill.md", middleware.AuthMiddleware(authService), func(c *gin.Context) {
+	// The skill file is served at two paths with different credential models.
+	// /mcp-skill.md is reached directly by external agents with a Bearer API
+	// key (the ingress bypasses the BFF for it, because the BFF strips client
+	// Authorization headers). The Web UI only holds a session cookie, so it
+	// uses /webui/mcp-skill.md, which the BFF proxies with the injected session
+	// JWT. Both land on this same handler behind AuthMiddleware.
+	skillFile := func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/markdown", []byte(mcpadapter.SkillMD))
-	})
+	}
+	api.GET("/mcp-skill.md", middleware.AuthMiddleware(authService), skillFile)
+	api.GET("/webui/mcp-skill.md", middleware.AuthMiddleware(authService), skillFile)
 
 	// Context-resolved routes (forms, snippets, static assets).
 	// RequireContextMembership runs after ContextResolver: it rejects requests

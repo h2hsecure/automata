@@ -292,6 +292,29 @@ var _ = Describe("MCP wiring (full engine)", func() {
 		Expect(w.Header().Get("Content-Type")).To(HavePrefix("text/markdown"))
 		Expect(w.Body.String()).To(ContainSubstring("Automata MCP"))
 	})
+
+	// The Web UI reaches the skill file via /api/webui/mcp-skill.md, which the
+	// BFF proxies with the injected session JWT (the ingress bypasses the BFF
+	// only for the Exact /api/mcp and /api/mcp-skill.md paths, so a cookie-only
+	// SPA fetch of the latter 401'd in prod). The engine serves both paths
+	// behind AuthMiddleware; here we exercise it with an API key, as the BFF
+	// would with the injected JWT.
+	It("requires auth for GET /api/webui/mcp-skill.md", func() {
+		req := httptest.NewRequest("GET", "/api/webui/mcp-skill.md", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusUnauthorized))
+	})
+
+	It("serves the skill file at /api/webui/mcp-skill.md with a valid credential", func() {
+		req := httptest.NewRequest("GET", "/api/webui/mcp-skill.md", bytes.NewBuffer(nil))
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(w.Header().Get("Content-Type")).To(HavePrefix("text/markdown"))
+		Expect(w.Body.String()).To(ContainSubstring("Automata MCP"))
+	})
 })
 
 var _ = Describe("MCP contacts tools", func() {
